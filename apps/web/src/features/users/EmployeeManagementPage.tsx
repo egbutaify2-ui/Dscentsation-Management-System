@@ -49,26 +49,29 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
   const [invitation, setInvitation] = useState<InvitationResult | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const loadEmployees = useCallback(async (
-    query: string,
-    roleValue: 'all' | 'MANAGER' | 'STAFF',
-    statusValue: 'all' | Employee['status'],
-  ) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (query.trim()) params.set('q', query.trim());
-      if (roleValue !== 'all') params.set('role', roleValue);
-      if (statusValue !== 'all') params.set('status', statusValue);
-      const path = `/users${params.size ? `?${params.toString()}` : ''}`;
-      setEmployees(await api.get<Employee[]>(path));
-    } catch (loadError) {
-      setError(errorMessage(loadError));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loadEmployees = useCallback(
+    async (
+      query: string,
+      roleValue: 'all' | 'MANAGER' | 'STAFF',
+      statusValue: 'all' | Employee['status'],
+    ) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        if (query.trim()) params.set('q', query.trim());
+        if (roleValue !== 'all') params.set('role', roleValue);
+        if (statusValue !== 'all') params.set('status', statusValue);
+        const path = `/users${params.size ? `?${params.toString()}` : ''}`;
+        setEmployees(await api.get<Employee[]>(path));
+      } catch (loadError) {
+        setError(errorMessage(loadError));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     void loadEmployees('', 'all', 'all');
@@ -108,20 +111,21 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
 
   async function updateStatus(employee: Employee) {
     const nextStatus = employee.status === 'active' ? 'suspended' : 'active';
-    const message = nextStatus === 'suspended'
-      ? `Suspend ${employee.displayName}? All of their active sessions will be revoked immediately.`
-      : `Reactivate ${employee.displayName}? They will need to sign in again.`;
+    const message =
+      nextStatus === 'suspended'
+        ? `Suspend ${employee.displayName}? All of their active sessions will be revoked immediately.`
+        : `Reactivate ${employee.displayName}? They will need to sign in again.`;
     if (!window.confirm(message)) return;
     setSaving(true);
     setError(null);
     setNotice(null);
     try {
-      await api.patch(
-        `/users/${employee.id}/status`,
-        { status: nextStatus },
-        await getCsrfToken(),
+      await api.patch(`/users/${employee.id}/status`, { status: nextStatus }, await getCsrfToken());
+      setNotice(
+        nextStatus === 'suspended'
+          ? 'Employee suspended and active sessions revoked.'
+          : 'Employee reactivated. Previous sessions remain revoked.',
       );
-      setNotice(nextStatus === 'suspended' ? 'Employee suspended and active sessions revoked.' : 'Employee reactivated. Previous sessions remain revoked.');
       await loadEmployees(search, roleFilter, statusFilter);
     } catch (actionError) {
       setError(errorMessage(actionError));
@@ -131,7 +135,12 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
   }
 
   async function revokeSessions(employee: Employee) {
-    if (!window.confirm(`Revoke every active session for ${employee.displayName}? They will need to sign in again.`)) return;
+    if (
+      !window.confirm(
+        `Revoke every active session for ${employee.displayName}? They will need to sign in again.`,
+      )
+    )
+      return;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -150,16 +159,17 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
   }
 
   async function revokeInvitation(employee: Employee) {
-    if (!window.confirm(`Revoke the pending setup invitation for ${employee.displayName}? The current link will stop working.`)) return;
+    if (
+      !window.confirm(
+        `Revoke the pending setup invitation for ${employee.displayName}? The current link will stop working.`,
+      )
+    )
+      return;
     setSaving(true);
     setError(null);
     setNotice(null);
     try {
-      await api.post(
-        `/users/${employee.id}/invitation/revoke`,
-        {},
-        await getCsrfToken(),
-      );
+      await api.post(`/users/${employee.id}/invitation/revoke`, {}, await getCsrfToken());
       setNotice('Pending invitation revoked.');
       await loadEmployees(search, roleFilter, statusFilter);
     } catch (actionError) {
@@ -187,40 +197,66 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
           <p className="eyebrow">ACCOUNT ADMINISTRATION</p>
           <h1>Employees</h1>
           <p className="muted-copy">
-            Manage individual Manager and Staff accounts. Invitations are delivered manually
-            using the official Dscentsation company email identity.
+            Manage individual Manager and Staff accounts. Invitations are delivered manually using
+            the official Dscentsation company email identity.
           </p>
         </div>
         {canManage && (
-          <button className="primary-button employee-primary-action" onClick={() => {
-            setInvitation(null);
-            setError(null);
-            setInviteOpen((open) => !open);
-          }}>
+          <button
+            className="primary-button employee-primary-action"
+            onClick={() => {
+              setInvitation(null);
+              setError(null);
+              setInviteOpen((open) => !open);
+            }}
+          >
             {inviteOpen ? 'Close invitation' : 'Invite employee'}
           </button>
         )}
       </div>
 
-      {error && <p className="employee-alert error" role="alert">{error}</p>}
-      {notice && <p className="employee-alert success" role="status">{notice}</p>}
+      {error && (
+        <p className="employee-alert error" role="alert">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="employee-alert success" role="status">
+          {notice}
+        </p>
+      )}
 
       {invitation && (
-        <section className="employee-card invitation-result" aria-labelledby="invitation-created-title">
+        <section
+          className="employee-card invitation-result"
+          aria-labelledby="invitation-created-title"
+        >
           <div>
             <p className="eyebrow">ONE-TIME SETUP LINK</p>
-            <h2 id="invitation-created-title">Invitation created for {invitation.employee.displayName}</h2>
+            <h2 id="invitation-created-title">
+              Invitation created for {invitation.employee.displayName}
+            </h2>
             <p>
-              This link is shown only in this successful creation response. Deliver it securely
-              from the official Dscentsation company email identity. DMS does not send invitations automatically.
+              This link is shown only in this successful creation response. Deliver it securely from
+              the official Dscentsation company email identity. DMS does not send invitations
+              automatically.
             </p>
             <p className="employee-expiry">Expires: {dateLabel(invitation.expiresAt)}</p>
           </div>
           <label className="employee-link-field">
             Invitation URL
-            <input aria-label="One-time invitation URL" readOnly value={invitation.setupUrl} onFocus={(event) => event.currentTarget.select()} />
+            <input
+              aria-label="One-time invitation URL"
+              readOnly
+              value={invitation.setupUrl}
+              onFocus={(event) => event.currentTarget.select()}
+            />
           </label>
-          <button className="secondary-button" type="button" onClick={() => void copyInvitationLink()}>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => void copyInvitationLink()}
+          >
             {copied ? 'Copied' : 'Copy invitation link'}
           </button>
           <p className="employee-warning">
@@ -230,7 +266,10 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
       )}
 
       {inviteOpen && canManage && (
-        <section className="employee-card employee-invite-card" aria-labelledby="invite-employee-title">
+        <section
+          className="employee-card employee-invite-card"
+          aria-labelledby="invite-employee-title"
+        >
           <div className="employee-card-heading">
             <div>
               <p className="eyebrow">NEW ACCOUNT</p>
@@ -241,27 +280,49 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
             <div className="employee-form-grid">
               <label>
                 Employee name
-                <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} required maxLength={120} />
+                <input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  required
+                  maxLength={120}
+                />
               </label>
               <label>
                 Company email address
-                <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required maxLength={254} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  maxLength={254}
+                />
               </label>
               <label>
                 Role
-                <select value={role} onChange={(event) => setRole(event.target.value as 'MANAGER' | 'STAFF')}>
+                <select
+                  value={role}
+                  onChange={(event) => setRole(event.target.value as 'MANAGER' | 'STAFF')}
+                >
                   <option value="STAFF">Staff</option>
                   <option value="MANAGER">Manager</option>
                 </select>
               </label>
             </div>
             <p className="employee-hint">
-              The employee sets their own password using the secure, single-use link. Expiry defaults to 24 hours.
-              Send the link manually from the official company email identity.
+              The employee sets their own password using the secure, single-use link. Expiry
+              defaults to 24 hours. Send the link manually from the official company email identity.
             </p>
             <div className="employee-form-actions">
-              <button className="secondary-button" type="button" onClick={() => setInviteOpen(false)}>Cancel</button>
-              <button className="primary-button" type="submit" disabled={saving}>{saving ? 'Creating…' : 'Create invitation'}</button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setInviteOpen(false)}
+              >
+                Cancel
+              </button>
+              <button className="primary-button" type="submit" disabled={saving}>
+                {saving ? 'Creating…' : 'Create invitation'}
+              </button>
             </div>
           </form>
         </section>
@@ -278,11 +339,19 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
         <form className="employee-filters" onSubmit={(event) => void submitSearch(event)}>
           <label>
             Search name or email
-            <input value={search} onChange={(event) => setSearch(event.target.value)} maxLength={100} placeholder="Search employees" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              maxLength={100}
+              placeholder="Search employees"
+            />
           </label>
           <label>
             Role
-            <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as typeof roleFilter)}>
+            <select
+              value={roleFilter}
+              onChange={(event) => setRoleFilter(event.target.value as typeof roleFilter)}
+            >
               <option value="all">All roles</option>
               <option value="MANAGER">Manager</option>
               <option value="STAFF">Staff</option>
@@ -290,7 +359,10 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
           </label>
           <label>
             Account status
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+            >
               <option value="all">All statuses</option>
               <option value="active">Active</option>
               <option value="invited">Invited</option>
@@ -298,11 +370,15 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
               <option value="disabled">Disabled</option>
             </select>
           </label>
-          <button className="search-button" type="submit">Apply filters</button>
+          <button className="search-button" type="submit">
+            Apply filters
+          </button>
         </form>
 
         {loading ? (
-          <div className="employee-state" role="status">Loading employee accounts…</div>
+          <div className="employee-state" role="status">
+            Loading employee accounts…
+          </div>
         ) : employees.length === 0 ? (
           <div className="employee-state">
             <strong>No employee accounts found</strong>
@@ -324,25 +400,60 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
               <tbody>
                 {employees.map((employee) => (
                   <tr key={employee.id}>
-                    <td><strong>{employee.displayName}</strong><small>{employee.email}</small></td>
+                    <td>
+                      <strong>{employee.displayName}</strong>
+                      <small>{employee.email}</small>
+                    </td>
                     <td>{employee.roleName}</td>
-                    <td><span className={`employee-status ${employee.status}`}>{employee.status}</span></td>
+                    <td>
+                      <span className={`employee-status ${employee.status}`}>
+                        {employee.status}
+                      </span>
+                    </td>
                     <td>{dateLabel(employee.createdAt)}</td>
                     <td>{dateLabel(employee.lastLoginAt)}</td>
                     {canManage && (
                       <td>
                         <div className="employee-actions">
                           {employee.status === 'active' && (
-                            <button type="button" className="table-link-button" disabled={saving} onClick={() => void updateStatus(employee)}>Suspend</button>
+                            <button
+                              type="button"
+                              className="table-link-button"
+                              disabled={saving}
+                              onClick={() => void updateStatus(employee)}
+                            >
+                              Suspend
+                            </button>
                           )}
                           {employee.status === 'suspended' && (
-                            <button type="button" className="table-link-button" disabled={saving} onClick={() => void updateStatus(employee)}>Reactivate</button>
+                            <button
+                              type="button"
+                              className="table-link-button"
+                              disabled={saving}
+                              onClick={() => void updateStatus(employee)}
+                            >
+                              Reactivate
+                            </button>
                           )}
                           {employee.status === 'invited' && (
-                            <button type="button" className="table-link-button danger-link" disabled={saving} onClick={() => void revokeInvitation(employee)}>Revoke invite</button>
+                            <button
+                              type="button"
+                              className="table-link-button danger-link"
+                              disabled={saving}
+                              onClick={() => void revokeInvitation(employee)}
+                            >
+                              Revoke invite
+                            </button>
                           )}
                           {employee.status !== 'invited' && (
-                            <button type="button" className="table-link-button" disabled={saving} onClick={() => void revokeSessions(employee)}>Revoke sessions</button>
+                            <button
+                              type="button"
+                              className="table-link-button"
+                              disabled={saving}
+                              onClick={() => void revokeSessions(employee)}
+                            >
+                              Revoke sessions
+                            </button>
                           )}
                         </div>
                       </td>
