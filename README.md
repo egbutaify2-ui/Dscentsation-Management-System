@@ -346,6 +346,7 @@ This checklist is the project's shared progress record. It is intended to help f
 - [x] Confirm products will be entered manually; no bulk website catalogue import.
 - [x] Create the public GitHub repository.
 - [x] Establish this central README and project progress checklist.
+- [x] Document and independently review the Sheraton-to-Warehouse stock pickup workflow, separate Warehouse and Sheraton stock balances, restricted Staff pickup permissions and ADR-016 security boundaries (Task 002; merged PRs #3 and #4).
 - [ ] Verify the current company email provider's supported SMTP/API sending method and requirements.
 - [ ] Identify and name the actual stock locations and their operating processes.
 - [ ] Agree the detailed role/permission matrix and approval limits.
@@ -480,13 +481,13 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 ### Current project position
 
-**Completed:** Business discovery, core requirements, product scope decisions, public repository creation and initial project documentation.
+**Completed:** Business discovery, core requirements, product scope decisions, public repository creation, initial project documentation and Task 002 architecture work for the Sheraton-to-Warehouse pickup workflow (ADR-016), independently reviewed and merged in PRs #3 and #4.
 
-**Current task:** Establish the technical architecture and detailed implementation plan.
+**Current task:** Resolve the remaining architecture decisions and continue implementation planning. Task 002 and its approved pickup architecture are complete, but overall technical architecture approval and deployment plan approval remain pending.
 
-**Not yet implemented:** The application, database, authentication, dashboard, business modules, integrations and deployment.
+**Not yet implemented:** No database has been provisioned. The application, authentication, dashboard, business modules, integrations and deployment have not been implemented.
 
-**Next development task:** Review the proposed architecture, choose the repository structure, define the database boundaries and agree the implementation sequence before application code is introduced.
+**Next development task:** Resolve the remaining architecture decisions, confirm the repository structure and database boundaries, and agree the implementation sequence before application code is introduced.
 
 ## Working agreement
 
