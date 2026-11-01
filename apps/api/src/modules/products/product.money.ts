@@ -1,13 +1,15 @@
+import { invalid } from './product.errors.js';
+
 const MAX_BIGINT = 9_223_372_036_854_775_807n;
-const MONEY_PATTERN = /^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$/;
+const MONEY_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
 
 export function toMinorUnits(amount: string): string {
   if (!MONEY_PATTERN.test(amount)) {
-    throw new Error('Enter a non-negative amount with no more than two decimal places.');
+    throw invalid('Enter a non-negative amount with no more than two decimal places.');
   }
   const [whole, fraction = ''] = amount.split('.');
   const minor = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
-  if (minor > MAX_BIGINT) throw new Error('The amount is too large.');
+  if (minor > MAX_BIGINT) throw invalid('The amount is too large.');
   return minor.toString();
 }
 
