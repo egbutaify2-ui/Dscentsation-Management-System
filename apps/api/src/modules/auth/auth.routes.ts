@@ -228,4 +228,4 @@ router.get('/capabilities', requireAuthentication, (request, response) => {
   });
 });
 
-export const authRoutes = router;
+export const authRoutes: Router = router;
