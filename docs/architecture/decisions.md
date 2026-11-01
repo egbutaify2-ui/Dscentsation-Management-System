@@ -1,7 +1,8 @@
 # Dscentsation Management System — Architecture Decisions
 
-**Document status:** Implementation-aware architecture decisions for project-manager review  
-**Task:** 002 — Technical Architecture, reconciled against Task 005  
+**Document status:** Implementation-aware architecture decisions for project-manager review
+**Task:** 002 — Technical Architecture, reconciled against Task 005
+
 **Decision rule:** Each ADR's status controls its approval state. Only decisions explicitly marked Confirmed are treated as accepted; an implementation detail appearing in the codebase does not by itself change an ADR's status.
 
 This document records the rationale for architecture decisions, preserves existing approval statuses and distinguishes confirmed product constraints, proposed target design and implementation choices adopted in the codebase. Task 005 was approved and merged through PR #7; that merge did not approve the whole target architecture or the unimplemented business modules.
