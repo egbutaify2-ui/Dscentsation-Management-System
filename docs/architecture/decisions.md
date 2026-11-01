@@ -129,7 +129,7 @@ Track physical on-hand/reserved balances per (location_id, product_variant_id), 
 
 A transfer dispatch transaction decreases source on-hand and increases in-transit quantity. A Staff user assigned to the destination location must confirm receipt; the receipt transaction decreases in-transit and increases destination on-hand. Partial receipts leave the remainder in transit. Discrepancies require attributed resolution.
 
-On order confirmation, reserve the required quantity immediately from the order's single selected fulfilment location, whether the order is unpaid, partially paid or paid. A persisted reservation_policies record controls whether expiry is enabled, its duration and its eligibility scope. Each new reservation snapshots its expiry timestamp and policy version.
+On order confirmation, reserve the required quantity immediately from the order's single selected fulfilment location, whether the order is unpaid, partially paid or paid. A persisted, versioned reservation_policies record controls whether expiry is enabled, its duration and its eligibility scope. Every policy edit creates a new immutable version for future reservations. Each reservation stores a foreign key to the policy version used, its expiry timestamp and that policy version; the expiry worker evaluates eligibility against the referenced version, so configuration changes do not retroactively alter existing reservations.
 
 **Why**
 
