@@ -1,0 +1,120 @@
+name: DMS CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+      - task-005-application-foundation
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality, migration, API tests and production builds
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: dms_test
+          POSTGRES_PASSWORD: dms_test
+          POSTGRES_DB: dms_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dms_test -d dms_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://dms_test:dms_test@localhost:5432/dms_test
+      DATABASE_SSL: "false"
+      SESSION_SECRET: ci-only-random-looking-secret-value-long-enough
+      SESSION_IDLE_TIMEOUT_MINUTES: "30"
+      SESSION_ABSOLUTE_TIMEOUT_HOURS: "12"
+      COOKIE_SECURE: "false"
+      TRUST_PROXY: "false"
+      APP_ORIGIN: http://localhost:5173
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 26.13.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+          run_install: false
+
+      - name: Install frozen workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Run ESLint
+        run: pnpm lint
+
+      - name: Run TypeScript checks
+        run: pnpm typecheck
+
+      - name: Confirm API refuses to start before foundation migrations
+        shell: bash
+        run: |
+          if pnpm --filter @dms/api exec tsx src/server.ts > /tmp/dms-pre-migration.log 2>&1; then
+            cat /tmp/dms-pre-migration.log
+            echo "The API unexpectedly started without the foundation schema."
+            exit 1
+          fi
+          cat /tmp/dms-pre-migration.log
+          grep -F "Required foundation tables are missing" /tmp/dms-pre-migration.log
+
+      - name: Apply migrations to the clean disposable PostgreSQL database
+        run: pnpm db:migrate
+
+      - name: Verify all foundation tables, role seeds, permissions and idempotent seeding
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-foundation.sql
+
+      - name: Verify rollback removes the foundation schema in the disposable database
+        shell: bash
+        run: |
+          pnpm db:rollback
+          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs')")"
+          if [ "$remaining" != "0" ]; then
+            echo "Rollback left $remaining foundation tables behind."
+            exit 1
+          fi
+          echo "Rollback removed all eight foundation tables."
+
+      - name: Reapply migrations and reverify the foundation schema
+        run: |
+          pnpm db:migrate
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-foundation.sql
+
+      - name: Run API integration and security tests
+        run: pnpm --filter @dms/api test
+
+      - name: Run frontend tests
+        run: pnpm --filter @dms/web test
+
+      - name: Run complete workspace test command
+        run: pnpm test
+
+      - name: Build API and frontend for production
+        run: pnpm build
+
+      - name: Check patch whitespace
+        run: git diff --check
