@@ -1,0 +1,574 @@
+# DMS Task 009 — Inventory Implementation Readiness & Decision Pack
+
+**Document status:** Task 009 documentation deliverable; pending independent project-manager/business-owner review
+**Implementation status:** Inventory feature implementation has not started
+**Evidence baseline:** adb0258d463d6337d99f76ef1bb7d7abf5749b21
+**Scope:** Readiness assessment and decision worksheet only. This document does not approve, implement or provision inventory functionality.
+
+## 1. Purpose and current project position
+
+This pack establishes the verified repository baseline and the decisions required before Dscentsation begins its next major phase: multi-location inventory and stock management. It separates executable database/code evidence from conceptual architecture entities and confirmed business rules.
+
+The assessment is based on the required starting commit, which is also the observed main HEAD at inspection time. Tasks 007 (Product Management, PR #9) and 008 (Employee Account Administration, PR #10) are merged. The Task 008 merge commit is a582a55b81d253fa84feb29a81932ec7843a2d97. The required baseline includes the post-merge documentation reconciliation.
+
+Task 009 is deliberately a readiness task. It does not authorise inventory feature work. No inventory migration, API, UI, balance calculation, opening-stock record, location record or employee assignment is introduced by this pack. The project manager/business owner must answer the worksheet, record the approval evidence in the appropriate project records, and independently review the implementation plan before inventory development is authorised.
+
+**Current implementation position:** the repository contains the application foundation, Product Management and Employee Account Administration. It has physical location and location-access tables plus reusable access-check helpers, but does not yet contain an executable inventory domain. Product variants exist and are ready to be referenced by a future inventory model; stock balances and stock history do not.
+
+## 2. Verified existing implementation
+
+### 2.1 Migration and database evidence
+
+The complete migration directory at the evidence baseline contains exactly three migration files:
+
+| Migration | Executable result |
+|---|---|
+| **001_initial_foundation.js** | Eight foundation tables: **roles**, **permissions**, **role_permissions**, **users**, **locations**, **user_location_access**, **user_sessions** and **audit_logs**. |
+| **002_product_management.js** | Three product tables: **product_categories**, **products** and **product_variants**. |
+| **003_employee_account_administration.js** | One new table, **user_invitations**, plus the invited user status and last-active-Owner / no-hard-delete protections. |
+
+There are twelve physical application tables after the three migrations. No migration creates inventory balances, stock movements, reservations, reservation policies, transfer headers/items, pickup/receipt events, in-transit balances, stock counts or reconciliation records.
+
+The existing **locations** table stores a location code, name, optional address/contact fields, active state and timestamps. The existing **user_location_access** table stores a user/location assignment and the user who granted it. **Neither table is seeded with real physical locations or Staff assignments.** The foundation migration explicitly avoids inventing or seeding locations.
+
+The existing **audit_logs** table has database triggers rejecting UPDATE, DELETE and TRUNCATE. It is an audit foundation, not a stock movement ledger. The existence of the location and audit tables does not mean that inventory operations are implemented.
+
+### 2.2 Existing location and permission code
+
+The executable code already provides the following reusable foundations:
+
+- **canAccessStockLocation** grants Owner and Manager global location access and checks an active **user_location_access** assignment for Staff.
+- **requireStockLocationAccess** is available as backend middleware for a location-scoped API action.
+- **canUseWarehouseSheratonPickup** is a narrow authorisation helper. It checks the Staff role, the dedicated pickup permission, the configured Warehouse source, a configured Sheraton destination and the Staff member's assignment to that destination. Its source comment states that canonical location IDs must come from trusted configuration and that the foundation does not invent or seed physical locations.
+- **requirePermission** enforces seeded permission codes on the backend.
+
+These are access-control primitives, not location administration or stock-transfer functionality. There is no API route to create/edit/deactivate locations or grant/revoke employee location assignments. The API application currently mounts authentication, user administration and Product Management routes; it does not mount an inventory or location-administration module. The web feature tree has authentication, dashboard, products and users features; it has no inventory or locations feature.
+
+The foundation migration seeds four permission codes: **payments.record**, **payments.verify**, **inventory.transfer.receive_destination_assigned** and **inventory.transfer.pickup_warehouse_to_assigned_sheraton**. The two inventory codes are capability seeds only; no corresponding transfer/receipt workflow exists. Staff receives the two narrow inventory action permissions. The Manager/Owner global location access rule is implemented in the access helper, not by assigning every location to those roles.
+
+Task 007 adds six **products.*** permissions to Owner only. Task 008 adds **users.view** and **users.manage** to Owner only. Those product/user permissions do not settle the complete module permission matrix: DMS-DEC-002 remains pending.
+
+### 2.3 Product and variant implementation
+
+Task 007 implements manual product categories, products and variants, including:
+
+- Product/category create, read, update and archive/deactivate operations through authenticated API routes.
+- Product and variant validation in the API boundary.
+- Parameterised SQL and transaction-backed service operations.
+- Actor-attributed audit events for product/category/variant lifecycle changes.
+- Product and variant database integrity controls, including no hard delete, no variant reparenting, and exactly one default variant per product.
+- A product is created together with its initial variant. A product with no meaningful real-world variants can therefore use its single default variant as the stockable item key.
+
+The implemented variant fields include unit of measure, SKU where used, current selling price, current cost price, currency, active state and default-variant state. There is no stock quantity on the product or variant, no cost-price history, and no inventory valuation calculation.
+
+### 2.4 API, frontend, tests and delivery conventions
+
+The repository is a pnpm workspace with separate React web and Node.js/Express API applications. The API uses TypeScript, Express, versioned JSON routes under /api/v1, Zod request validation, authentication/permission middleware, explicit parameterised PostgreSQL SQL through pg, and node-pg-migrate migrations. No ORM is present in the implemented foundation.
+
+Product and employee services use transaction wrappers and write audit events in the same transaction as the protected business change. API tests use Vitest, Supertest and disposable PostgreSQL; frontend tests use Vitest and React Testing Library. The GitHub Actions workflow checks formatting, ESLint, TypeScript, migrations/schema seeds, API integration/security tests, frontend tests, workspace tests and production builds.
+
+No production database, inventory worker, production inventory service, stock data store, or stock-specific infrastructure is evidenced by these migrations and application modules. CI's PostgreSQL instance is disposable test infrastructure with synthetic records, not a production database.
+
+### 2.5 Executable implementation matrix
+
+| Capability | Verified status at the baseline | Evidence / boundary |
+|---|---|---|
+| Location records | **Table exists; no real records seeded.** | Migration 001 creates locations; no location seed. |
+| Staff location assignments | **Table and read-time access checks exist; no assignments seeded and no administration workflow.** | Migration 001, location-access.service.ts; no location/user assignment routes or UI. |
+| Product records | **Implemented.** | Migration 002 and Product Management API/UI. |
+| Product variants | **Implemented.** | Migration 002 and Product Management API/UI; one default variant is enforced. |
+| Inventory balances | **Not implemented.** | No migration/table or production balance calculation. |
+| Stock movement ledger | **Not implemented.** | audit_logs is not a stock ledger; no stock movement table or workflow. |
+| Stock reservations | **Not implemented.** | No reservation table, service, policy or expiry worker. |
+| Reservation policies | **Not implemented.** | Versioning and policy persistence are conceptual requirements only. |
+| Stock transfers | **Not implemented.** | No transfer tables, endpoints, services or UI. |
+| Pickup and destination receipt events | **Not implemented.** | Only narrowly scoped permission/access helper foundations exist; no event tables or movement workflows. |
+| Stock counts and reconciliation | **Not implemented.** | No count/count-item tables, API, UI or reconciliation process. |
+
+### 2.6 What the architecture documents describe but PostgreSQL does not yet contain
+
+The database design describes a target inventory model, including **inventory_balances**, **stock_movements**, **stock_reservations**, **reservation_policies**, **stock_transfers**, **stock_transfer_items**, pickup event/item tables, receipt event/item tables, discrepancy events, **stock_in_transit_balances**, **stock_counts** and **stock_count_items**. These are **conceptual entities only**. They are not present in the three migrations and must not be reported as existing tables.
+
+The same distinction applies to conceptual orders and order items referenced by reservations. The order, customer and procurement schemas are not physically migrated either. Inventory cannot be integrated with an executable order workflow until those dependencies are designed and implemented in their approved sequence.
+
+## 3. Confirmed inventory business rules
+
+The following requirements are confirmed and must be preserved. They are not reopened by Task 009.
+
+### 3.1 Product and stock identity
+
+- Products are created and maintained manually inside DMS.
+- No website catalogue import, scraping or synchronisation is in scope.
+- Inventory is keyed by product variant and physical stock location.
+- Every product must retain one default variant. Where there is no meaningful variant distinction, that default variant remains the consistent stockable key.
+- Warehouse and Sheraton remain separate physical stock locations and separate balances.
+
+### 3.2 Stock accounting
+
+- **On-hand** is the physical quantity recorded at a location.
+- **Reserved** is quantity committed to confirmed orders but not yet dispatched.
+- **Available** is on-hand less reserved.
+- Stock in transit is separate from the physical balances and is not available at either the source or destination location.
+- A stock operation must not silently cause physical on-hand to become negative.
+- A reservation must not exceed available quantity at the selected fulfilment location.
+- Critical changes to stock, reservations and transfers require database transactions, concurrency protection and attributable audit events.
+- The stock movement ledger is the historical evidence of quantity changes. Balance tables, including in-transit balances, are current-state projections maintained transactionally from those events.
+
+### 3.3 Orders and reservations
+
+- Each first-release order has exactly one fulfilment location. Cross-location split fulfilment is not supported.
+- When an order is confirmed, its required stock is reserved immediately at that one location, whether the order is unpaid, partially paid or paid.
+- A reservation cannot exceed available stock at the order's selected fulfilment location. The backend must not silently source shortages from another location.
+- Reservation expiry must be configurable and persisted. Every reservation retains the policy version and expiry applied when it was created.
+- A reservation-policy change applies to new reservations. An existing reservation retains its original policy and expiry unless an authorised, explicit change is made and audited.
+- Expiry does not cancel an order and does not reduce physical on-hand. It releases eligible reserved quantity and places the order on fulfilment hold/reconfirmation as specified by ADR-005.
+- Reservation creation, extension, release, expiry and dispatch consumption must be transactional and must not double-consume or double-release the same reservation.
+
+### 3.4 Warehouse-to-Sheraton pickup — preserve ADR-016 exactly
+
+Warehouse and Sheraton are separate physical locations. The confirmed exception is a narrow transfer action for a Staff member assigned to the destination Sheraton location. It is not a general Warehouse role or access grant.
+
+- Sheraton-assigned Staff may perform only the dedicated Warehouse-to-their-assigned-Sheraton pickup action.
+- The Staff member must not receive general Warehouse access, Warehouse balance browsing, Warehouse adjustments or unrelated Warehouse transfer-management access.
+- The backend checks Warehouse availability internally for the specific transfer items and submitted quantities. The exact Warehouse balance must not be returned or exposed to Sheraton Staff. An insufficient-stock response must not disclose the exact balance.
+- Pickup atomically reduces Warehouse on-hand and increases the transfer-item-specific in-transit quantity by the same amount.
+- Destination receipt is a separate operation performed by Staff assigned to the destination. Receipt atomically reduces in-transit and increases that destination's on-hand balance.
+- Partial pickup and partial receipt are supported. Unpicked requested quantities remain open; unreceived quantities remain in transit.
+- Pickup and receipt events preserve their individual authenticated actors and timestamps. The same person may perform both actions, but the events and attribution remain separate.
+- Idempotency prevents retries from creating duplicate pickup/receipt events or stock movements. Reusing an idempotency key with a different payload is rejected.
+- Discrepancies preserve quantity, reason, reporter and time. Unresolved discrepancies remain visible and must not be hidden by silent balance changes or transfer cancellation.
+- Picked quantity cannot be automatically expired, silently restored to Warehouse or erased by cancellation. A return must be a separately recorded reverse transfer; any other outcome requires an authorised, recorded discrepancy resolution.
+- The exact physical paperwork/reference accompanying collection is not confirmed; DMS-DEC-010 must answer that without weakening any ADR-016 control.
+
+## 4. Inventory domain entities and relationships
+
+This section distinguishes existing entities from proposed inventory entities.
+
+### 4.1 Existing physical entities reused by inventory
+
+| Existing entity | Role in the future inventory model |
+|---|---|
+| **locations** | Physical location master record. Table exists; approved Warehouse/Sheraton records are not yet supplied or seeded. |
+| **user_location_access** | Staff-to-location assignment. Table exists; assignment records and administration workflow are not present. |
+| **users**, **roles**, **permissions**, **role_permissions** | Authenticated actors and backend permission checks. Existing role/permission seed is intentionally incomplete. |
+| **audit_logs** | Append-only security/business audit foundation. Future stock commands must write attributable events transactionally. |
+| **products**, **product_variants**, **product_categories** | Manually maintained catalogue and stockable variant identity. Tables and Product Management are implemented. |
+
+### 4.2 Proposed inventory entities — not migrated
+
+| Conceptual entity | Intended responsibility and relationship |
+|---|---|
+| **Inventory balance** | One current physical projection per location and product variant, uniquely keyed by (location_id, product_variant_id); holds on-hand, reserved and any approved reorder threshold. It excludes in-transit quantity. |
+| **Stock movement** | Append-only quantity event for a physical location or transfer-specific in-transit bucket. Links the product variant, movement type, quantity delta/before/after where used, reason/reference, actor, database timestamp and idempotency key. It is the historical stock evidence. |
+| **Stock reservation** | Commitment for an order item, variant, quantity and its one fulfilment location. References the exact reservation policy version and expiry applied, plus its lifecycle/release/consumption state. |
+| **Reservation policy** | Persisted, versioned configuration for enabled/disabled expiry, duration and eligibility scope. A policy edit creates a new version for future reservations. |
+| **Stock transfer and transfer item** | Transfer header linking distinct source/destination locations, mode and lifecycle; item rows hold requested, dispatched/picked, received, cancelled and formally resolved quantities. |
+| **Pickup event and event items** | Immutable record of each physical Warehouse pickup, with source/destination, actor, timestamp, idempotency identity and product quantities. Used only for the ADR-016 destination-Staff pickup mode. |
+| **Receipt event and event items** | Separate immutable record of each destination receipt, with destination, actor, timestamp, idempotency identity, quantities received and any reported discrepancy. |
+| **Discrepancy event** | Attributed report and authorised resolution history for shortage, damage, loss or other approved transfer discrepancy. An unresolved quantity remains visible. |
+| **In-transit balance** | Current projection per transfer item, product variant, source and destination. It is reduced only by confirmed receipt or approved, recorded resolution/return. |
+| **Stock count and count item** | Physical count session scoped to a location, with system quantity, observed quantity, counter/reviewer attribution, differences and resulting approved reconciliation events. No count or reconciliation workflow currently exists. |
+
+### 4.3 Relationships and accounting boundaries
+
+A product has one or more variants; each variant can have a separate inventory balance at each physical location. The balance is not stored on the product master record.
+
+A confirmed order has one fulfilment location and order items. Each order item may create a reservation for its variant at that same location. Dispatch consumes the reservation and decreases on-hand in one transaction.
+
+A transfer has one or more transfer items. Dispatch/pickup moves quantity from the source's physical on-hand bucket into that transfer item's in-transit bucket. Receipt moves physically received quantity from in-transit into the destination's physical on-hand bucket. A discrepancy is not a receipt and does not make unaccounted quantity available.
+
+A stock movement ledger explains how the projections changed. Reconciliation must be able to compare the projections with the ledger; ordinary corrections use reversal/adjustment events, not edits to past movements.
+
+Opening stock is not present in the repository. It must be introduced only through a separately approved, attributable opening-stock process after the physical inventory has been verified. No quantities or opening movements may be fabricated to make the first balance display appear complete.
+
+## 5. Outstanding business decisions and decision worksheet
+
+All seven decisions below remain **Pending confirmation** in the existing decision register. Task 009 does not change those statuses. Each answer must be completed by the project manager/business owner with an approval source and date; a suggested option or existing schema description is not approval.
+
+### DMS-DEC-001 — Canonical physical stock locations and Staff assignments
+
+**Current status:** Pending confirmation
+
+**Already confirmed:** DMS supports multiple physical locations. Warehouse and Sheraton are distinct physical stock locations with separate balances. ADR-016 requires a configured Warehouse source, a Sheraton destination and destination Staff assignments. Owner and Manager have global stock-location access; Staff access is assignment-scoped, subject to the dedicated ADR-016 action.
+
+**Still unanswered:** The complete list of physical stock/fulfilment locations; approved names and unique codes; which records are the canonical Warehouse and Sheraton location(s); address/identifying description and operating purpose; active state; which Staff accounts are assigned to each location; and who may grant, change or revoke assignments.
+
+**Why it affects implementation:** Location IDs anchor balances, receiving, transfers, order fulfilment and every Staff location-access check. Incorrect codes or assignments can direct stock to the wrong balance or expose a location to the wrong person. ADR-016 cannot be enabled safely until the canonical source/destination and assignments are known.
+
+**Exact information / approval required:**
+
+1. Provide each initial location's approved business name, unique code, purpose/type, address or identifying description, active state and operational notes.
+2. Identify the single canonical Warehouse record used as the ADR-016 source and every approved Sheraton destination record.
+3. Identify which existing employee accounts are assigned to each location using a controlled internal reference; do not place personal employee details in this public repository.
+4. Identify the role/person authorised to grant, change and revoke an assignment, and the required reason/audit evidence.
+5. Confirm how temporary assignment changes and staff transfers between locations are authorised and recorded.
+
+**Governing sources:** README — Business context, Inventory rules and Phase 0; Architecture Overview §§4.2, 4.2.1 and 5; Database Design §§2.1–2.2; ADR-005, ADR-006 and ADR-016; Decision Register DMS-DEC-001.
+
+**Project manager / business owner response (complete before approval):**
+
+- Approved location register: **[To be completed]**
+- Canonical Warehouse record and code: **[To be completed]**
+- Canonical Sheraton destination record(s) and code(s): **[To be completed]**
+- Staff-to-location assignments (controlled employee references): **[To be completed]**
+- Assignment authority and change/revocation process: **[To be completed]**
+- Approval by / role: **[To be completed]**
+- Approval date and evidence/reference: **[To be completed]**
+
+### DMS-DEC-002 — Detailed role and permission matrix
+
+**Current status:** Pending confirmation
+
+**Already confirmed:** Owner and Manager have global stock-location access. Staff are restricted to assigned locations. The ADR-016 pickup permission does not grant general Warehouse access. Destination receipt is restricted to Staff assigned to the destination. Staff may record payment entries; only Owner/Manager may verify them. The executable foundation currently grants the two inventory action permission codes to Staff, but no stock workflows exist.
+
+**Still unanswered:** The complete Owner/Manager/Staff permission matrix for viewing, creating, editing, receiving, adjusting, counting, transferring, dispatching, reconciling, approving, exporting and administering inventory and locations. The present permission seeds do not settle this matrix.
+
+**Why it affects implementation:** Every API route and service command must have a clear least-privilege rule. UI visibility is not an access-control boundary. In particular, a generic inventory permission must not accidentally grant Sheraton Staff general Warehouse access.
+
+**Exact information / approval required:**
+
+1. Approve role-by-module permissions for location administration, inventory viewing, receiving, adjustments, counts, standard transfers, ADR-016 pickup, destination receipt, discrepancy reporting/resolution, order reservation/dispatch and inventory reporting.
+2. For each role, specify view/create/edit/deactivate/submit/approve/resolve/export actions where relevant, including field-level and location restrictions.
+3. Confirm whether an action needs a second approver, whether the actor may approve their own action, and how unavailability is escalated. Coordinate approval limits with DMS-DEC-003 where applicable.
+4. Confirm whether access is global, assigned-location-only or limited to a specific resource/action.
+5. Explicitly preserve all current ADR-005, ADR-006 and ADR-016 boundaries.
+
+**Governing sources:** README — Users and permissions, Inventory rules and Security; Architecture Overview §5; Database Design §§2.1 and 7; ADR-006 and ADR-016; Decision Register DMS-DEC-002.
+
+**Project manager / business owner response:**
+
+- Approved Owner permissions: **[To be completed]**
+- Approved Manager permissions: **[To be completed]**
+- Approved Staff permissions: **[To be completed]**
+- Location-scoping and exception rules: **[To be completed]**
+- Approval / segregation-of-duties rules: **[To be completed]**
+- Approval by / role: **[To be completed]**
+- Approval date and evidence/reference: **[To be completed]**
+
+### DMS-DEC-007 — Initial reservation duration and expiry eligibility
+
+**Current status:** Pending confirmation
+
+**Already confirmed:** Stock is reserved immediately when an order is confirmed, whether unpaid, partially paid or paid. Expiry must be configurable and persisted; each reservation snapshots its policy version and expiry. A policy change applies to new reservations. Expiry releases reserved quantity only, does not reduce physical on-hand and does not silently cancel the order; an affected order is placed on fulfilment hold/reconfirmation.
+
+**Still unanswered:** Whether expiry is enabled in the first release; the initial duration and unit; which undispatched order/payment states are eligible; and any order-type exceptions. No initial business-approved duration exists. The 24-hour technical invitation expiry in Employee Account Administration is unrelated and must not be reused as an inventory default.
+
+**Why it affects implementation:** The policy determines when reserved stock becomes available to other orders and which orders need operational follow-up. The expiry worker and its concurrency rules cannot be implemented safely without eligibility and duration values.
+
+**Exact information / approval required:**
+
+1. State explicitly whether reservation expiry is enabled at first release or disabled initially.
+2. If enabled, provide duration and unit.
+3. Define eligible order/payment states and exclusions, including paid, partially paid, processing, packed and other relevant states.
+4. Confirm any separate treatment by order source/type.
+5. Confirm the operational hold/reconfirmation action when expiry occurs. Preserve immediate reservation on confirmation and the no-silent-cancellation rule.
+
+**Governing sources:** README — Inventory rules and order workflow; Architecture Overview §4.1; Database Design §§2.5 and 5; ADR-005; Decision Register DMS-DEC-007.
+
+**Project manager / business owner response:**
+
+- Expiry enabled for first release? **[Yes / No — to be approved]**
+- Initial duration and unit (if enabled): **[To be completed]**
+- Eligible states and exclusions: **[To be completed]**
+- Order-type exceptions: **[To be completed]**
+- Expiry follow-up / hold owner: **[To be completed]**
+- Approval by / role: **[To be completed]**
+- Approval date and evidence/reference: **[To be completed]**
+
+### DMS-DEC-008 — Reservation grace periods, warnings and authorised overrides
+
+**Current status:** Pending confirmation
+
+**Already confirmed:** Reservation policies are versioned. New policy versions affect new reservations only. Changing an existing reservation expiry requires an explicit authorised and audited action. Expiry does not cancel an order or reduce on-hand stock.
+
+**Still unanswered:** Whether there is a grace period; warning timing and recipients; internal/customer notification channels; who may extend or manually release a reservation; eligible reasons; extension limits; and whether reminder delivery is first-release scope or deferred.
+
+**Why it affects implementation:** The warning/override process determines how staff handle an order near expiry and prevents uncontrolled extensions or premature release. Permissions, audit details and any notification worker depend on the answers.
+
+**Exact information / approval required:**
+
+1. Confirm whether a grace period exists and its duration, if any.
+2. Define warning trigger(s), timing and recipients. Identify whether warnings are staff-only, customer-facing or both, and the approved channel.
+3. Specify roles authorised to extend or manually release an existing reservation.
+4. Define eligible reasons, maximum extension rules, whether additional approval is needed and the required evidence.
+5. Confirm whether warnings/reminders are required in the first release or explicitly deferred.
+6. Require actor, timestamp, before/after expiry, reason and approval attribution for an override.
+
+**Governing sources:** Architecture Overview §§4.1 and 9; Database Design §§2.5 and 5; ADR-005 and ADR-006; Decision Register DMS-DEC-008.
+
+**Project manager / business owner response:**
+
+- Grace period and duration: **[To be completed]**
+- Warning trigger(s), timing, recipients and channel: **[To be completed]**
+- Roles allowed to extend/release: **[To be completed]**
+- Eligible reasons, limits and approval: **[To be completed]**
+- Reminder delivery in first release or deferred: **[To be completed]**
+- Required override audit evidence: **[To be completed]**
+- Approval by / role: **[To be completed]**
+- Approval date and evidence/reference: **[To be completed]**
+
+### DMS-DEC-009 — Transfer exceptions and discrepancy resolution
+
+**Current status:** Pending confirmation
+
+**Already confirmed:** Destination-assigned Staff confirms physical receipt. Partial receipt is supported; unreceived quantity remains in transit. A discrepancy has a quantity, reason, reporter and subsequent authorised resolution. Unresolved quantities remain visible. Under ADR-016, picked quantities cannot be silently cancelled, expired or restored to Warehouse; they must be received, separately returned or formally resolved.
+
+**Still unanswered:** How transfer processing is escalated when destination Staff are unavailable; whether a substitute can be used and how they become assigned; required shortage/damage/loss/wrong-item evidence; permissible resolution outcomes; approver role/threshold; and ageing/escalation expectations.
+
+**Why it affects implementation:** A transfer can leave stock in transit for an extended period. Without approved exceptions, the system may expose a bypass around destination assignment or encourage unsupported write-offs that conceal missing stock.
+
+**Exact information / approval required:**
+
+1. Define who monitors/escalates a transfer when no currently assigned destination Staff member is available and the expected escalation timing.
+2. If a substitute is permitted, define how the substitute is formally assigned to the destination before receipt. Do not assume an unassigned Staff member or Manager may bypass the confirmed destination-Staff receipt rule.
+3. For shortage, damage, loss and wrong-item cases, specify required quantity evidence, reason, photos/documents if any, reporter and review record.
+4. List the permitted resolution outcomes and the exact stock/in-transit event for each (for example, receipt of remaining physical quantity, separately recorded return transfer, quarantine, write-off or another explicitly approved outcome).
+5. Specify who approves each resolution, any quantity/value thresholds, segregation-of-duties rules and what happens when an approver is unavailable.
+6. Define ageing thresholds, escalation owner and reporting for unresolved in-transit quantities.
+7. Preserve transfer reconciliation and ADR-016 cancellation/pickup constraints.
+
+**Governing sources:** README — Multi-location Inventory and stock management; Architecture Overview §§4.2 and 4.2.1; Database Design §2.5 and §5; ADR-005, ADR-006 and ADR-016; Decision Register DMS-DEC-009. DMS-DEC-003 may also govern approval thresholds.
+
+**Project manager / business owner response:**
+
+- Unavailable destination Staff escalation and timing: **[To be completed]**
+- Substitute assignment process (if allowed): **[To be completed]**
+- Required evidence by discrepancy type: **[To be completed]**
+- Permitted resolution outcomes and corresponding stock treatment: **[To be completed]**
+- Approver roles / thresholds / segregation rules: **[To be completed]**
+- Ageing and escalation expectations: **[To be completed]**
+- Approval by / role: **[To be completed]**
+- Approval date and evidence/reference: **[To be completed]**
+
+### DMS-DEC-010 — Physical pickup paperwork or reference at Warehouse
+
+**Current status:** Pending confirmation
+
+**Already confirmed:** ADR-016's dedicated Warehouse-to-assigned-Sheraton pickup mode, backend availability check, no-Warehouse-balance-disclosure rule, atomic source-to-in-transit movement, partial pickup, actor/time attribution and idempotency are fixed. The physical paperwork/reference process is explicitly left open.
+
+**Still unanswered:** Whether a Staff member must present or record a transfer reference, printed slip, dispatch note, signed handover, Warehouse confirmation, identity check or other evidence; who creates/checks it; and whether DMS must retain a file or only a reference.
+
+**Why it affects implementation:** The pickup screen, handover evidence, audit metadata and possibly private file storage depend on what Warehouse requires. The paperwork answer must not change ADR-016's access or stock-movement model.
+
+**Exact information / approval required:**
+
+1. Confirm whether any evidence is required beyond the DMS transfer reference and immutable pickup event. Explicitly approve “no additional paperwork” if that is the decision.
+2. List each required paper/digital reference and specify who creates it, who verifies it and at what point in the pickup.
+3. Specify required fields and whether a signature, identifier check, Warehouse acknowledgment or other evidence is needed.
+4. Confirm whether DMS stores an uploaded copy, a reference string, or both. If file uploads are required, resolve the relevant private storage controls before implementing the upload path.
+5. Confirm how missing, incorrect or disputed paperwork is handled without bypassing the pickup transaction.
+
+**Governing sources:** Architecture Overview §§4.2.1 and 11; Database Design §2.5 (Sheraton pickup authorisation); ADR-016; Decision Register DMS-DEC-010. DMS-DEC-018 is a conditional dependency if private file storage is required.
+
+**Project manager / business owner response:**
+
+- Additional paperwork/reference required? **[Yes / No — to be approved]**
+- Required evidence, fields and format: **[To be completed]**
+- Created by / checked by / verification point: **[To be completed]**
+- DMS storage approach (file, reference or both): **[To be completed]**
+- Exception process: **[To be completed]**
+- Approval by / role: **[To be completed]**
+- Approval date and evidence/reference: **[To be completed]**
+
+### DMS-DEC-015 — Cost-price history and stock valuation method
+
+**Current status:** Pending confirmation
+
+**Already confirmed:** Product variants currently store a cost price. The product/order design preserves relevant transaction price snapshots. Stock valuation must not be presented as reliable until a valuation method and appropriate historical cost basis are agreed. The decision register explicitly allows stock valuation reporting to be deferred.
+
+**Still unanswered:** Whether cost-price changes must be retained as immutable effective-dated history; who may record/approve them; which valuation/costing method is approved, or whether valuation reporting is explicitly deferred; the treatment of freight, duties, discounts, supplier credits, partial receipts and returns; and the cost basis for historical margin reports.
+
+**Why it affects implementation:** A current cost field alone cannot explain historical stock value after supplier costs change. Different valuation methods produce different values and margin reports. Implementing an assumed method would create misleading financial information.
+
+**Exact information / approval required:**
+
+1. Decide whether cost-price changes require immutable, effective-dated history per product variant.
+2. Identify who may create, amend or approve a new cost record and the audit evidence required.
+3. Choose the approved first-release stock valuation method, or explicitly defer stock valuation reporting until a later approved phase.
+4. If valuation is approved, define treatment of inbound freight, duties, supplier discounts/credits, partial receipts, damaged goods and returns where applicable.
+5. Define which cost basis applies to historical margin reporting (for example, order-time cost snapshot or another explicitly approved basis).
+6. Do not assume FIFO, weighted average or standard cost.
+
+**Governing sources:** README — Product records, Multi-location inventory and Reports; Architecture Overview §§3.1 and 4; Database Design §§2.4, 2.9 and 6; ADR-013; Decision Register DMS-DEC-015.
+
+**Project manager / business owner response:**
+
+- Effective-dated cost history required? **[Yes / No — to be approved]**
+- Roles allowed to record/approve cost changes: **[To be completed]**
+- Approved valuation method or explicit deferral: **[To be completed]**
+- Inbound cost/discount/return treatment (if valuation is approved): **[To be completed]**
+- Historical margin cost basis: **[To be completed]**
+- Approval by / role: **[To be completed]**
+- Approval date and evidence/reference: **[To be completed]**
+
+### 5.8 Decision worksheet handling
+
+Do not fill any blank with an assumption. Do not paste real employee personal details, customer information, actual stock quantities, supplier invoices or other production data into the public repository. Record controlled personnel references only where suitable and authorised. An answer becomes approved only when its authority, date and evidence are recorded in the relevant decision record/ADR through a separately reviewed documentation change. The decision-register statuses remain unchanged until that evidence is accepted.
+
+## 6. Security, access-control and audit requirements
+
+The following requirements must be carried into the eventual design and implementation.
+
+### 6.1 Backend authorisation and location scope
+
+- Every protected operation is authenticated and authorised by the backend. Hiding a control in the frontend is not sufficient.
+- Enforce the approved role permission and the location/resource scope for every command and read.
+- Owner and Manager retain the confirmed global stock-location access.
+- Staff may use ordinary stock functions only for locations to which they are actively assigned.
+- Sheraton Staff must not receive a Warehouse assignment or general Warehouse read, adjustment or transfer access.
+- The ADR-016 pickup exception remains a dedicated action for a transfer from the configured Warehouse to the actor's assigned Sheraton destination. The backend validates the actor, role, permission, source, destination and assignment. It checks exact Warehouse availability internally and does not expose the balance.
+- Destination receipt remains a separate action performed by Staff assigned to that destination.
+
+### 6.2 Actor attribution, timestamps and audit
+
+- Attribute every stock command, movement, reservation, pickup, receipt, count, adjustment, discrepancy report and resolution to the authenticated actor. Do not accept the actor ID from an untrusted client field.
+- Use database-authoritative UTC timestamps (timezone-aware timestamps) for durable events. Display business-facing dates/times using Africa/Lagos.
+- Write the business event, balance projection changes and associated audit event in the same database transaction.
+- Keep stock movements and audit events append-only in ordinary application workflows. Correct mistakes with separately attributed reversal/adjustment/resolution events; never silently edit or delete historical movements.
+- Preserve event-level pickup and receipt actor/time attribution even when the same person performs both steps.
+- Keep audit metadata safe: do not record credentials, tokens, unnecessary personal data or secrets.
+
+### 6.3 Transaction, concurrency and retry requirements
+
+- Update balances, reservations and transfers transactionally.
+- Lock or conditionally update the relevant balance, order/reservation and transfer-item rows before applying quantity changes. Recheck eligibility and available quantity while holding the relevant locks.
+- Use a consistent lock order for operations touching multiple inventory rows to reduce deadlocks.
+- Add database constraints/unique keys for critical relationships, non-negative quantities, one balance per location/variant, transfer quantity reconciliation and idempotency.
+- Use idempotency keys for commands that may be retried, including transfer pickup/receipt and other non-repeatable stock changes. Same-key/same-payload retries return the original outcome; same-key/different-payload reuse is rejected.
+- A transaction failure, including an audit-write failure, must roll back the business change and the projections together.
+
+### 6.4 Data and repository handling
+
+- Use synthetic test fixtures only in development, CI and staging.
+- Do not commit real stock records, opening balances, customer/order data, employee personal data, supplier invoices or financial records to Git.
+- No production data or real employee assignments are needed to complete Task 009.
+
+## 7. Inventory transaction and concurrency risks
+
+The implementation plan must explicitly test and protect the following failure modes.
+
+| Risk | Required protection / expected invariant |
+|---|---|
+| Two orders reserve the same last available units concurrently | Lock or conditional-update the location/variant balance; only one transaction may reserve the available quantity. Available never becomes negative. |
+| Reservation expiry races dispatch, cancellation or manual release | Lock and recheck order and reservation state. The reservation can be consumed or released/expired only once; expiry does not change on-hand or silently cancel the order. |
+| Policy changes while reservations are active | Store the applied policy version and expiry on each reservation. New policy versions do not retroactively alter existing reservations. |
+| Two source dispatches/pickups or destination receipts are retried | Transfer/item locks, unique idempotency keys and transactional event/movement writes prevent duplicate stock changes. |
+| Partial transfer pickup/receipt or cancellation | Reconcile requested, dispatched, received, cancelled, in-transit and formally resolved quantities. Picked quantity cannot be erased by cancellation. |
+| Sheraton Staff tries to read or use unrelated Warehouse stock | Authorise the exact Warehouse-to-assigned-Sheraton transfer action. Perform only item-specific internal availability checks; do not return exact Warehouse balances. |
+| Destination Staff is unavailable or an item is disputed | Leave unreceived quantity visible in transit until a formally approved receipt, return or discrepancy resolution. Do not silently force receipt or write off. |
+| Stock count overlaps with normal movements | Define a count cutoff/snapshot and locking/reconciliation strategy before implementation so legitimate movements are not overwritten by a stale count. Every reconciliation delta must be attributable. |
+| Audit insertion or downstream write fails | Roll back the entire stock transaction; a balance change without its movement/audit evidence must not commit. |
+| Duplicate or malformed quantity command | Validate positive quantities and unit precision, apply database constraints, and use idempotency/state checks. Never use floating-point quantity arithmetic. |
+
+The database design also identifies the need for unique (location_id, product_variant_id) balances, non-negative in-transit quantities, transfer-item quantity reconciliation, row locks and safe idempotency. These are design requirements for future schema/service review, not claims about current tables.
+
+## 8. Recommended implementation sequence
+
+This sequence is a dependency assessment, not a commitment to deliver every module immediately. The project manager must authorise each implementation task after the required decisions and acceptance gates are satisfied.
+
+### Stage 0 — Business and technical decision closure
+
+Complete and independently review DMS-DEC-001, 002, 007, 008, 009, 010 and 015. Resolve related approval, order, supplier, file-storage and database/tooling dependencies where they affect a selected stage. Confirm the opening-stock verification/cutover procedure and the approved quantity/unit precision before creating live balances. No inventory feature code should begin on assumptions.
+
+### Stage 1 — Stock location register and location-access administration
+
+Build on the existing locations and user_location_access tables only after DMS-DEC-001 and DMS-DEC-002 are approved. Implement location administration, assignment grant/change/revocation and audit history with backend enforcement. Verify Owner/Manager global access, assigned-Staff scope and the absence of a Warehouse assignment for Sheraton Staff. Do not seed invented locations or users.
+
+### Stage 2 — Inventory balance foundation and opening-stock handling
+
+After Stage 1 and approved product/variant identities, introduce the balance model per location/variant and its integrity constraints. Define a controlled opening-stock process that records a verified physical count, effective/cutover timestamp, source/reference, actor and approval evidence as opening movements. Do not import or fabricate balances. Confirm unit precision and prohibit negative on-hand/reserved values.
+
+### Stage 3 — Stock receiving and append-only movements
+
+Implement receiving into one selected location with transactional balance updates and ledger entries. Confirm whether the initial receiving workflow is a direct/manual receipt or linked to purchase orders. If linked procurement is in first-release scope, DMS-DEC-013 and DMS-DEC-014 must be resolved; a purchase order alone must never increase stock. Include quantity/unit validation, actor attribution and idempotency.
+
+### Stage 4 — Stock adjustments and physical stock counts
+
+Implement reason-coded adjustments and count sessions only after DMS-DEC-002 and any relevant approval authority under DMS-DEC-003 are defined. A count must retain the counted quantity, system snapshot/cutoff, counter, reviewer where applicable, difference and reconciliation event. Do not overwrite the balance or ledger with a stale count. Discrepancy and damage outcomes must use the approved permissions and audit trail.
+
+### Stage 5 — Standard stock transfers
+
+Implement source/destination selection, transfer items, source dispatch, transfer-specific in-transit projections and destination receipt. Gate this stage on approved locations/assignments (DMS-DEC-001), permissions (DMS-DEC-002) and exception/discrepancy rules (DMS-DEC-009). Enforce partial receipts, item-level reconciliation, actor/time events and idempotency.
+
+### Stage 6 — Dedicated Warehouse-to-Sheraton pickup and destination receipt
+
+Implement only after Stages 1, 2 and the transfer foundations are approved and DMS-DEC-009/010 have answers. Preserve ADR-016 verbatim in behaviour: exact configured Warehouse source, actor's assigned Sheraton destination, item-specific backend-only Warehouse availability check, no Warehouse balance disclosure, atomic Warehouse-to-in-transit pickup, separate destination receipt, partial events, individual actor/time attribution and idempotency. If the paperwork decision requires uploaded documents, resolve DMS-DEC-018 private storage controls before building that upload path.
+
+### Stage 7 — Order reservation and dispatch integration
+
+Integrate reservations only when the order/customer foundation and order lifecycle are approved and available. ADR-015 already fixes one fulfilment location per first-release order. DMS-DEC-007 and DMS-DEC-008 must define reservation policy values, eligibility, expiry and overrides. DMS-DEC-005 and DMS-DEC-006 govern cancellation/dispatch rules and evidence; related payment rules must not be invented. Reservation and dispatch must use the same transactional balance/ledger model. If expiry is enabled, a reliable scheduled/worker execution and retry model must be designed; no expiry worker currently exists.
+
+### Stage 8 — Low-stock thresholds, inventory history and reporting
+
+Add per-location/variant reorder thresholds and operational history/reporting only after balances and movements are reliable. Define who may set thresholds and who may view/export reports under the approved permission matrix. Reports must separate on-hand, reserved, available and in-transit values and reconcile to source movements. Do not imply that a low-stock alert or report exists before it is implemented and tested.
+
+### Stage 9 — Stock valuation, only after DMS-DEC-015
+
+Implement cost history and valuation only if DMS-DEC-015 approves the basis, or explicitly keep valuation reporting deferred. Never assume FIFO, weighted average or another valuation method. The current variant cost field is not a historical valuation ledger.
+
+## 9. Explicit implementation blockers
+
+The following items prevent an evidence-based start of the corresponding inventory implementation work:
+
+1. **DMS-DEC-001 — locations and assignments:** approved location codes, canonical Warehouse/Sheraton records, employee assignments and assignment authority are unknown.
+2. **DMS-DEC-002 — permissions:** the full Owner/Manager/Staff matrix for inventory and location actions is not approved.
+3. **DMS-DEC-007 — reservation policy:** initial expiry enablement, duration and eligible order/payment states are not approved.
+4. **DMS-DEC-008 — reservation exceptions:** grace period, warning rules, extension and manual-release authorities are not approved.
+5. **DMS-DEC-009 — transfer exceptions:** unavailable destination Staff, discrepancy evidence, permitted resolutions and approvals are not defined.
+6. **DMS-DEC-010 — pickup evidence:** the Warehouse physical paperwork/reference process is not confirmed.
+7. **DMS-DEC-015 — cost basis:** historical cost-price treatment and stock valuation method are unresolved; valuation must remain deferred unless approved.
+
+Additional dependencies that may gate particular stages, without replacing the seven required worksheet items:
+
+- DMS-DEC-003 may be needed where adjustment, write-off or discrepancy approvals have thresholds.
+- DMS-DEC-005 and DMS-DEC-006 affect order cancellation and dispatch integration.
+- DMS-DEC-013 and DMS-DEC-014 affect whether receiving is tied to supplier procurement.
+- DMS-DEC-018 is required before implementing private file uploads if pickup/discrepancy evidence must be stored as files.
+- DMS-DEC-024 records the pending formal confirmation of the adopted PostgreSQL/explicit-SQL/node-pg-migrate convention. The current code uses that approach, but its implementation is not itself a formal ratification.
+- DMS-DEC-027 records the proposed test strategy and quality gates. Inventory concurrency, permission-boundary, ledger reconciliation and transaction rollback tests must be added before the relevant feature can be accepted.
+- The opening-stock source/count, cutover method and verification authority must be supplied and approved before actual balances are introduced. No opening quantity is currently evidenced.
+- No inventory schema, routes, UI, worker or production database has been implemented/provisioned.
+
+These blockers must be closed through evidence-backed decision updates and a separately reviewed implementation authorisation. Creating this readiness document does not mark any roadmap inventory item complete.
+
+## 10. Acceptance criteria for beginning inventory feature work
+
+Inventory implementation may begin only when all applicable criteria are met:
+
+- [ ] DMS-DEC-001 is answered with the approved location register, canonical Warehouse/Sheraton records, Staff assignments and assignment authority; the decision is updated with approver/date/evidence.
+- [ ] DMS-DEC-002 is answered with a complete role/module/action and location-scope matrix; the decision is updated with approver/date/evidence.
+- [ ] DMS-DEC-007 and DMS-DEC-008 define the initial reservation policy, expiry eligibility, grace/warnings and permitted extensions/releases, or explicitly defer the relevant behaviour. The expiry/worker requirement is documented.
+- [ ] DMS-DEC-009 defines unavailable-Staff escalation, discrepancy evidence, allowed outcomes, approvals and in-transit ageing.
+- [ ] DMS-DEC-010 defines the pickup paperwork/reference requirement, including an explicit “no additional paperwork” answer if applicable.
+- [ ] DMS-DEC-015 approves effective-dated cost history and a valuation basis, or explicitly defers valuation reporting.
+- [ ] Related dependencies (approval limits, order cancellation/dispatch, receiving/procurement, private file storage if needed, and database/testing conventions) are resolved for the first authorised implementation slice.
+- [ ] Opening-stock verification, cutover, actor/approval evidence, unit of measure and quantity precision are defined. No opening balance is invented.
+- [ ] A reviewed entity/migration/API plan identifies constraints, transactions, lock order, idempotency keys, audit events and rollback behaviour.
+- [ ] Test scenarios use synthetic data and cover concurrency, permissions, partial transfer/receipt, discrepancy resolution, retry safety, projection/ledger reconciliation and audit rollback.
+- [ ] The project manager has independently reviewed the completed decision evidence and explicitly authorised a scoped inventory implementation task.
+
+Until these criteria are satisfied, inventory remains **not implemented**. No decision-register status, roadmap checkbox or feature-completion claim is changed by Task 009.
+
+## Repository evidence and references
+
+The assessment was checked against the required base commit:
+
+- [README.md](../../README.md)
+- [Architecture Overview](../architecture/overview.md)
+- [Database Design](../architecture/database-design.md)
+- [Architecture Decisions](../architecture/decisions.md)
+- [Decision Register](../architecture/decision-register.md)
+- [Migration 001 — initial foundation](../../apps/api/migrations/001_initial_foundation.js)
+- [Migration 002 — Product Management](../../apps/api/migrations/002_product_management.js)
+- [Migration 003 — Employee Account Administration](../../apps/api/migrations/003_employee_account_administration.js)
+- [Location access service](../../apps/api/src/modules/roles/location-access.service.ts)
+- [Permission service](../../apps/api/src/modules/roles/permission.service.ts)
+- [Authorization middleware](../../apps/api/src/middleware/authorization.ts)
+- [Application route mounts](../../apps/api/src/app.ts)
+- [Product Management service](../../apps/api/src/modules/products/product.service.ts)
+- [Product Management routes](../../apps/api/src/modules/products/product.routes.ts)
+- [GitHub Actions CI](../../.github/workflows/ci.yml)
+
+**Task 009 status:** Readiness and decision worksheet prepared for independent review.
+**Inventory implementation status:** Not started.
+**Decision-register status:** Unchanged; DMS-DEC-001, 002, 007, 008, 009, 010 and 015 remain Pending confirmation.

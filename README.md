@@ -3,6 +3,8 @@
 A centralised internal business management platform for Dscentsation's Nigerian operations. The planned system will bring orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
 
 > **Project status:** Tasks 005 and 006 architecture reconciliation, Task 007 Product Management (PR #9), and Task 008 Employee Account Administration (PR #10, merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`) are merged into `main`. Employee account administration is implemented with Owner-only permissions, secure Manager/Staff invitations, initial password setup, account suspension/reactivation, session revocation and audit events. Email delivery (DMS-DEC-017), location assignments (DMS-DEC-001), the full permission matrix (DMS-DEC-002), password recovery, session history, comprehensive business-event audit coverage, production infrastructure and deployment remain pending.
+>
+> **Current task:** DMS Task 009 — Inventory Implementation Readiness & Decision Pack — is under review in open draft PR #11. Task 009 has not yet been approved or merged; inventory feature implementation has not started.
 
 ## Contents
 
@@ -14,6 +16,7 @@ A centralised internal business management platform for Dscentsation's Nigerian 
 - [Users and permissions](#users-and-permissions)
 - [Identity, user accounts and activity accountability](#identity-user-accounts-and-activity-accountability)
 - [Inventory rules](#inventory-rules)
+- [Inventory implementation readiness](#inventory-implementation-readiness)
 - [Application architecture and technology status](#application-architecture-and-technology-status)
 - [Security and data integrity](#security-and-data-integrity)
 - [Development roadmap and progress](#development-roadmap-and-progress)
@@ -347,6 +350,10 @@ Inventory accuracy is business-critical. The implementation must follow these ru
 - Returned goods must be inspected before being added back to sellable stock.
 - Critical stock changes must be protected against concurrent updates and recorded transactionally.
 
+## Inventory implementation readiness
+
+DMS Task 009 is the current documentation/readiness task for multi-location inventory. It records the verified implementation baseline, confirmed business rules, unresolved decisions, dependencies and recommended sequence. It does not introduce inventory feature code, migrations, screens, stock balances or real stock records. Inventory implementation has not started and remains blocked pending the approvals in the [Inventory Implementation Readiness & Decision Pack](docs/operations/inventory-implementation-readiness.md).
+
 ## Application architecture and technology status
 
 Task 005 established the initial application foundation in `main`. The table below separates code that exists from proposals and infrastructure that have not been provisioned.
@@ -417,15 +424,16 @@ This checklist is the project's shared progress record. It is intended to help f
 - [x] Implement and test provisioned-account authentication, Argon2id password hashing, PostgreSQL-backed sessions, CSRF protection, session rotation, expiry and revocation.
 - [ ] Complete the Owner, Manager and Staff business permission matrix. The foundation seeds only the three established roles and four currently confirmed permission codes; the full matrix remains open.
 - [x] Implement the append-only audit-table foundation, including authentication/bootstrap audit events and database rejection of UPDATE, DELETE and TRUNCATE. Full business-event coverage and before/after field history remain pending.
-- [ ] Implement administrator-managed employee account creation/invitations, secure password setup/recovery, account suspension/reactivation and session revocation.
+- [x] Implement the employee directory, Manager/Staff invitations, secure initial password setup, suspension/reactivation and session revocation (Task 008, merged PR #10).
+- [ ] Implement employee password recovery/reset.
 - [ ] Implement authorised session-history and activity-history views, including employee/action/record/date filters.
 - [ ] Record business changes with the authenticated actor, authoritative UTC event time, affected record and before/after values; retain the separate audit timestamp when a business date/time is edited.
 - [x] Build the responsive application shell, login screen, role identity display, placeholder navigation and initial dashboard shell.
 
 ### Phase 2 — Products and multi-location inventory
 
-- [ ] Implement manual product creation, editing and archiving.
-- [ ] Implement product categories and optional variants/SKUs.
+- [x] Implement manual product creation, editing and archiving (Task 007, merged PR #9).
+- [x] Implement product categories and optional variants/SKUs (Task 007, merged PR #9).
 - [ ] Implement stock location management.
 - [ ] Implement stock balances per product and location.
 - [ ] Implement stock receiving.
@@ -545,7 +553,7 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 **Not yet implemented or approved:** Real Warehouse/Sheraton location records and Staff assignments (DMS-DEC-001); automated company email delivery (DMS-DEC-017; Task 008 returns a one-time URL for secure manual delivery using the official company email identity); the full role/permission matrix (DMS-DEC-002); password recovery; session-history and searchable audit-history screens; comprehensive business-event audit coverage; operational business modules; production database/service provisioning; production credentials; background workers; file-storage integrations; production deployment; MFA; approved production session lifetimes and high-risk-action re-authentication; distributed rate limiting; and overall architecture/deployment approval. The technical implementation choices tracked by DMS-DEC-021–024 and DMS-DEC-027 are documented as adopted in the codebase where applicable but retain their existing review statuses.
 
-**Completed development tasks:** Task 007 — Product Management — is merged through PR #9. Task 008 — Employee Account Administration — is independently reviewed and merged through PR #10 (merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`). **Next task:** Task 009 has not been started.
+**Completed development tasks:** Task 007 — Product Management — is merged through PR #9. Task 008 — Employee Account Administration — is independently reviewed and merged through PR #10 (merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`). **Current task:** Task 009 — Inventory Implementation Readiness & Decision Pack — is under review in open draft PR #11. The readiness pack is not yet approved or merged, and inventory feature implementation has not started.
 
 ## Working agreement
 
@@ -563,5 +571,5 @@ Agents must read this README before making changes. If implementation reveals a 
 
 ---
 
-**Dscentsation Management System (DMS)**  
+**Dscentsation Management System (DMS)**
 *One system. Clear records. Better business operations.*
