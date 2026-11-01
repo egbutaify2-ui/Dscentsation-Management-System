@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { ErrorRequestHandler, Request } from 'express';
+import { z } from 'zod';
 import type { ZodError } from 'zod';
 import { requireAuthentication } from '../../middleware/authentication.js';
 import { requirePermission } from '../../middleware/authorization.js';
@@ -33,8 +34,9 @@ const router = Router();
 router.use('/products', requireAuthentication);
 router.use('/categories', requireAuthentication);
 
-function routeId(value: string): string {
-  const result = z.string().uuid().safeParse(value);
+function routeId(value: string | string[]): string {
+  const candidate = typeof value === 'string' ? value : value[0];
+  const result = z.string().uuid().safeParse(candidate);
   if (!result.success) {
     throw new ProductError('A valid record identifier is required.', 400, 'INVALID_REQUEST');
   }
