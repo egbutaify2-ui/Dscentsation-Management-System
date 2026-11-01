@@ -54,6 +54,12 @@ export const api = {
       headers: { 'X-CSRF-Token': csrfToken },
       body: JSON.stringify(body),
     }),
+  patch: <T>(path: string, body: unknown, csrfToken: string) =>
+    request<T>(path, {
+      method: 'PATCH',
+      headers: { 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify(body),
+    }),
   postEmpty: (path: string, csrfToken: string) =>
     request<void>(path, {
       method: 'POST',
