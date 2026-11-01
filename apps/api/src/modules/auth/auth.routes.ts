@@ -27,7 +27,8 @@ const dummyPasswordHash = argon2.hash(randomBytes(32).toString('hex'), {
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  // Production remains limited to ten attempts; disposable integration tests cover more sign-ins.
+  limit: env.NODE_ENV === 'test' ? 50 : 10,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   handler: (_request, response) => {
