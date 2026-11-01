@@ -7,7 +7,7 @@ export const requireAuthentication: RequestHandler = async (request, response, n
     const userId = request.session.userId;
     const issuedAt = request.session.authIssuedAt;
 
-    if (!userId || !issuedAt || Date.now() - issuedAt > env.sessionAbsoluteTimeoutMs) {
+    if (!userId || !issuedAt || Date.now() - issuedAt >= env.sessionAbsoluteTimeoutMs) {
       if (userId || issuedAt) {
         await new Promise<void>((resolve, reject) => {
           request.session.destroy((error) => (error ? reject(error) : resolve()));
