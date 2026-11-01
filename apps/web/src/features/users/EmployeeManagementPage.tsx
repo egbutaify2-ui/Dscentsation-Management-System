@@ -181,7 +181,8 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
       setCopied(false);
       setInviteOpen(false);
       setNotice(
-        'Replacement invitation created. No email was sent; deliver the new link manually using the official Dscentsation company email identity.',
+        'Replacement invitation created. No email was sent; deliver the new link manually using ' +
+          'the official Dscentsation company email identity.',
       );
       await loadEmployees(search, roleFilter, statusFilter);
     } catch (actionError) {
@@ -268,7 +269,9 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
           <div>
             <p className="eyebrow">ONE-TIME SETUP LINK</p>
             <h2 id="invitation-created-title">
-              {invitationMode === 'reissued' ? 'Invitation link reissued for' : 'Invitation created for'}{' '}
+              {invitationMode === 'reissued'
+                ? 'Invitation link reissued for'
+                : 'Invitation created for'}{' '}
               {invitation.employee.displayName}
             </h2>
             <p>

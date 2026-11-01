@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { env } from '../../config/env.js';
 import type { ErrorRequestHandler, Request } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
@@ -42,7 +43,8 @@ const statusSchema = z.object({ status: z.enum(['active', 'suspended']) }).stric
 
 const acceptanceLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  // The production throttle remains ten attempts; disposable integration tests exercise more cases.
+  limit: env.NODE_ENV === 'test' ? 50 : 10,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   handler: (_request, response) => {

@@ -157,9 +157,9 @@ describe('EmployeeManagementPage', () => {
     mocks.post.mockRejectedValueOnce(new Error('Replacement invitation could not be created.'));
     render(<EmployeeManagementPage canManage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Reissue invitation' }));
-    expect(
-      (await screen.findByRole('alert')).textContent,
-    ).toContain('Replacement invitation could not be created.');
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Replacement invitation could not be created.',
+    );
     expect(screen.queryByLabelText('One-time invitation URL')).toBeNull();
   });
 

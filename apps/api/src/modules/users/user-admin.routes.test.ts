@@ -436,7 +436,11 @@ describe('Employee Account Administration API', () => {
       [employee.id],
     );
     expect(account.rows).toHaveLength(1);
-    expect(account.rows[0]).toMatchObject({ count: '1', email: employee.email, role_code: 'MANAGER' });
+    expect(account.rows[0]).toMatchObject({
+      count: '1',
+      email: employee.email,
+      role_code: 'MANAGER',
+    });
 
     const invitations = await pool.query<{
       token_hash: string;
@@ -621,7 +625,9 @@ describe('Employee Account Administration API', () => {
       [employeeId],
     );
     expect(open.rows).toHaveLength(1);
-    const candidateTokens = attempts.map((response) => tokenFromSetupUrl(response.body.data.setupUrl));
+    const candidateTokens = attempts.map((response) =>
+      tokenFromSetupUrl(response.body.data.setupUrl),
+    );
     expect(candidateTokens.filter((token) =>
       createHash('sha256').update(token).digest('hex') === open.rows[0]?.token_hash.trim(),
     )).toHaveLength(1);
