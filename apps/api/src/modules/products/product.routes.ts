@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { ErrorRequestHandler, Request } from 'express';
-import { z } from 'zod';
+import type { ZodError } from 'zod';
 import { requireAuthentication } from '../../middleware/authentication.js';
 import { requirePermission } from '../../middleware/authorization.js';
 import { ProductError } from './product.errors.js';
@@ -39,7 +39,7 @@ function actorId(request: Request): string {
   return request.auth.id;
 }
 
-function validationResponse(error: z.ZodError) {
+function validationResponse(error: ZodError) {
   return {
     error: {
       code: 'INVALID_REQUEST',
