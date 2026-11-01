@@ -1,6 +1,6 @@
 # DMS Development Setup
 
-This guide covers the local application foundation only. It does not authorise production deployment, Render provisioning, production credentials or the use of real business data.
+This guide covers the local Task 005 application foundation only. It does not authorise production deployment, Render provisioning, production credentials or the use of real business data. For the distinction between implemented code, proposed architecture and unresolved approvals, see [Architecture Overview](../architecture/overview.md), [Database Design](../architecture/database-design.md), [Architecture Decisions](../architecture/decisions.md) and the [Decision Register](../architecture/decision-register.md).
 
 ## 1. Toolchain
 
@@ -109,6 +109,8 @@ pnpm build
 
 API integration tests require a disposable PostgreSQL database. Set `NODE_ENV=test`, `DATABASE_URL`, `SESSION_SECRET`, `APP_ORIGIN` and test timeout values. The suite uses synthetic `.invalid` user identities and synthetic location rows; run it against a disposable database only.
 
-## 8. Technical choices for follow-up documentation
+## 8. Architecture records and implementation boundaries
 
-This task adopts explicit SQL through `pg` and migrations through `node-pg-migrate`, without an ORM. It uses `connect-pg-simple` for persistent sessions and a session-bound synchronizer token plus exact-Origin validation for CSRF. These choices should be recorded in a separate, reviewed architecture documentation update; this task does not rewrite ADRs or the decision register.
+The adopted Task 005 implementation choices are recorded in [Architecture Overview](../architecture/overview.md), the [Task 005 physical-schema baseline](../architecture/database-design.md), and the implementation-evidence notes in [Architecture Decisions](../architecture/decisions.md). The corresponding ratification and policy questions remain in the [Decision Register](../architecture/decision-register.md), with their existing Proposed/Pending statuses preserved.
+
+The codebase uses explicit parameterised SQL through `pg`, `node-pg-migrate` without an ORM, `connect-pg-simple` for persistent sessions, and exact-Origin plus session-bound-token CSRF protection. Implementation evidence does not itself constitute architecture or business-owner approval. No background worker, email provider, file-storage service, production database, hosting service or deployment is included in the Task 005 foundation. Do not start a business module or provision production infrastructure by inferring answers to unresolved decisions.
