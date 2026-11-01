@@ -2,7 +2,7 @@
 
 A centralised internal business management platform for Dscentsation's Nigerian operations. The planned system will bring orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
 
-> **Project status:** The Task 005 application foundation has been implemented and is recorded in PR #7. This is only the initial application foundation, not the complete business application. The full business schema, complete permission matrix, outstanding architecture/business decisions, production infrastructure and deployment remain pending. The checklist below is the source of truth for progress and will be updated only after work is reviewed and verified.
+> **Project status:** Task 005 — the initial application foundation — was approved and merged into `main` through PR #7 (merge commit `652b5d51d17ecb36e78871a99164c12238a8ac41`). This does not mean the complete business application or overall architecture has been approved. The full business schema, complete permission matrix, outstanding architecture/business decisions, production infrastructure and deployment remain pending. The checklist below is the source of truth for progress and will be updated only after work is reviewed and verified.
 
 ## Contents
 
@@ -12,8 +12,9 @@ A centralised internal business management platform for Dscentsation's Nigerian 
 - [Modules and planned capabilities](#modules-and-planned-capabilities)
 - [Core business workflows](#core-business-workflows)
 - [Users and permissions](#users-and-permissions)
+- [Identity, user accounts and activity accountability](#identity-user-accounts-and-activity-accountability)
 - [Inventory rules](#inventory-rules)
-- [Proposed technology](#proposed-technology)
+- [Application architecture and technology status](#application-architecture-and-technology-status)
 - [Security and data integrity](#security-and-data-integrity)
 - [Development roadmap and progress](#development-roadmap-and-progress)
 - [Working agreement](#working-agreement)
@@ -276,6 +277,60 @@ AI-generated answers must be grounded in actual records, respect user permission
 
 Permissions must be enforced by backend APIs and database access patterns, not only by hiding buttons in the user interface. The exact permission matrix will be defined during architecture and authentication work.
 
+## Identity, user accounts and activity accountability
+
+DMS must identify the individual person performing each authenticated action. This is a core security and operational requirement, not an optional reporting feature.
+
+### Individual employee accounts
+
+- Every Owner, Manager and Staff member must use their own named account and unique email address. Shared accounts and shared passwords are not permitted.
+- An account must identify the employee, their active/suspended status and the access role approved for them. Location assignments and permissions must be checked by the backend against approved business rules.
+- An authorised administrator must be able to create or invite an employee, issue a secure account-setup process, suspend/reactivate access and revoke that employee's active sessions. The exact administrator permissions remain subject to the business permission matrix.
+- Employees should set their own password through a secure, single-use, expiring setup or reset link. Passwords must never be sent in plain text, stored in plain text, or placed in Render environment variables.
+- Passwords are stored only as secure password hashes. Task 005 already implements Argon2id password hashing, provisioned accounts and an interactive initial Owner bootstrap CLI. The employee-management interface, invitation flow, password recovery and ongoing account-administration workflows remain to be implemented.
+- Render environment variables are for application/service configuration and secrets (for example, database connection and session signing secrets), not for maintaining each employee's login credentials. Employee account records and password hashes belong in the protected PostgreSQL user store.
+
+### Session and login accountability
+
+- The system must associate each authenticated session with the individual user account that created it. The backend must derive the actor identity and role from the validated server-side session, never from a user ID, role or timestamp supplied by the browser.
+- Record successful and failed login attempts and logout events. The foundation already records these authentication events and stores sessions in PostgreSQL.
+- The complete session-history capability must make it possible for authorised administrators to see relevant session events and status, including sign-in time, sign-out/expiry/revocation where available, and the account to which the session belongs.
+- Provide a controlled way to revoke sessions when an account is suspended, compromised or no longer authorised. Do not expose raw session cookies, session secrets or reusable session identifiers in the activity interface.
+- MFA, approved session idle/absolute lifetimes, high-risk-action re-authentication and the detailed session-management policy remain unresolved and must not be assumed.
+
+### Immutable activity and change history
+
+For each important business action, DMS must retain enough information to answer: **who did it, what record was affected, what changed, and when did it happen?**
+
+The audit record should capture, as appropriate:
+
+- The actor's stable user ID and readable identity at the time of the action.
+- The action performed and the affected record type and ID.
+- The authoritative event timestamp and a request/correlation reference.
+- The previous and new values for changed business fields, or an explicit before/after change set.
+- A reason or explanation when a sensitive correction, override, cancellation, approval or adjustment requires one under the approved business rules.
+- The outcome of the action, including rejected/failed attempts where the event is security-relevant.
+
+Examples include creating or editing a customer, changing an order status, changing a scheduled delivery date/time, recording or verifying a payment, adjusting stock, receiving a transfer, approving an expense, suspending an employee or changing access.
+
+**Date and time changes require special care:** if a user changes a business date or time, preserve the previous value and the new value as part of the change history. Also preserve the separate timestamp showing when the edit itself occurred. The audit timestamp must never be overwritten just because a business date/time field was changed.
+
+### Timestamp and audit integrity rules
+
+- Store authoritative event timestamps in PostgreSQL as UTC timestamps (timestamptz) using server/database time, not a browser-provided clock.
+- Display dates and times in the DMS business timezone, Africa/Lagos, unless a separately approved requirement calls for another timezone.
+- Keep the business date/time recorded on an order, delivery, payment or other record distinct from the audit event timestamp that records when a user changed it.
+- Audit history must be append-only through the application and protected at the database level. Ordinary application users must not be able to edit or delete audit records.
+- Never place passwords, password hashes, session cookies, tokens, secrets or unnecessary sensitive personal/payment data in audit metadata.
+- User accounts may be suspended or deactivated, but historical activity must remain attributable. Do not delete an employee's identity in a way that breaks historical audit records.
+- Provide an activity-history screen with appropriate filters (for example, employee, action, record and date range) for roles authorised under the completed permission matrix. Do not expose activity records to users who are not authorised to view them.
+
+### Current implementation boundary
+
+Task 005 provides the foundation: individual provisioned user accounts, Argon2id password hashes, PostgreSQL-backed sessions, Owner bootstrap, login success/failure and logout audit events, an append-only audit table, request IDs and database protection against audit UPDATE, DELETE and TRUNCATE.
+
+The following are still future work: employee-management UI, secure invitation and password-recovery flows, an administrator session-history view, comprehensive audit coverage for every business-module action, before/after field-level change history, and a searchable management activity screen. These must be implemented and tested as the relevant account and business modules are built; they must not be described as already complete.
+
 ## Inventory rules
 
 Inventory accuracy is business-critical. The implementation must follow these rules:
@@ -292,24 +347,22 @@ Inventory accuracy is business-critical. The implementation must follow these ru
 - Returned goods must be inspected before being added back to sellable stock.
 - Critical stock changes must be protected against concurrent updates and recorded transactionally.
 
-## Proposed technology
+## Application architecture and technology status
 
-The initial technical direction is:
+Task 005 established the initial application foundation in `main`. The table below separates code that exists from proposals and infrastructure that have not been provisioned.
 
-| Layer | Proposed technology |
-|---|---|
-| Web frontend | React |
-| Backend API | Node.js and Express |
-| Database | PostgreSQL |
-| Application hosting | Render |
-| File storage | Supabase Storage or an equivalent suitable service |
-| Authentication | Secure server-side authentication and role-based authorisation |
-| Email | Dscentsation's company-hosted email through a verified SMTP/API sending integration |
-| SMS | A suitable Nigerian provider, to be selected if/when SMS is implemented |
+| Area | Implemented Task 005 foundation | Remaining boundary |
+|---|---|---|
+| Workspace | pnpm 12.16.1 workspace/monorepo; Node.js 26.13.0; separate `apps/web` and `apps/api` applications. | The code structure is consistent with a modular-monolith proposal; formal architecture ratification remains tracked in DMS-DEC-021. |
+| Web frontend | React 19.3.0, TypeScript 6.0.3 and Vite 8.3.5; responsive sign-in screen, authenticated shell, placeholder navigation and initial dashboard shell. | Business screens and operational modules are not implemented. TypeScript/Vite formal ratification remains open. |
+| API | Node.js 26.13.0, Express 5.3.0 and TypeScript 6.0.3; versioned JSON API under `/api/v1`, with health and foundation authentication/capability routes. | No Product, Inventory, Customer, Order, Finance or other business-module routes exist. The API is not a public customer/ecommerce API. |
+| Database | PostgreSQL via `pg` 8.23.1, explicit parameterised SQL, `node-pg-migrate` 9.0.0 and no ORM. The initial migration creates the eight foundation tables documented in the architecture records. | The complete business schema is not implemented. CI uses disposable PostgreSQL; no production database has been provisioned. |
+| Authentication | Argon2id hashes, provisioned accounts, PostgreSQL-backed sessions, HttpOnly/SameSite cookies, login rotation, logout/revocation, expiry handling, exact-Origin/session-bound CSRF protection, login throttling and an interactive Owner bootstrap CLI. | MFA, approved production idle/absolute session values, high-risk-action re-authentication and a distributed rate limiter remain unresolved or unimplemented. |
+| Roles, permissions and audit | Owner, Manager and Staff seed roles; four confirmed permission codes with seven role-permission assignments; append-only audit table protected against UPDATE, DELETE and TRUNCATE. | This is only the confirmed seed subset, not the complete business permission matrix. Future business workflows are not implemented. |
+| Verification | Prettier, ESLint, TypeScript checks, Vitest, Supertest, React Testing Library, PostgreSQL-backed API integration tests, migration/seed/rollback/reapplication checks and production builds in GitHub Actions. | Comprehensive Playwright journeys and business-specific stock-concurrency, inventory-transfer and financial-workflow coverage remain future work. |
+| Infrastructure and integrations | No Task 005 production infrastructure or external integration was provisioned. | Render hosting/database, background workers, email delivery, file storage, production secrets, backups and deployment remain subject to separate verification and approval. |
 
-These are the agreed proposed technologies, not evidence of an existing implementation. Specific hosting, database and email configuration must be verified before deployment.
-
-The application should be modular, with clear boundaries between orders, inventory, finance, customers, notifications and administration.
+The implementation details and evidence are reconciled in [the architecture overview](docs/architecture/overview.md), [database design](docs/architecture/database-design.md), [architecture decisions](docs/architecture/decisions.md) and [decision register](docs/architecture/decision-register.md). A codebase implementation is evidence of what was built, not automatic approval of a Proposed architecture decision.
 
 ## Security and data integrity
 
@@ -363,7 +416,10 @@ This checklist is the project's shared progress record. It is intended to help f
 - [ ] Define the complete application database schema and entity relationships. The current migration contains only the eight foundation tables; business-module schema design remains open.
 - [x] Implement and test provisioned-account authentication, Argon2id password hashing, PostgreSQL-backed sessions, CSRF protection, session rotation, expiry and revocation.
 - [ ] Complete the Owner, Manager and Staff business permission matrix. The foundation seeds only the three established roles and four currently confirmed permission codes; the full matrix remains open.
-- [x] Implement append-only audit storage and verify authentication/bootstrap audit events and mutation protection.
+- [x] Implement the append-only audit-table foundation, including authentication/bootstrap audit events and database rejection of UPDATE, DELETE and TRUNCATE. Full business-event coverage and before/after field history remain pending.
+- [ ] Implement administrator-managed employee account creation/invitations, secure password setup/recovery, account suspension/reactivation and session revocation.
+- [ ] Implement authorised session-history and activity-history views, including employee/action/record/date filters.
+- [ ] Record business changes with the authenticated actor, authoritative UTC event time, affected record and before/after values; retain the separate audit timestamp when a business date/time is edited.
 - [x] Build the responsive application shell, login screen, role identity display, placeholder navigation and initial dashboard shell.
 
 ### Phase 2 — Products and multi-location inventory
@@ -481,13 +537,15 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 ### Current project position
 
-**Completed:** Business discovery, core requirements, product scope decisions, public repository creation, initial project documentation, Task 002 architecture work for the Sheraton-to-Warehouse pickup workflow (ADR-016) merged in PRs #3 and #4, and the Task 005 application-foundation implementation. Task 005 CI has passed on the implementation branch using a disposable PostgreSQL service and synthetic test records.
+**Completed:** Business discovery, core requirements, product scope decisions, public repository creation, initial project documentation, Task 002 architecture work for the Sheraton-to-Warehouse pickup workflow (ADR-016) merged in PRs #3 and #4, and the Task 005 application foundation approved and merged into `main` through PR #7. The Task 005 CI run passed on the exact reviewed head using disposable PostgreSQL and synthetic test records.
 
-**Task 005 status:** The initial application-foundation implementation, its scope and its CI verification evidence are recorded in PR #7. This documents the implementation and verification evidence; it does not assert that PR #7 has been approved or merged.
+**Task 005 status:** Approved and merged. Merge commit: `652b5d51d17ecb36e78871a99164c12238a8ac41`. The application foundation is now part of `main`; this does not represent approval of the full target architecture or implementation of the business application.
 
-**Not yet implemented or approved:** The complete business database schema and entity relationships; complete role/permission matrix; real Warehouse/Sheraton location records and Staff assignments; operational business modules; production database/service provisioning; production credentials; company email/storage integrations; production deployment; MFA policy; and overall technical architecture/deployment approval.
+**Current implementation boundary:** The repository contains the initial web/API workspace, the eight-table foundation migration, provisioned-account authentication and persistent sessions, the confirmed permission seed subset, append-only audit storage, the initial application shell and CI. The full business schema, complete Owner/Manager/Staff permission matrix, Product/Inventory/Customer/Order/Finance/Supplier modules and their workflows remain incomplete.
 
-**Next development task:** Integrate Task 005 through PR #7 before starting the first business module. The first business module must not begin until the foundation has been approved and merged. Continue to resolve remaining architecture and business decisions where required rather than filling gaps with assumed rules.
+**Not yet implemented or approved:** Real Warehouse/Sheraton location records and Staff assignments; operational business modules; production database/service provisioning; production credentials; background workers; company email and file-storage integrations; production deployment; MFA; approved production session lifetimes and high-risk-action re-authentication; distributed rate limiting; and overall architecture/deployment approval. The technical implementation choices tracked by DMS-DEC-021–024 and DMS-DEC-027 are documented as adopted in the codebase where applicable but retain their existing review statuses.
+
+**Next development task:** Task 007 — Product Management — is the next planned development task. It may begin only after Task 006's documentation reconciliation has been merged. Its scope must follow the reconciled architecture and preserve all unresolved business and technical decisions; do not invent answers or treat implementation choices as approvals.
 
 ## Working agreement
 
