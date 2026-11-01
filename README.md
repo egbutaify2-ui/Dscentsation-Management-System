@@ -43,7 +43,7 @@ The owner should be able to monitor Nigerian operations remotely from the UK, wh
 | Order sources | WhatsApp, Instagram, website and phone calls |
 | Currency | Nigerian Naira (NGN / ₦) |
 | Business timezone | Africa/Lagos |
-| Inventory | Multiple physical stock locations |
+| Inventory | Two initial physical stock locations: Ajose Warehouse (main warehouse and stock holding) and Sheraton Store (customer-facing walk-in retail); each has an independent balance. Unique codes, addresses/identifiers and secure account mappings remain pending under DMS-DEC-001. |
 | User roles | Owner, Manager and Staff |
 | Company email | Existing company-hosted email account |
 | Product records | Staff will add products manually in DMS |
@@ -130,6 +130,8 @@ All items below describe planned functionality; they are not claims that the fea
 - Show stock movement history by product, location, date and staff member.
 - Configure low-stock thresholds and alerts per product/location.
 - Report stock valuation using recorded cost information.
+- Provide shared read-only operational dashboards, stock quantities and availability for Ajose Warehouse and Sheraton Store to authorised operational users; direct stock-changing operations remain location-scoped.
+- Route non-Owner stock-changing requests affecting the other location through destination-location approval, excluding standard transfers and the separate pickup/receipt workflows.
 
 ### 5. Customer management (CRM)
 
@@ -217,7 +219,7 @@ DMS is an operational management system. Financial reports must clearly distingu
 - Individual accounts for the Owner, Managers and Staff.
 - Configurable role-based permissions enforced by the backend.
 - Restrict sensitive financial, user-management and configuration actions.
-- Optionally restrict staff to assigned stock locations.
+- Keep shared read-only operational visibility of both initial stock locations separate from location-scoped direct stock-changing permissions.
 - Record important actions: who created, changed, approved, transferred or cancelled a record and when.
 - Provide management access to relevant activity history.
 - Protect sensitive business settings and integrations.
@@ -274,11 +276,17 @@ AI-generated answers must be grounded in actual records, respect user permission
 
 | Role | Intended access |
 |---|---|
-| **Owner** | Full business oversight, user and system administration, financial visibility, approvals, reports and all stock locations. |
-| **Manager** | Day-to-day operations, orders, customers, inventory, suppliers, returns, permitted reports and authorised approvals. |
-| **Staff** | Restricted operational access for assigned tasks, such as registering orders, customers, receipts and permitted stock actions. |
+| **Owner** | Full authority across both locations; may view and operate at Ajose Warehouse and Sheraton Store without location restriction; may approve/reject/override another user's pending cross-location request; and alone may access the consolidated financial overview. |
+| **Manager (Sheraton Store Manager assignment)** | May view both operational location dashboards, stock quantities and availability; direct stock-changing operations are limited to the assigned Sheraton Store. May use the dedicated Warehouse-to-assigned-Sheraton pickup and destination-receipt actions where the active destination assignment and explicit action permission pass. The generic Manager role does not grant unrestricted cross-location stock editing. |
+| **Staff (Ajose Warehouse assignment)** | May view both operational location dashboards, stock quantities and availability; direct stock-changing operations are limited to the assigned Ajose Warehouse. Cross-location stock-changing requests require the destination-location approval described below. |
 
-Permissions must be enforced by backend APIs and database access patterns, not only by hiding buttons in the user interface. Task 008 introduces only the explicit `users.view` and `users.manage` permissions for employee administration and assigns them to Owner only. Manager and Staff do not receive employee-administration permissions. The complete permission matrix remains unresolved under DMS-DEC-002.
+**Shared operational visibility is not shared write access.** Authorised operational users use the same operational screens and can view both Ajose Warehouse and Sheraton Store quantities/availability. A non-Owner may carry out normal authorised stock-changing operations directly only at the location assigned to that account. The actual account-to-location mappings must be configured privately through an authorised process; do not place employee names, personal email addresses or account IDs in this public repository.
+
+**Cross-location stock-change approval (Task 010 planning direction, pending formal confirmation):** a non-Owner request to change stock at the other location enters **Pending Approval** and must not change the live balance before approval. A Sheraton Store Manager request affecting Ajose Warehouse requires approval from any one authorised Ajose Warehouse Staff account. An Ajose Warehouse Staff request affecting Sheraton Store requires approval from the Sheraton Store Manager. The requester cannot approve their own request. The Owner may approve, reject or override another user's pending request; the Owner's own direct operations need no second approver. The request and decision retain requester/approver, target location, proposed operation, reason, timestamps, decision and outcome; approval revalidates current stock and permissions and posts transactionally; rejection changes no stock. Standard stock transfers, dedicated physical pickup and destination receipt remain separate workflows and do not use this additional approval queue.
+
+**Owner-only consolidated financial overview (Task 010 planning direction, pending formal confirmation):** only the Owner may see total money in, total money out, revenue, expenses and profit/loss consolidated across both locations. Backend authorisation and protected API responses must prevent Manager and Staff from receiving these aggregates; hiding a frontend panel is not sufficient. This does not settle broader access to individual payment, expense, refund or other financial records.
+
+Permissions must be enforced by backend APIs and database access patterns, not only by hiding buttons in the user interface. Task 008 introduces only the explicit `users.view` and `users.manage` permissions for employee administration and assigns them to Owner only. Manager and Staff do not receive employee-administration permissions. The complete permission matrix remains unresolved under DMS-DEC-002. The Task 010 access rules above are planning direction, not formal business-owner approval evidence; DMS-DEC-001 and DMS-DEC-002 remain Pending confirmation.
 
 ## Identity, user accounts and activity accountability
 
@@ -349,6 +357,9 @@ Inventory accuracy is business-critical. The implementation must follow these ru
 - Adjustments require a reason and an audit record.
 - Returned goods must be inspected before being added back to sellable stock.
 - Critical stock changes must be protected against concurrent updates and recorded transactionally.
+- Authorised operational users can view both Ajose Warehouse and Sheraton Store stock quantities and availability; shared visibility does not grant direct cross-location editing.
+- Non-Owner direct stock-changing operations are limited to the assigned location. Other-location stock-change requests remain pending until an authorised destination-location approver approves them, with the Owner able to act directly or review another user's request.
+- Standard transfers, dedicated Warehouse-to-Sheraton physical pickup and destination receipt remain separate workflows, not part of the additional cross-location approval queue.
 
 ## Inventory implementation readiness
 
@@ -406,10 +417,11 @@ This checklist is the project's shared progress record. It is intended to help f
 - [x] Confirm products will be entered manually; no bulk website catalogue import.
 - [x] Create the public GitHub repository.
 - [x] Establish this central README and project progress checklist.
-- [x] Document and independently review the Sheraton-to-Warehouse stock pickup workflow, separate Warehouse and Sheraton stock balances, restricted Staff pickup permissions and ADR-016 security boundaries (Task 002; merged PRs #3 and #4).
+- [x] Document and independently review the Sheraton-to-Warehouse stock pickup workflow, separate Warehouse and Sheraton stock balances, destination-assigned pickup permissions and ADR-016 security boundaries (Task 002; merged PRs #3 and #4).
 - [ ] Verify the current company email provider's supported SMTP/API sending method and requirements.
-- [ ] Identify and name the actual stock locations and their operating processes.
-- [ ] Agree the detailed role/permission matrix and approval limits.
+- [x] Identify the two initial operating stock locations and purposes: Ajose Warehouse (main warehouse and stock holding) and Sheraton Store (customer-facing walk-in retail). This does not approve unique location codes, addresses/identifiers or actual account assignments.
+- [ ] Approve unique location codes and any required address/identifying details; securely establish employee-to-location mappings and assignment authority (DMS-DEC-001).
+- [ ] Formally approve the supplied location/access direction and complete the broader role/permission matrix; preserve outstanding monetary approval limits under DMS-DEC-003.
 - [ ] Finalise operational rules for payment verification, order cancellation, dispatch, returns and refunds.
 - [ ] Approve the initial technical architecture and deployment plan.
 
@@ -551,9 +563,9 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 **Current implementation boundary:** `main` contains the Task 005 eight-table foundation, the merged Task 007 Product Management module (three tables, Owner-only permissions, API, audit events, frontend and tests), and Task 008 Employee Account Administration (invitation table and lifecycle constraints, Owner-only permissions, API, frontend, audit events and tests). Inventory, Customer, Order, Finance and Supplier modules remain incomplete.
 
-**Not yet implemented or approved:** Real Warehouse/Sheraton location records and Staff assignments (DMS-DEC-001); automated company email delivery (DMS-DEC-017; Task 008 returns a one-time URL for secure manual delivery using the official company email identity); the full role/permission matrix (DMS-DEC-002); password recovery; session-history and searchable audit-history screens; comprehensive business-event audit coverage; operational business modules; production database/service provisioning; production credentials; background workers; file-storage integrations; production deployment; MFA; approved production session lifetimes and high-risk-action re-authentication; distributed rate limiting; and overall architecture/deployment approval. The technical implementation choices tracked by DMS-DEC-021–024 and DMS-DEC-027 are documented as adopted in the codebase where applicable but retain their existing review statuses.
+**Not yet implemented or approved:** Real Ajose Warehouse/Sheraton Store location records, unique codes, addresses/identifying details and secure employee-to-location assignments (DMS-DEC-001); formal approval of the Task 010 shared-visibility, location-scoped-editing, cross-location approval and Owner-only financial-overview direction plus the complete role/module matrix (DMS-DEC-002); automated company email delivery (DMS-DEC-017; Task 008 returns a one-time URL for secure manual delivery using the official company email identity); the full role/permission matrix (DMS-DEC-002); password recovery; session-history and searchable audit-history screens; comprehensive business-event audit coverage; operational business modules; production database/service provisioning; production credentials; background workers; file-storage integrations; production deployment; MFA; approved production session lifetimes and high-risk-action re-authentication; distributed rate limiting; and overall architecture/deployment approval. The technical implementation choices tracked by DMS-DEC-021–024 and DMS-DEC-027 are documented as adopted in the codebase where applicable but retain their existing review statuses.
 
-**Completed development tasks:** Task 007 — Product Management — is merged through PR #9. Task 008 — Employee Account Administration — is independently reviewed and merged through PR #10 (merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`). Task 009 — Inventory Implementation Readiness & Decision Pack — is reviewed and merged through PR #11 (merge commit `f301eb238b982ead836e049b15348154c02c72b0`). The readiness pack is complete; the seven inventory business decisions remain pending, and inventory feature implementation has not started. **Next work:** complete the business decision worksheet and approve the applicable prerequisites before issuing the first inventory implementation task.
+**Completed development tasks:** Task 007 — Product Management — is merged through PR #9. Task 008 — Employee Account Administration — is independently reviewed and merged through PR #10 (merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`). Task 009 — Inventory Implementation Readiness & Decision Pack — is reviewed and merged through PR #11 (merge commit `f301eb238b982ead836e049b15348154c02c72b0`). The readiness pack is complete; the seven inventory business decisions remain pending, and inventory feature implementation has not started. **Current documentation task:** Task 010 — Location Access, Cross-Location Approval & Financial Visibility — is being reconciled in a draft pull request for independent review. Task 010 does not approve inventory implementation or introduce inventory functionality. **Next work:** complete formal business approval evidence for the applicable decisions and independently review Task 010 before issuing any inventory implementation task.
 
 ## Working agreement
 
