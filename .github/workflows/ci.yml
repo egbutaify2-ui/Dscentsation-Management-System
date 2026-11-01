@@ -63,9 +63,6 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Print canonical audit-service formatting (read-only)
-        run: pnpm exec prettier --single-quote --trailing-comma all --print-width 100 apps/api/src/modules/audit/audit.service.ts
-
       - name: Check formatting
         run: pnpm format:check
 
