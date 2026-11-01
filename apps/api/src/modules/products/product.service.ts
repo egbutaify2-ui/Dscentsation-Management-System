@@ -420,7 +420,8 @@ export async function updateCategory(
         'SELECT is_active FROM product_categories WHERE id = $1',
         [parentId],
       );
-      if (!parent.rows[0]?.is_active) throw conflict('An active category must have an active parent.');
+      if (!parent.rows[0]?.is_active)
+        throw conflict('An active category must have an active parent.');
     }
     if (input.isActive === false) {
       const children = await client.query(
@@ -449,11 +450,12 @@ export async function updateCategory(
       ],
     );
     const after = await loadCategory(client, categoryId);
-    const action = after.isActive === before.isActive
-      ? 'product.category.updated'
-      : after.isActive
-        ? 'product.category.activated'
-        : 'product.category.deactivated';
+    const action =
+      after.isActive === before.isActive
+        ? 'product.category.updated'
+        : after.isActive
+          ? 'product.category.activated'
+          : 'product.category.deactivated';
     await appendAuditEvent(
       {
         actorUserId: actorId,
@@ -731,13 +733,16 @@ export async function setVariantActive(
         FOR UPDATE`,
       [variantId, productId],
     );
-    if (!variantResult.rows[0]) throw notFound('The requested variant was not found for this product.');
+    if (!variantResult.rows[0])
+      throw notFound('The requested variant was not found for this product.');
     const before = variantFromRow(variantResult.rows[0]);
     if (before.isActive === isActive) return before;
     if (!isActive && product.status === 'active') {
       const activeVariants = product.variants.filter((item) => item.isActive);
       if (activeVariants.length <= 1) {
-        throw conflict('Archive the product or activate another variant before deactivating this one.');
+        throw conflict(
+          'Archive the product or activate another variant before deactivating this one.',
+        );
       }
     }
     await client.query(
