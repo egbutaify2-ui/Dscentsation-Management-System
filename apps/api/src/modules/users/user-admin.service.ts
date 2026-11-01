@@ -226,7 +226,7 @@ export async function acceptEmployeeInvitation(
 
     const activated = await client.query<{ id: string }>(
       `UPDATE users
-          SET password_hash = $2, status = 'active', updated_at = now()
+          SET password_hash = $2, status = 'active', last_login_at = now(), updated_at = now()
         WHERE id = $1 AND status = 'invited'
         RETURNING id`,
       [row.user_id, passwordHash],
@@ -345,6 +345,19 @@ export async function setEmployeeStatus(
       throw new UserAdminError('Employee account was not found.', 404, 'USER_NOT_FOUND');
     const sessionsRevoked =
       status === 'suspended' ? await revokeSessionsForUser(userId, client) : 0;
+    if (status === 'suspended') {
+      await appendAuditEvent(
+        {
+          actorUserId,
+          action: 'user.sessions.revoked',
+          entityType: 'user',
+          entityId: userId,
+          requestId,
+          safeMetadata: { revokedCount: sessionsRevoked, reason: 'employee_suspended' },
+        },
+        client,
+      );
+    }
     await appendAuditEvent(
       {
         actorUserId,
@@ -365,7 +378,7 @@ export async function setEmployeeStatus(
             role: current.role_code,
             status,
           },
-          sessionsRevoked,
+          revokedCount: sessionsRevoked,
         },
       },
       client,
@@ -421,7 +434,7 @@ export async function revokeEmployeeSessions(
         entityType: 'user',
         entityId: userId,
         requestId,
-        safeMetadata: { sessionsRevoked },
+        safeMetadata: { revokedCount: sessionsRevoked },
       },
       client,
     );

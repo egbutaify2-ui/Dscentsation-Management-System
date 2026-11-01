@@ -366,27 +366,28 @@ describe('Employee Account Administration API', () => {
     const audit = await pool.query<{
       action: string;
       actor_user_id: string;
-      safe_metadata: { before: { status: string }; after: { status: string } };
+      safe_metadata: Record<string, unknown>;
     }>(
       `SELECT action, actor_user_id, safe_metadata
          FROM audit_logs
-        WHERE entity_id = $1 AND action IN ('user.status.suspended', 'user.status.reactivated')
+        WHERE entity_id = $1
+          AND action IN ('user.sessions.revoked', 'user.status.suspended', 'user.status.reactivated')
         ORDER BY occurred_at`,
       [employee.id],
     );
-    expect(audit.rows.map((row) => row.action)).toEqual(
-      expect.arrayContaining([
-        'user.sessions.revoked',
-        'user.status.suspended',
-        'user.status.reactivated',
-      ]),
-    );
+    const auditByAction = new Map(audit.rows.map((row) => [row.action, row]));
+    expect(audit.rows).toHaveLength(3);
+    expect(auditByAction.has('user.sessions.revoked')).toBe(true);
     expect(audit.rows.every((row) => row.actor_user_id === owner.id)).toBe(true);
-    expect(audit.rows[1]?.safe_metadata).toMatchObject({
+    expect(auditByAction.get('user.sessions.revoked')?.safe_metadata).toMatchObject({
+      revokedCount: 2,
+      reason: 'employee_suspended',
+    });
+    expect(auditByAction.get('user.status.suspended')?.safe_metadata).toMatchObject({
       before: { status: 'active' },
       after: { status: 'suspended' },
     });
-    expect(audit.rows[2]?.safe_metadata).toMatchObject({
+    expect(auditByAction.get('user.status.reactivated')?.safe_metadata).toMatchObject({
       before: { status: 'suspended' },
       after: { status: 'active' },
     });
