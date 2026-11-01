@@ -1,7 +1,8 @@
 # Dscentsation Management System — Architecture Overview
 
-**Document status:** Implementation-aware architecture draft; proposed technical decisions remain subject to their recorded review status  
-**Task:** 002 — Technical Architecture, reconciled against Task 005  
+**Document status:** Implementation-aware architecture draft; proposed technical decisions remain subject to their recorded review status
+**Task:** 002 — Technical Architecture, reconciled against Task 005
+
 **Scope:** Initial internal operations platform for Dscentsation's Nigerian operations  
 **Requirements and implementation sources:** Repository `README.md`, Task 005 merge commit `652b5d51d17ecb36e78871a99164c12238a8ac41`, application manifests, source, migration and CI workflow
 
