@@ -87,8 +87,8 @@ Birthday, preferences, segmentation and promotional follow-ups are optional/futu
 |---|---|---|
 | inventory_balances | id, location_id, product_variant_id, quantity_on_hand, quantity_reserved, reorder_level, updated_at | Current physical-stock balance for one variant at one location. Excludes stock in transit. Unique constraint on (location_id, product_variant_id). |
 | stock_movements | id, movement_bucket (location/in_transit), location_id nullable, transfer_item_id nullable, product_variant_id, movement_type, quantity_delta, quantity_before, quantity_after, reason, reference_type, reference_id, idempotency_key, actor_user_id, occurred_at | Append-only ledger for physical-location and in-transit movements. A location-bucket event references a location; an in-transit event references its transfer item. |
-| stock_reservations | id, order_item_id, location_id, product_variant_id, quantity, status, reserved_at, expires_at, released_at, release_reason, consumed_at, policy_version | A confirmed order's reserved quantity at its one fulfilment location. Expiry is snapshotted from the policy active at creation. |
-| reservation_policies | id, duration_minutes, is_enabled, expiry_scope, version, updated_by, updated_at | Persisted, configurable reservation-expiry policy. expiry_scope defines eligible order/payment states (for example, unpaid-only versus all undispatched confirmed orders). Duration and scope are not hard-coded constants. |
+| stock_reservations | id, order_item_id, location_id, product_variant_id, quantity, status, reservation_policy_id, policy_version, reserved_at, expires_at nullable, released_at, release_reason, consumed_at | A confirmed order's reserved quantity at its one fulfilment location. It references the immutable policy version used to calculate its expiry; expires_at is null only when that version explicitly disables expiry. |
+| reservation_policies | id, version (unique), duration_minutes, is_enabled, expiry_scope, is_active, created_by, created_at | Persisted, versioned reservation-expiry policy. expiry_scope defines eligible order/payment states (for example, unpaid-only versus all undispatched confirmed orders). Each change creates a new version; only one version is active for new reservations. |
 | stock_transfers | id, reference (unique), source_location_id, destination_location_id, status, requested_by, dispatched_by, dispatched_at, received_by, received_at, timestamps | Transfer header and lifecycle. Source and destination must differ. Destination receipt is confirmed by Staff assigned to the destination location. |
 | stock_transfer_items | id, transfer_id, product_variant_id, quantity_requested, quantity_dispatched, quantity_received, quantity_resolved, discrepancy_reason | Item-level quantities and discrepancy resolution. Unreceived, unresolved dispatched quantity remains in transit. |
 | stock_in_transit_balances | id, transfer_item_id (unique), source_location_id, destination_location_id, product_variant_id, quantity_in_transit, updated_at | Current in-transit stock summary for a transfer item. Created/increased at dispatch; decreased as destination Staff confirms receipt or a discrepancy is formally resolved. |
@@ -105,7 +105,7 @@ Birthday, preferences, segmentation and promotional follow-ups are optional/futu
 - Lock the relevant physical and transit rows (for example with SELECT ... FOR UPDATE) inside a transaction before changing a balance.
 - A reservation may not exceed available quantity at the order's selected fulfilment location.
 - Confirming an order creates its reservation immediately, regardless of whether a payment has been recorded or verified.
-- Each reservation stores expires_at and the policy version applied when created. A policy edit applies to new reservations only; changing an existing expiry requires an explicit authorised and audited action.
+- Each reservation stores a foreign key to the immutable reservation-policy version, its version and expires_at. A policy edit creates a new version for new reservations only; existing reservations retain their original eligibility scope and expiry unless an explicit authorised and audited action changes them.
 - A scheduled/background worker expires reservations only after locking and rechecking the order, reservation and balance. It verifies the reservation is still active, due and eligible under the current business rules, marks it expired, reduces quantity_reserved, writes an expiry/audit event and places the order on fulfilment hold/reconfirmation. It does not reduce physical on-hand stock or silently cancel the order.
 - Expiry is idempotent. A race with dispatch, cancellation or re-reservation is resolved with row locks/conditional state transitions so stock is released or consumed exactly once, never both.
 - Transfer dispatch reduces source on-hand and increases the transfer item's in-transit balance in one transaction. Write paired source-location and in-transit ledger events.
@@ -195,7 +195,7 @@ Returned goods must not enter sellable stock automatically. An authorised inspec
 | Table | Key columns | Purpose / relationships |
 |---|---|---|
 | `stored_files` | `id`, `storage_provider`, `bucket`, `object_key`, `original_filename`, `content_type`, `size_bytes`, `checksum`, `uploaded_by`, `created_at`, `status` | Metadata only; binary file content lives in private object storage. Other records refer to a file ID. |
-| `email_outbox` | `id`, `message_key` (unique), `recipient`, `template_key`, `payload`, `related_type`, `related_id`, `status`, `attempt_count`, `next_attempt_at`, `provider_reference`, timestamps | Durable request to send transactional email, processed by a worker. |
+| `email_outbox` | `id`, `message_key` (unique), `receipt_issuance_id` nullable, `recipient`, `template_key`, `payload`, `related_type`, `related_id`, `status`, `attempt_count`, `next_attempt_at`, `provider_reference`, timestamps | Durable request to send transactional email, processed by a worker. Receipt-related messages reference the immutable receipt issuance; email delivery is not the issuance record. |
 | `email_delivery_attempts` | `id`, `outbox_id`, `attempted_at`, `outcome`, `provider_response_code`, `safe_error_summary` | Delivery/retry history, with secrets and sensitive payloads redacted. |
 | `audit_logs` | `id`, `actor_user_id`, `action`, `entity_type`, `entity_id`, `request_id`, `safe_metadata`, `occurred_at` | Append-only audit trail for sensitive business/security actions. |
 
@@ -224,7 +224,7 @@ erDiagram
   PRODUCTS ||--|{ PRODUCT_VARIANTS : has
   PRODUCT_VARIANTS ||--o{ ORDER_ITEMS : sold_as
   ORDERS ||--o{ RECEIPT_ISSUANCES : issues
-  PAYMENTS ||--o{ RECEIPT_ISSUANCES : evidenced_by
+  PAYMENTS o|--o{ RECEIPT_ISSUANCES : evidenced_by
   RECEIPT_ISSUANCES ||--o{ RECEIPT_ISSUANCE_EVENTS : history
 
   LOCATIONS ||--o{ INVENTORY_BALANCES : stores
@@ -232,7 +232,7 @@ erDiagram
   PRODUCT_VARIANTS ||--o{ STOCK_MOVEMENTS : changes
   LOCATIONS o|--o{ STOCK_MOVEMENTS : physical_location
   ORDER_ITEMS ||--o{ STOCK_RESERVATIONS : reserves
-  RESERVATION_POLICIES ||--o{ STOCK_RESERVATIONS : configures
+  RESERVATION_POLICIES ||--o{ STOCK_RESERVATIONS : versions
 
   STOCK_TRANSFERS ||--|{ STOCK_TRANSFER_ITEMS : contains
   STOCK_TRANSFER_ITEMS ||--o| STOCK_IN_TRANSIT_BALANCES : tracks
@@ -263,7 +263,7 @@ erDiagram
 At minimum, add:
 
 - Unique index on normalised `users.email`.
-- Unique indexes on `orders.order_reference`, purchase-order references, receipt references, return references and expense references.
+- Unique indexes on `orders.order_reference`, `receipt_issuances.receipt_reference`, purchase-order references, goods-receipt references, return references and expense references.
 - Unique index on (`location_id`, `product_variant_id`) in `inventory_balances`.
 - Unique nullable SKU index on `product_variants.sku` if the business uses SKUs; blank values should be stored as NULL, not repeated empty strings.
 - Foreign-key indexes on frequently joined columns such as `customer_id`, `order_id`, `product_variant_id`, `location_id`, `supplier_id` and timestamp columns used in reports.
