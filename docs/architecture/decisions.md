@@ -2,7 +2,7 @@
 
 **Document status:** Implementation-aware architecture decisions for project-manager review  
 **Task:** 002 — Technical Architecture, reconciled against Task 005  
-**Decision rule:** Each ADR's own status is authoritative. Implementation evidence records what exists in the codebase; it does not approve a Proposed choice or change a Pending status. Confirmed business rules remain confirmed only where an ADR explicitly says so.
+**Decision rule:** Each ADR's status controls its approval state. Only decisions explicitly marked Confirmed are treated as accepted; an implementation detail appearing in the codebase does not by itself change an ADR's status.
 
 This document records the rationale for architecture decisions, preserves existing approval statuses and distinguishes confirmed product constraints, proposed target design and implementation choices adopted in the codebase. Task 005 was approved and merged through PR #7; that merge did not approve the whole target architecture or the unimplemented business modules.
 
@@ -110,7 +110,7 @@ Use PostgreSQL as the authoritative relational database. Use migrations in versi
 **Consequences**
 
 - Production schema changes require reviewed migrations.
-- The ORM/data-access library remains an implementation choice to settle when repository scaffolding begins.
+- Task 005 adopted explicit parameterised SQL through `pg` and `node-pg-migrate` for migrations, without an ORM. This implementation choice is documented below and remains subject to formal ratification under DMS-DEC-024.
 - A managed database provider, region, size, backup policy and restore capability must be selected before deployment.
 
 **Task 005 implementation evidence (PR #7, merged):** The API accesses PostgreSQL through `pg` 8.23.1 using explicit parameterised SQL and uses `node-pg-migrate` 9.0.0 for versioned migrations. No ORM is included. The initial migration creates only the eight foundation tables recorded in `docs/architecture/database-design.md`. The CI integration/migration checks use disposable PostgreSQL 17. This records the codebase's adopted query/migration tooling, not formal architecture ratification; ADR-004's status remains **Proposed technology** and DMS-DEC-024 remains Pending confirmation.
