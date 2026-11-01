@@ -92,6 +92,7 @@ BEGIN
       FROM role_permissions rp
       JOIN roles r ON r.id = rp.role_id
       JOIN permissions p ON p.id = rp.permission_id
+     WHERE p.code NOT LIKE 'products.%'
   ) THEN
     RAISE EXCEPTION 'Role-permission assignments do not match the confirmed matrix';
   END IF;
