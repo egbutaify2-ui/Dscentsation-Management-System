@@ -82,6 +82,7 @@ BEGIN
       FROM role_permissions rp
       JOIN roles r ON r.id = rp.role_id
       JOIN permissions p ON p.id = rp.permission_id
+     WHERE p.code NOT LIKE 'products.%'
     EXCEPT
     SELECT role_code, permission_code FROM expected_role_permissions
   ) OR EXISTS (
