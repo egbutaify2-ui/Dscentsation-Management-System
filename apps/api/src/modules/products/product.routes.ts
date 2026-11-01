@@ -87,19 +87,25 @@ router.get('/products', requirePermission('products.view'), async (request, resp
       });
       return;
     }
-    response.json({ data: await listProducts(query || undefined, status === 'all' ? undefined : status) });
+    response.json({
+      data: await listProducts(query || undefined, status === 'all' ? undefined : status),
+    });
   } catch (error) {
     next(error);
   }
 });
 
-router.get('/products/:productId', requirePermission('products.view'), async (request, response, next) => {
-  try {
-    response.json({ data: await getProduct(routeId(request.params.productId!)) });
-  } catch (error) {
-    next(error);
-  }
-});
+router.get(
+  '/products/:productId',
+  requirePermission('products.view'),
+  async (request, response, next) => {
+    try {
+      response.json({ data: await getProduct(routeId(request.params.productId!)) });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 router.post('/products', requirePermission('products.create'), async (request, response, next) => {
   try {
@@ -115,35 +121,53 @@ router.post('/products', requirePermission('products.create'), async (request, r
   }
 });
 
-router.patch('/products/:productId', requirePermission('products.update'), async (request, response, next) => {
-  try {
-    const parsed = updateProductSchema.safeParse(request.body);
-    if (!parsed.success) {
-      response.status(400).json(validationResponse(parsed.error));
-      return;
+router.patch(
+  '/products/:productId',
+  requirePermission('products.update'),
+  async (request, response, next) => {
+    try {
+      const parsed = updateProductSchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      response.json({
+        data: await updateProduct(
+          actorId(request),
+          request.requestId,
+          routeId(request.params.productId!),
+          parsed.data,
+        ),
+      });
+    } catch (error) {
+      next(error);
     }
-    response.json({
-      data: await updateProduct(actorId(request), request.requestId, routeId(request.params.productId!), parsed.data),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
-router.patch('/products/:productId/status', requirePermission('products.archive'), async (request, response, next) => {
-  try {
-    const parsed = productStatusSchema.safeParse(request.body);
-    if (!parsed.success) {
-      response.status(400).json(validationResponse(parsed.error));
-      return;
+router.patch(
+  '/products/:productId/status',
+  requirePermission('products.archive'),
+  async (request, response, next) => {
+    try {
+      const parsed = productStatusSchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      response.json({
+        data: await setProductStatus(
+          actorId(request),
+          request.requestId,
+          routeId(request.params.productId!),
+          parsed.data.status,
+        ),
+      });
+    } catch (error) {
+      next(error);
     }
-    response.json({
-      data: await setProductStatus(actorId(request), request.requestId, routeId(request.params.productId!), parsed.data.status),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
 router.get('/categories', requirePermission('products.view'), async (_request, response, next) => {
   try {
@@ -153,80 +177,122 @@ router.get('/categories', requirePermission('products.view'), async (_request, r
   }
 });
 
-router.post('/categories', requirePermission('products.categories.manage'), async (request, response, next) => {
-  try {
-    const parsed = createCategorySchema.safeParse(request.body);
-    if (!parsed.success) {
-      response.status(400).json(validationResponse(parsed.error));
-      return;
+router.post(
+  '/categories',
+  requirePermission('products.categories.manage'),
+  async (request, response, next) => {
+    try {
+      const parsed = createCategorySchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      response.status(201).json({
+        data: await createCategory(actorId(request), request.requestId, parsed.data),
+      });
+    } catch (error) {
+      next(error);
     }
-    response.status(201).json({
-      data: await createCategory(actorId(request), request.requestId, parsed.data),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
-router.patch('/categories/:categoryId', requirePermission('products.categories.manage'), async (request, response, next) => {
-  try {
-    const parsed = updateCategorySchema.safeParse(request.body);
-    if (!parsed.success) {
-      response.status(400).json(validationResponse(parsed.error));
-      return;
+router.patch(
+  '/categories/:categoryId',
+  requirePermission('products.categories.manage'),
+  async (request, response, next) => {
+    try {
+      const parsed = updateCategorySchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      response.json({
+        data: await updateCategory(
+          actorId(request),
+          request.requestId,
+          routeId(request.params.categoryId!),
+          parsed.data,
+        ),
+      });
+    } catch (error) {
+      next(error);
     }
-    response.json({
-      data: await updateCategory(actorId(request), request.requestId, routeId(request.params.categoryId!), parsed.data),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
-router.post('/products/:productId/variants', requirePermission('products.variants.manage'), async (request, response, next) => {
-  try {
-    const parsed = createVariantSchema.safeParse(request.body);
-    if (!parsed.success) {
-      response.status(400).json(validationResponse(parsed.error));
-      return;
+router.post(
+  '/products/:productId/variants',
+  requirePermission('products.variants.manage'),
+  async (request, response, next) => {
+    try {
+      const parsed = createVariantSchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      response.status(201).json({
+        data: await createVariant(
+          actorId(request),
+          request.requestId,
+          routeId(request.params.productId!),
+          parsed.data,
+        ),
+      });
+    } catch (error) {
+      next(error);
     }
-    response.status(201).json({
-      data: await createVariant(actorId(request), request.requestId, routeId(request.params.productId!), parsed.data),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
-router.patch('/products/:productId/variants/:variantId', requirePermission('products.variants.manage'), async (request, response, next) => {
-  try {
-    const parsed = updateVariantSchema.safeParse(request.body);
-    if (!parsed.success) {
-      response.status(400).json(validationResponse(parsed.error));
-      return;
+router.patch(
+  '/products/:productId/variants/:variantId',
+  requirePermission('products.variants.manage'),
+  async (request, response, next) => {
+    try {
+      const parsed = updateVariantSchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      response.json({
+        data: await updateVariant(
+          actorId(request),
+          request.requestId,
+          routeId(request.params.productId!),
+          routeId(request.params.variantId!),
+          parsed.data,
+        ),
+      });
+    } catch (error) {
+      next(error);
     }
-    response.json({
-      data: await updateVariant(actorId(request), request.requestId, routeId(request.params.productId!), routeId(request.params.variantId!), parsed.data),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
-router.patch('/products/:productId/variants/:variantId/status', requirePermission('products.variants.manage'), async (request, response, next) => {
-  try {
-    const parsed = statusSchema.safeParse(request.body);
-    if (!parsed.success) {
-      response.status(400).json(validationResponse(parsed.error));
-      return;
+router.patch(
+  '/products/:productId/variants/:variantId/status',
+  requirePermission('products.variants.manage'),
+  async (request, response, next) => {
+    try {
+      const parsed = statusSchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      response.json({
+        data: await setVariantActive(
+          actorId(request),
+          request.requestId,
+          routeId(request.params.productId!),
+          routeId(request.params.variantId!),
+          parsed.data.isActive,
+        ),
+      });
+    } catch (error) {
+      next(error);
     }
-    response.json({
-      data: await setVariantActive(actorId(request), request.requestId, routeId(request.params.productId!), routeId(request.params.variantId!), parsed.data.isActive),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
 const productErrorHandler: ErrorRequestHandler = (error, request, response, next) => {
   if (error instanceof ProductError) {
