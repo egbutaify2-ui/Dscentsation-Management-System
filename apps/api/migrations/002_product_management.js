@@ -95,7 +95,7 @@ export async function up(pgm) {
       WHERE is_default = true;
 
     CREATE FUNCTION prevent_product_variant_reparenting() RETURNS trigger
-    LANGUAGE plpgsql AS $
+    LANGUAGE plpgsql AS $$
     BEGIN
       IF NEW.product_id IS DISTINCT FROM OLD.product_id THEN
         RAISE EXCEPTION 'Product variants cannot be reassigned to another product'
@@ -104,7 +104,7 @@ export async function up(pgm) {
       END IF;
       RETURN NEW;
     END;
-    $;
+    $$;
     CREATE TRIGGER product_variants_product_id_immutable
       BEFORE UPDATE OF product_id ON product_variants
       FOR EACH ROW EXECUTE FUNCTION prevent_product_variant_reparenting();
