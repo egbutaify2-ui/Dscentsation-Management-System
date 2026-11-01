@@ -407,4 +407,4 @@ Remaining questions before implementation:
 9. Confirm the canonical Warehouse and Sheraton location records/codes and the Staff accounts assigned to each Sheraton location.
 10. Confirm any operational paperwork/reference required at Warehouse when a Sheraton Staff member records physical pickup; the access boundary and stock accounting rules in this architecture are fixed.
 
-**Review outcome:** Pending independent review of this reconciliation. The Task 005 foundation has been implemented and merged; the broader target architecture, unresolved technical choices, business modules and production deployment have not thereby been approved.
+**Architecture status:** Task 005 implementation evidence has been reconciled into this overview. Formal architecture ratification, remaining business decisions, implementation of business modules and production deployment remain subject to their separate approvals; this reconciliation does not grant those approvals.
