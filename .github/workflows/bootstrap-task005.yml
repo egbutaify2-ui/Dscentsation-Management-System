@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - task-005-application-foundation
+    paths:
+      - .task005-trigger
 
 permissions:
   contents: write
@@ -44,7 +46,6 @@ jobs:
                   handle.write(content)
           manifest.unlink()
           Path('.task005-trigger').unlink()
-          Path('.github/workflows/bootstrap-task005.yml').unlink()
           print(f"Materialised {len(files)} files.")
           PY
 
