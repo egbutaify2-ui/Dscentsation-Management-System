@@ -12,6 +12,7 @@ A centralised internal business management platform for Dscentsation's Nigerian 
 - [Modules and planned capabilities](#modules-and-planned-capabilities)
 - [Core business workflows](#core-business-workflows)
 - [Users and permissions](#users-and-permissions)
+- [Identity, user accounts and activity accountability](#identity-user-accounts-and-activity-accountability)
 - [Inventory rules](#inventory-rules)
 - [Application architecture and technology status](#application-architecture-and-technology-status)
 - [Security and data integrity](#security-and-data-integrity)
@@ -276,6 +277,60 @@ AI-generated answers must be grounded in actual records, respect user permission
 
 Permissions must be enforced by backend APIs and database access patterns, not only by hiding buttons in the user interface. The exact permission matrix will be defined during architecture and authentication work.
 
+## Identity, user accounts and activity accountability
+
+DMS must identify the individual person performing each authenticated action. This is a core security and operational requirement, not an optional reporting feature.
+
+### Individual employee accounts
+
+- Every Owner, Manager and Staff member must use their own named account and unique email address. Shared accounts and shared passwords are not permitted.
+- An account must identify the employee, their active/suspended status and the access role approved for them. Location assignments and permissions must be checked by the backend against approved business rules.
+- An authorised administrator must be able to create or invite an employee, issue a secure account-setup process, suspend/reactivate access and revoke that employee's active sessions. The exact administrator permissions remain subject to the business permission matrix.
+- Employees should set their own password through a secure, single-use, expiring setup or reset link. Passwords must never be sent in plain text, stored in plain text, or placed in Render environment variables.
+- Passwords are stored only as secure password hashes. Task 005 already implements Argon2id password hashing, provisioned accounts and an interactive initial Owner bootstrap CLI. The employee-management interface, invitation flow, password recovery and ongoing account-administration workflows remain to be implemented.
+- Render environment variables are for application/service configuration and secrets (for example, database connection and session signing secrets), not for maintaining each employee's login credentials. Employee account records and password hashes belong in the protected PostgreSQL user store.
+
+### Session and login accountability
+
+- The system must associate each authenticated session with the individual user account that created it. The backend must derive the actor identity and role from the validated server-side session, never from a user ID, role or timestamp supplied by the browser.
+- Record successful and failed login attempts and logout events. The foundation already records these authentication events and stores sessions in PostgreSQL.
+- The complete session-history capability must make it possible for authorised administrators to see relevant session events and status, including sign-in time, sign-out/expiry/revocation where available, and the account to which the session belongs.
+- Provide a controlled way to revoke sessions when an account is suspended, compromised or no longer authorised. Do not expose raw session cookies, session secrets or reusable session identifiers in the activity interface.
+- MFA, approved session idle/absolute lifetimes, high-risk-action re-authentication and the detailed session-management policy remain unresolved and must not be assumed.
+
+### Immutable activity and change history
+
+For each important business action, DMS must retain enough information to answer: **who did it, what record was affected, what changed, and when did it happen?**
+
+The audit record should capture, as appropriate:
+
+- The actor's stable user ID and readable identity at the time of the action.
+- The action performed and the affected record type and ID.
+- The authoritative event timestamp and a request/correlation reference.
+- The previous and new values for changed business fields, or an explicit before/after change set.
+- A reason or explanation when a sensitive correction, override, cancellation, approval or adjustment requires one under the approved business rules.
+- The outcome of the action, including rejected/failed attempts where the event is security-relevant.
+
+Examples include creating or editing a customer, changing an order status, changing a scheduled delivery date/time, recording or verifying a payment, adjusting stock, receiving a transfer, approving an expense, suspending an employee or changing access.
+
+**Date and time changes require special care:** if a user changes a business date or time, preserve the previous value and the new value as part of the change history. Also preserve the separate timestamp showing when the edit itself occurred. The audit timestamp must never be overwritten just because a business date/time field was changed.
+
+### Timestamp and audit integrity rules
+
+- Store authoritative event timestamps in PostgreSQL as UTC timestamps (timestamptz) using server/database time, not a browser-provided clock.
+- Display dates and times in the DMS business timezone, Africa/Lagos, unless a separately approved requirement calls for another timezone.
+- Keep the business date/time recorded on an order, delivery, payment or other record distinct from the audit event timestamp that records when a user changed it.
+- Audit history must be append-only through the application and protected at the database level. Ordinary application users must not be able to edit or delete audit records.
+- Never place passwords, password hashes, session cookies, tokens, secrets or unnecessary sensitive personal/payment data in audit metadata.
+- User accounts may be suspended or deactivated, but historical activity must remain attributable. Do not delete an employee's identity in a way that breaks historical audit records.
+- Provide an activity-history screen with appropriate filters (for example, employee, action, record and date range) for roles authorised under the completed permission matrix. Do not expose activity records to users who are not authorised to view them.
+
+### Current implementation boundary
+
+Task 005 provides the foundation: individual provisioned user accounts, Argon2id password hashes, PostgreSQL-backed sessions, Owner bootstrap, login success/failure and logout audit events, an append-only audit table, request IDs and database protection against audit UPDATE, DELETE and TRUNCATE.
+
+The following are still future work: employee-management UI, secure invitation and password-recovery flows, an administrator session-history view, comprehensive audit coverage for every business-module action, before/after field-level change history, and a searchable management activity screen. These must be implemented and tested as the relevant account and business modules are built; they must not be described as already complete.
+
 ## Inventory rules
 
 Inventory accuracy is business-critical. The implementation must follow these rules:
@@ -361,7 +416,10 @@ This checklist is the project's shared progress record. It is intended to help f
 - [ ] Define the complete application database schema and entity relationships. The current migration contains only the eight foundation tables; business-module schema design remains open.
 - [x] Implement and test provisioned-account authentication, Argon2id password hashing, PostgreSQL-backed sessions, CSRF protection, session rotation, expiry and revocation.
 - [ ] Complete the Owner, Manager and Staff business permission matrix. The foundation seeds only the three established roles and four currently confirmed permission codes; the full matrix remains open.
-- [x] Implement append-only audit storage and verify authentication/bootstrap audit events and mutation protection.
+- [x] Implement the append-only audit-table foundation, including authentication/bootstrap audit events and database rejection of UPDATE, DELETE and TRUNCATE. Full business-event coverage and before/after field history remain pending.
+- [ ] Implement administrator-managed employee account creation/invitations, secure password setup/recovery, account suspension/reactivation and session revocation.
+- [ ] Implement authorised session-history and activity-history views, including employee/action/record/date filters.
+- [ ] Record business changes with the authenticated actor, authoritative UTC event time, affected record and before/after values; retain the separate audit timestamp when a business date/time is edited.
 - [x] Build the responsive application shell, login screen, role identity display, placeholder navigation and initial dashboard shell.
 
 ### Phase 2 — Products and multi-location inventory
