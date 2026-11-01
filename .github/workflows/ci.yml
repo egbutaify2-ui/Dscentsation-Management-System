@@ -119,7 +119,7 @@ jobs:
         shell: bash
         run: |
           pnpm --filter @dms/api exec tsx src/cli/migrate.ts down 3
-          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants')")"
+          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants', 'user_invitations')")"
           if [ "$remaining" != "0" ]; then
             echo "Rollback left $remaining application tables behind."
             exit 1

@@ -1,10 +1,10 @@
 # Dscentsation Management System — Database Design
 
-**Document status:** The eight-table Task 005 foundation is the merged `main` baseline. The unmerged Task 007 branch candidate adds three product tables described below; this document is not an approved final business schema or a production migration.
+**Document status:** The eight-table Task 005 foundation and three-table Task 007 Product Management module are merged into `main`. The Task 008 Employee Account Administration draft branch candidate adds one invitation table and user-status/Owner-protection constraints; this document is not an approved final business schema or a production database record.
 **Task:** 002 — Technical Architecture, updated for Task 005
 
 **Database:** PostgreSQL  
-**Purpose:** Distinguish the physical eight-table foundation migration from the larger proposed business schema below. The conceptual entity groups are not an executable migration and do not indicate that a production database has been provisioned.
+**Purpose:** Distinguish the physical Task 005 foundation, merged Task 007 product schema and Task 008 employee-account branch candidate from the larger proposed business schema below. The conceptual entity groups are not executable migrations and do not indicate that a production database has been provisioned.
 
 ## Task 005 implemented foundation — physical schema
 
@@ -19,23 +19,35 @@ Task 005 was approved and merged into `main` through PR #7 (merge commit `652b5d
 7. `user_sessions`
 8. `audit_logs`
 
-No product, product-variant, customer, order, delivery, inventory-balance, stock-movement, transfer, payment, refund, expense, supplier, procurement, return, receipt-issuance, file-metadata or email-outbox table exists in the eight-table Task 005 `main` baseline. The unmerged Task 007 branch adds product-specific tables only; the remaining conceptual entities must not be mistaken for migrated tables.
+Migration 001 contains only the eight Task 005 foundation tables. Merged migration 002 adds product categories, products and product variants. Task 008 migration 003 adds `user_invitations` on its draft branch. Customer, order, delivery, inventory-balance, stock-movement, transfer, payment, refund, expense, supplier, procurement, return, receipt-issuance, file-metadata and email-outbox tables remain unimplemented.
 
-### Task 007 Product Management branch candidate — not merged or accepted
+### Task 007 Product Management — merged through PR #9
 
-The unmerged `task-007-product-management` branch adds migration `002_product_management.js` with three physical tables:
+Migration `002_product_management.js` adds three physical tables:
 
 - `product_categories`: optional self-referencing parent, name/description, active flag and timestamps. A PostgreSQL trigger rejects self-parenting and category cycles.
 - `products`: optional restrictive category FK, manually entered name/description/internal code, active/archived status, creator/updater references and timestamps.
 - `product_variants`: product FK, variant/size label, optional non-unique SKU, validated free-form unit label, BIGINT current selling/cost prices in kobo, NGN currency, active/default flags, creator/updater references and timestamps.
 
-The migration prevents hard deletion of categories, products and variants, prevents variant reparenting, and ensures a committed product retains at least one variant. Product creation inserts its initial variant in the same transaction. The branch introduces no stock tables, image/file storage or inventory valuation history. Six explicit product permissions are assigned to Owner only; Manager and Staff receive none. DMS-DEC-002 remains open. Only current cost price is stored; DMS-DEC-015 remains open and no costing or valuation policy is implemented.
+The migration prevents hard deletion of categories, products and variants, prevents variant reparenting, and ensures a committed product retains at least one variant. Product creation inserts its initial variant in the same transaction. It introduces no stock tables, image/file storage or inventory valuation history. Six explicit product permissions are assigned to Owner only; Manager and Staff receive none. DMS-DEC-002 remains open. Only current cost price is stored; DMS-DEC-015 remains open and no costing or valuation policy is implemented.
+
+### Task 008 Employee Account Administration — draft branch candidate
+
+Migration `003_employee_account_administration.js` adds the following physical and constraint changes:
+
+- Extends the supported `users.status` values with `invited`. Login and active-session validation continue to require `active`.
+- Adds `user_invitations` with a foreign key to `users`, a unique 64-character SHA-256 token digest, expiry, creator, creation timestamp, revocation timestamp and consumption timestamp. Only a digest is stored; the raw high-entropy token and complete setup URL are returned to the Owner once and are not persisted.
+- Adds a partial unique index allowing at most one unrevoked/unconsumed invitation per employee, plus expiry and employee-history indexes.
+- Adds an enabled `users_protect_last_active_owner` trigger. The trigger serialises Owner status changes with a transaction-scoped advisory lock and rejects suspending/disabling the final active Owner with SQLSTATE `23514`.
+- Seeds `users.view` and `users.manage` and assigns them to Owner only. Manager and Staff receive neither permission.
+
+The technical invitation expiry default is 24 hours and can be configured with `INVITATION_EXPIRY_HOURS` (accepted range 1–168 hours). The 24-hour value is a technical default pending business policy confirmation, not a ratified business rule. Automated delivery is not implemented: DMS-DEC-017 remains pending, and the Owner manually sends the one-time URL using the official Dscentsation company email identity. Password recovery, session-history browsing, general role editing and employee location assignments are out of scope; DMS-DEC-001 and DMS-DEC-002 remain unresolved.
 
 ### Implemented database approach
 
 - PostgreSQL is the database technology used by the application foundation.
 - The API uses `pg` 8.23.1 and explicit SQL with parameterised query values. No ORM is used in Task 005.
-- `node-pg-migrate` 9.0.0 manages versioned migrations. Schema changes are migration-controlled; the API checks that the eight foundation tables exist and does not run migrations automatically at startup.
+- `node-pg-migrate` 9.0.0 manages versioned migrations. Schema changes are migration-controlled; on the Task 008 branch the API readiness check includes the eight foundation tables, three product tables and the `user_invitations` table. The API does not run migrations automatically at startup.
 - Transactions are used for implemented multi-step operations, including initial Owner creation (advisory lock, user insert and audit insert) and successful login metadata/audit writes. This is not evidence that future order, inventory or financial transaction workflows exist.
 - The API integration suite and migration verification run against a disposable PostgreSQL 17 service in GitHub Actions. This is not a production database or provisioning record.
 
@@ -63,7 +75,7 @@ These are only the confirmed rules represented in the foundation seed. They are 
 
 The `user_sessions` table follows the `connect-pg-simple` adapter shape (`sid`, `sess`, `expire`) with additional user attribution and timestamps. It is not identical to the generic conceptual session columns shown in the proposed entity model below. The `audit_logs` table is protected by PostgreSQL triggers that reject UPDATE, DELETE and TRUNCATE operations.
 
-Only the eight foundation tables exist in Task 005 migration 001 on `main`. Task 007 migration 002 adds the three product tables below on its unmerged branch. No production database was provisioned; CI uses disposable synthetic data.
+Migration 001 remains the eight-table Task 005 foundation. Migration 002 is merged and adds the three Product Management tables. Task 008 migration 003 is present on the draft branch and adds `user_invitations` plus the invited status and last-active-Owner guard. No production database was provisioned; CI uses disposable synthetic data.
 
 ## 1. Design principles
 
