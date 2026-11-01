@@ -1,5 +1,6 @@
 import connectPgSimple from 'connect-pg-simple';
 import session from 'express-session';
+import type { RequestHandler } from 'express';
 import { env } from '../config/env.js';
 import { pool } from '../db/pool.js';
 
@@ -13,7 +14,7 @@ export const sessionStore = new PgSessionStore({
   pruneSessionInterval: 15 * 60,
 });
 
-export const sessionMiddleware = session({
+export const sessionMiddleware: RequestHandler = session({
   name: env.cookieName,
   secret: env.SESSION_SECRET,
   store: sessionStore,
