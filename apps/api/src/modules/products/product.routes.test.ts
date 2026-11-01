@@ -180,6 +180,27 @@ describe('Product Management API', () => {
       costPrice: '500.25',
       currency: 'NGN',
     });
+    const initialVariantAudit = await pool.query<{
+      actor_user_id: string;
+      action: string;
+      entity_type: string;
+      entity_id: string;
+      safe_metadata: { before: string; after: string };
+    }>(
+      `SELECT actor_user_id, action, entity_type, entity_id, safe_metadata
+         FROM audit_logs
+        WHERE entity_type = 'product_variant'
+          AND entity_id = $1
+          AND action = 'product.variant.created'`,
+      [response.body.data.variants[0].id],
+    );
+    expect(initialVariantAudit.rows[0]).toMatchObject({
+      actor_user_id: owner.id,
+      action: 'product.variant.created',
+      entity_type: 'product_variant',
+      entity_id: response.body.data.variants[0].id,
+    });
+    expect(JSON.parse(initialVariantAudit.rows[0]!.safe_metadata.before)).toBeNull();
 
     const details = await ownerAgent.get(`/api/v1/products/${productId}`).expect(200);
     expect(details.body.data.id).toBe(productId);
@@ -368,6 +389,16 @@ describe('Product Management API', () => {
       [productId, category.body.data.id],
     );
     expect(categoryProduct.rowCount).toBe(1);
+  });
+
+  it('supports the all-products filter and validates route identifiers', async () => {
+    const all = await ownerAgent.get('/api/v1/products?status=all').expect(200);
+    expect(Array.isArray(all.body.data)).toBe(true);
+    await ownerAgent.get('/api/v1/products/not-a-uuid').expect(400);
+    await ownerAgent.patch('/api/v1/categories/not-a-uuid', { name: 'Invalid ID' }).expect(400);
+    await ownerAgent
+      .patch('/api/v1/products/not-a-uuid/variants/not-a-uuid', { name: 'Invalid ID' })
+      .expect(400);
   });
 
   it('does not impose SKU uniqueness and prevents invalid product-category relationships', async () => {

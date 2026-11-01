@@ -115,7 +115,7 @@ jobs:
       - name: Verify rollback removes the full disposable schema
         shell: bash
         run: |
-          pnpm db:rollback
+          pnpm --filter @dms/api exec tsx src/cli/migrate.ts down 2
           remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants')")"
           if [ "$remaining" != "0" ]; then
             echo "Rollback left $remaining application tables behind."

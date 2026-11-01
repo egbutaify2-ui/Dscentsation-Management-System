@@ -508,6 +508,8 @@ export async function createProduct(
       ],
     );
     const product = await loadProduct(client, productId);
+    const initialVariant = product.variants[0];
+    if (!initialVariant) throw new Error('The product initial variant could not be loaded.');
     await appendAuditEvent(
       {
         actorUserId: actorId,
@@ -521,6 +523,20 @@ export async function createProduct(
             product: productFields(product),
             initialVariant: product.variants[0] ? variantFields(product.variants[0]) : null,
           }),
+        },
+      },
+      client,
+    );
+    await appendAuditEvent(
+      {
+        actorUserId: actorId,
+        action: 'product.variant.created',
+        entityType: 'product_variant',
+        entityId: initialVariant.id,
+        requestId,
+        safeMetadata: {
+          before: 'null',
+          after: JSON.stringify(variantFields(initialVariant)),
         },
       },
       client,
