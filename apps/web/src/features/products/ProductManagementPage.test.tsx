@@ -63,7 +63,10 @@ describe('ProductManagementPage', () => {
     });
     mocks.post.mockResolvedValue(sampleProduct);
     mocks.patch.mockResolvedValue(sampleProduct);
-    vi.stubGlobal('confirm', vi.fn(() => true));
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    );
   });
 
   it('renders the product list and opens a product detail view with current prices', async () => {
@@ -89,18 +92,20 @@ describe('ProductManagementPage', () => {
       target: { value: '450.25' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Create product' }));
-    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith(
-      '/products',
-      expect.objectContaining({
-        name: 'New synthetic product',
-        variant: expect.objectContaining({
-          name: 'Default',
-          sellingPrice: '1200.50',
-          costPrice: '450.25',
+    await waitFor(() =>
+      expect(mocks.post).toHaveBeenCalledWith(
+        '/products',
+        expect.objectContaining({
+          name: 'New synthetic product',
+          variant: expect.objectContaining({
+            name: 'Default',
+            sellingPrice: '1200.50',
+            costPrice: '450.25',
+          }),
         }),
-      }),
-      'synthetic-csrf',
-    ));
+        'synthetic-csrf',
+      ),
+    );
   });
 
   it('edits product details and supports adding a further variant', async () => {
@@ -111,11 +116,13 @@ describe('ProductManagementPage', () => {
       target: { value: 'Renamed synthetic amber' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(mocks.patch).toHaveBeenCalledWith(
-      `/products/${sampleProduct.id}`,
-      expect.objectContaining({ name: 'Renamed synthetic amber' }),
-      'synthetic-csrf',
-    ));
+    await waitFor(() =>
+      expect(mocks.patch).toHaveBeenCalledWith(
+        `/products/${sampleProduct.id}`,
+        expect.objectContaining({ name: 'Renamed synthetic amber' }),
+        'synthetic-csrf',
+      ),
+    );
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add variant' }));
     fireEvent.change(screen.getByLabelText('Variant / size label'), {
@@ -125,11 +132,13 @@ describe('ProductManagementPage', () => {
       target: { value: '1750.00' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save variant' }));
-    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith(
-      `/products/${sampleProduct.id}/variants`,
-      expect.objectContaining({ name: '50ml', sellingPrice: '1750.00' }),
-      'synthetic-csrf',
-    ));
+    await waitFor(() =>
+      expect(mocks.post).toHaveBeenCalledWith(
+        `/products/${sampleProduct.id}/variants`,
+        expect.objectContaining({ name: '50ml', sellingPrice: '1750.00' }),
+        'synthetic-csrf',
+      ),
+    );
   });
 
   it('manages product categories and parent selection', async () => {
@@ -141,22 +150,26 @@ describe('ProductManagementPage', () => {
       target: { value: 'New category' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save category' }));
-    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith(
-      '/categories',
-      expect.objectContaining({ name: 'New category' }),
-      'synthetic-csrf',
-    ));
+    await waitFor(() =>
+      expect(mocks.post).toHaveBeenCalledWith(
+        '/categories',
+        expect.objectContaining({ name: 'New category' }),
+        'synthetic-csrf',
+      ),
+    );
   });
 
   it('asks for confirmation before archiving and displays API validation errors', async () => {
     render(<ProductManagementPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'View' }));
     fireEvent.click(screen.getByRole('button', { name: 'Archive product' }));
-    await waitFor(() => expect(mocks.patch).toHaveBeenCalledWith(
-      `/products/${sampleProduct.id}/status`,
-      { status: 'archived' },
-      'synthetic-csrf',
-    ));
+    await waitFor(() =>
+      expect(mocks.patch).toHaveBeenCalledWith(
+        `/products/${sampleProduct.id}/status`,
+        { status: 'archived' },
+        'synthetic-csrf',
+      ),
+    );
     expect(window.confirm).toHaveBeenCalled();
 
     mocks.post.mockRejectedValueOnce(new Error('Product name is required.'));
