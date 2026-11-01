@@ -38,14 +38,16 @@ Append-only event tables generally need `id`, `occurred_at`, `actor_user_id` and
 |---|---|---|
 | users | id, email (unique, normalised), display_name, password_hash, role_id, status, last_login_at, created_at, updated_at | One individual login per person. Role references roles.id. Never store plaintext passwords. |
 | roles | id, code (unique), name, description | Seed Owner, Manager and Staff. |
-| permissions | id, code (unique), description | Explicit permissions such as orders.create, payments.record, payments.verify, inventory.transfer.dispatch, inventory.transfer.receive, reports.finance.view. |
-| role_permissions | role_id, permission_id (composite unique/PK) | Many-to-many role-to-permission mapping. Staff may record payments; only Manager and Owner may verify. |
-| user_location_access | user_id, location_id, granted_by, created_at | Explicit location assignments for Staff. Staff access is restricted to assigned locations. Managers and Owner have access to all locations and do not require assignment rows. |
+| permissions | id, code (unique), description | Explicit permissions such as orders.create, payments.record, payments.verify, inventory.transfer.dispatch, inventory.transfer.receive, and the narrowly scoped inventory.transfer.pickup_warehouse_to_assigned_sheraton action. |
+| role_permissions | role_id, permission_id (composite unique/PK) | Many-to-many role-to-permission mapping. Staff may record payments; only Manager and Owner may verify. The Sheraton pickup permission is conditional on the transfer's exact source/destination and the Staff member's destination assignment; it is not general Warehouse access. |
+| user_location_access | user_id, location_id, granted_by, created_at | Explicit location assignments for Staff. Staff access is restricted to assigned locations except the dedicated Sheraton pickup action. Sheraton Staff are not assigned to Warehouse. Managers and Owner have access to all locations and do not require assignment rows. |
 | user_sessions | session_id (primary key), user_id, session_data JSONB, expires_at, created_at, updated_at | Persistent server-side session records for Express. Index expires_at for lookup and cleanup. |
 
 **Relationships:** One role has many users; roles and permissions are many-to-many; Staff users and locations are many-to-many through user_location_access. Each session belongs to one user and is invalidated on logout/account-security events.
 
-Use deny-by-default checks in backend services. Owner and Manager location access is global. Staff location access must be checked for every location-scoped API operation, including viewing stock, order fulfilment, dispatch, transfer operations and confirming receipt at a destination.
+Use deny-by-default checks in backend services. Owner and Manager location access is global. Staff location access must be checked for every location-scoped API operation, including viewing stock, order fulfilment, dispatch, standard transfer operations and confirming receipt at a destination.
+
+**Sheraton pickup authorisation is a conditional resource/action exception, not a location grant.** The pickup permission may be present for Staff as a capability, but it is usable only when the authenticated user has an active assignment to the destination Sheraton location and the selected transfer is specifically Warehouse-to-that-assigned-Sheraton. The check must be performed server-side using the persisted user-location assignments and transfer row. It must never create a user_location_access row for Warehouse or grant inventory.read, inventory.adjust or unrelated transfer permissions at Warehouse.
 
 **Session storage requirement:** Use a PostgreSQL-backed Express session store (for example, a maintained PostgreSQL session-store adapter) and provision its table through migrations. Production must not use Express MemoryStore, any in-memory session store or process-local session state. All API instances must use the same PostgreSQL-backed store so sessions survive process restarts and remain consistent across instances. Use secure, opaque, HttpOnly, SameSite cookies, with session rotation and revocation.
 
@@ -85,34 +87,51 @@ Birthday, preferences, segmentation and promotional follow-ups are optional/futu
 
 | Table | Key columns | Purpose / relationships |
 |---|---|---|
-| inventory_balances | id, location_id, product_variant_id, quantity_on_hand, quantity_reserved, reorder_level, updated_at | Current physical-stock balance for one variant at one location. Excludes stock in transit. Unique constraint on (location_id, product_variant_id). |
-| stock_movements | id, movement_bucket (location/in_transit), location_id nullable, transfer_item_id nullable, product_variant_id, movement_type, quantity_delta, quantity_before, quantity_after, reason, reference_type, reference_id, idempotency_key, actor_user_id, occurred_at | Append-only ledger for physical-location and in-transit movements. A location-bucket event references a location; an in-transit event references its transfer item. |
+| inventory_balances | id, location_id, product_variant_id, quantity_on_hand, quantity_reserved, reorder_level, updated_at | Current physical-stock balance for one variant at one location. Excludes stock in transit. Unique constraint on (location_id, product_variant_id). Warehouse and Sheraton therefore have separate physical balances. |
+| stock_movements | id, movement_bucket (location/in_transit), location_id nullable, transfer_item_id nullable, product_variant_id, movement_type, quantity_delta, quantity_before, quantity_after, reason, reference_type, reference_id, idempotency_key, actor_user_id, occurred_at | Append-only ledger for physical-location and in-transit movements. A location-bucket event references a location; an in-transit event references its transfer item. For a Sheraton pickup, the pickup event is the reference and the Sheraton Staff user is the actor. |
 | stock_reservations | id, order_item_id, location_id, product_variant_id, quantity, status, reservation_policy_id, policy_version, reserved_at, expires_at nullable, released_at, release_reason, consumed_at | A confirmed order's reserved quantity at its one fulfilment location. It references the immutable policy version used to calculate its expiry; expires_at is null only when that version explicitly disables expiry. |
-| reservation_policies | id, version (unique), duration_minutes, is_enabled, expiry_scope, is_active, created_by, created_at | Persisted, versioned reservation-expiry policy. expiry_scope defines eligible order/payment states (for example, unpaid-only versus all undispatched confirmed orders). Each change creates a new version; only one version is active for new reservations. |
-| stock_transfers | id, reference (unique), source_location_id, destination_location_id, status, requested_by, dispatched_by, dispatched_at, received_by, received_at, timestamps | Transfer header and lifecycle. Source and destination must differ. Destination receipt is confirmed by Staff assigned to the destination location. |
-| stock_transfer_items | id, transfer_id, product_variant_id, quantity_requested, quantity_dispatched, quantity_received, quantity_resolved, discrepancy_reason | Item-level quantities and discrepancy resolution. Unreceived, unresolved dispatched quantity remains in transit. |
-| stock_in_transit_balances | id, transfer_item_id (unique), source_location_id, destination_location_id, product_variant_id, quantity_in_transit, updated_at | Current in-transit stock summary for a transfer item. Created/increased at dispatch; decreased as destination Staff confirms receipt or a discrepancy is formally resolved. |
+| reservation_policies | id, version (unique), duration_minutes, is_enabled, expiry_scope, is_active, created_by, created_at | Persisted, versioned reservation-expiry policy. expiry_scope defines eligible order/payment states. Each change creates a new version; only one version is active for new reservations. |
+| stock_transfers | id, reference (unique), source_location_id, destination_location_id, pickup_mode (standard_source_dispatch/destination_staff_pickup), status, requested_by, dispatched_by, dispatched_at, received_by, received_at, timestamps | Transfer header and lifecycle. Source and destination must differ. destination_staff_pickup is the narrow Sheraton workflow; destination receipt remains confirmed by Staff assigned to the destination. Event tables below retain each partial action's actor. |
+| stock_transfer_items | id, transfer_id, product_variant_id, quantity_requested, quantity_dispatched, quantity_received, quantity_cancelled, quantity_resolved, discrepancy_reason | Cumulative item quantities. quantity_dispatched includes quantities picked up/removed from source; quantity_cancelled applies only to the not-yet-picked remainder; quantity_resolved requires an authorised discrepancy disposition. |
+| stock_transfer_pickup_events | id, transfer_id, source_location_id, destination_location_id, picked_up_by, picked_up_at, idempotency_key (unique), request_fingerprint | Immutable record of each physical pickup submission, including its Staff actor and idempotency identity. Used by destination_staff_pickup transfers. |
+| stock_transfer_pickup_event_items | id, pickup_event_id, transfer_item_id, quantity_picked_up | Product-level quantities collected in one pickup event. Sum across events must reconcile to stock_transfer_items.quantity_dispatched for pickup-mode transfers. |
+| stock_transfer_receipt_events | id, transfer_id, destination_location_id, received_by, received_at, idempotency_key (unique), request_fingerprint | Immutable record of each destination receipt submission and the Staff member who confirmed it. The same user may be both pickup and receipt actor. |
+| stock_transfer_receipt_event_items | id, receipt_event_id, transfer_item_id, quantity_received, discrepancy_quantity, discrepancy_reason | Product-level quantities physically received and any reported discrepancy in that receipt event. Sum of confirmed quantities reconciles to stock_transfer_items.quantity_received. |
+| stock_transfer_discrepancy_events | id, transfer_item_id, related_receipt_event_id nullable, discrepancy_type, quantity, reason, reported_by, reported_at, status, resolved_by nullable, resolved_at nullable, resolution_type nullable | Append-only discrepancy report and authorised resolution history. No discrepancy may be hidden by editing quantities or balances. |
+| stock_in_transit_balances | id, transfer_item_id (unique), source_location_id, destination_location_id, product_variant_id, quantity_in_transit, updated_at | Current unreceived transfer quantity. Created/increased on pickup/dispatch and decreased only on confirmed receipt or authorised discrepancy/return resolution. An unresolved discrepancy remains visible against this transfer and is not available at either physical location. |
 | stock_counts | id, location_id, status, counted_by, reviewed_by, started_at, completed_at | Physical stock-count session. |
 | stock_count_items | id, stock_count_id, product_variant_id, system_quantity, counted_quantity, variance, reason | Captures count variances before an authorised adjustment movement is posted. |
 
-**Relationships:** Each physical balance belongs to one location and variant. A variant has many balances and movements. Transfers have many transfer items and corresponding in-transit balance rows. Reservations link an order line to the one order fulfilment location/variant whose stock is committed. A transfer item has one current in-transit balance and many immutable stock movement events.
+**Relationships:** Each physical balance belongs to one location and variant. A variant has many balances and movements. Transfers have many transfer items, pickup events, receipt events and discrepancy events. Pickup/receipt events have item rows and preserve event-level actor attribution. A transfer item has one current in-transit balance and many immutable stock movement events. Pickup and receipt actors are stored per event, not only as one mutable field on the transfer header.
 
-#### Inventory and transfer invariants
+#### Inventory, transfer and Sheraton pickup invariants
 
 - available = quantity_on_hand - quantity_reserved; calculate it from the balance row or a database view rather than accepting it from the browser.
 - Physical-location quantity_on_hand excludes stock currently in transit. In-transit stock is tracked separately and is not available at either location.
+- Warehouse and Sheraton are separate location records and separate inventory_balances rows for every product variant.
 - Enforce quantity_on_hand >= 0, quantity_reserved >= 0 and quantity_reserved <= quantity_on_hand.
-- Lock the relevant physical and transit rows (for example with SELECT ... FOR UPDATE) inside a transaction before changing a balance.
+- Lock the relevant transfer/item, physical balance and transit rows (for example with SELECT ... FOR UPDATE) inside a transaction before changing a balance.
 - A reservation may not exceed available quantity at the order's selected fulfilment location.
 - Confirming an order creates its reservation immediately, regardless of whether a payment has been recorded or verified.
 - Each reservation stores a foreign key to the immutable reservation-policy version, its version and expires_at. A policy edit creates a new version for new reservations only; existing reservations retain their original eligibility scope and expiry unless an explicit authorised and audited action changes them.
 - A scheduled/background worker expires reservations only after locking and rechecking the order, reservation and balance. It verifies the reservation is still active, due and eligible under the current business rules, marks it expired, reduces quantity_reserved, writes an expiry/audit event and places the order on fulfilment hold/reconfirmation. It does not reduce physical on-hand stock or silently cancel the order.
 - Expiry is idempotent. A race with dispatch, cancellation or re-reservation is resolved with row locks/conditional state transitions so stock is released or consumed exactly once, never both.
-- Transfer dispatch reduces source on-hand and increases the transfer item's in-transit balance in one transaction. Write paired source-location and in-transit ledger events.
-- A Staff user assigned to the destination location must confirm receipt. In one transaction, reduce in-transit quantity and increase destination on-hand by the confirmed quantity; write paired in-transit and destination movements and an audit event. Manager access to all locations does not replace the requirement for destination Staff confirmation.
-- Partial receipt leaves the remainder in transit. Shortage/damage is resolved through an attributed exception event; unresolved quantity remains visible as in transit.
-- Adjustments, damage, loss, return-to-stock and count reconciliation require movement records and reasons.
-- Store idempotency/business-operation keys so retries cannot create duplicate reservations, releases or stock movements.
+
+**Sheraton pickup permission boundary**
+
+- A Staff user assigned to the Sheraton destination may create a transfer with source = the configured Warehouse location and destination = that assigned Sheraton location, or open only a transfer that already has that exact source/destination pair and is in a pickup-eligible state.
+- The dedicated pickup command may read only the Warehouse inventory balance rows needed to validate the submitted transfer-item quantities inside its transaction. It returns a generic validation result and the transfer's own requested/picked quantities; it must not return the Warehouse on-hand/available balance or expose general Warehouse inventory queries.
+- The action is not a general source-location permission. It cannot be used for a different source, a different destination, a transfer not addressed to one of the caller's assigned Sheraton locations, Warehouse stock browsing, Warehouse adjustments or unrelated Warehouse operations.
+- Pickup submission locks the transfer, transfer items and relevant Warehouse balance rows. Validate that actual collected quantities are positive, do not exceed the unpicked requested remainder, and do not exceed Warehouse available stock (on-hand less reserved).
+- In one transaction, record the pickup event and item rows, reduce Warehouse on-hand by the actual collected quantity, increase the transfer item's in-transit balance by the same quantity, append Warehouse-out and in-transit-in stock movements with the acting Sheraton Staff ID, and update cumulative dispatched/picked quantities and transfer status.
+- If Warehouse available stock is insufficient, reject the entire submitted event with no balance, transit, event or movement changes. Return a generic insufficient-stock result without disclosing the exact Warehouse balance. The Staff member may submit a smaller actual collection as a separate/partial pickup.
+- A partial pickup leaves the unpicked remainder open on the transfer. A later pickup may collect that remainder when stock becomes available, subject to the same authorization and validation.
+- Destination receipt is recorded as a separate receipt event by Staff assigned to the destination. In one transaction, reduce in-transit quantity and increase destination on-hand by the quantity physically received, write paired in-transit/destination movements and audit records, and update cumulative received quantity. The same staff member may perform both steps; both actor/time records remain distinct.
+- Partial receipt leaves the outstanding quantity in transit. A receipt greater than the remaining in-transit quantity is rejected.
+- A pickup/receipt discrepancy is recorded with quantity, reason, reporter and time. The unaccounted quantity remains visible against the transfer/in-transit ledger until an authorised resolution event is recorded. Do not increase Sheraton stock or restore Warehouse stock to make the numbers appear to match.
+- A transfer with no pickup may be cancelled without stock movement. After partial pickup, only the unpicked remainder may be cancelled; picked quantities remain in transit and must still be received, returned through a separately recorded reverse transfer, or formally resolved. The transfer must not be marked fully cancelled while any picked quantity remains unreceived/unresolved.
+- A transfer left in transit remains visible in an ageing/open-transfer queue. No automatic expiry or silent stock release is allowed for picked quantities.
+- All pickup and receipt commands require idempotency keys. A retry with the same key and same request returns the original result; re-use of a key with a different request is rejected. Database uniqueness and transactional state checks prevent duplicate movements.
 
 The balance tables are transactionally maintained current-state projections. The append-only movement ledger is the evidence of how physical and in-transit stock changed. Reconciliation tooling must compare the projections with the ledger.
 
@@ -207,7 +226,7 @@ Audit events should contain enough information to explain who did what and when,
 
 ## 3. Main entity relationships
 
-The following map shows core relationships. The in-transit balance is transfer-item scoped; session, receipt and event tables are shown where they add important design context.
+The following map shows core relationships. The in-transit balance is transfer-item scoped; pickup/receipt events preserve the responsible Staff actor for each partial collection or receipt.
 
 ```mermaid
 erDiagram
@@ -235,6 +254,11 @@ erDiagram
   RESERVATION_POLICIES ||--o{ STOCK_RESERVATIONS : versions
 
   STOCK_TRANSFERS ||--|{ STOCK_TRANSFER_ITEMS : contains
+  STOCK_TRANSFERS ||--o{ STOCK_TRANSFER_PICKUP_EVENTS : pickup_history
+  STOCK_TRANSFER_PICKUP_EVENTS ||--|{ STOCK_TRANSFER_PICKUP_EVENT_ITEMS : items
+  STOCK_TRANSFERS ||--o{ STOCK_TRANSFER_RECEIPT_EVENTS : receipt_history
+  STOCK_TRANSFER_RECEIPT_EVENTS ||--|{ STOCK_TRANSFER_RECEIPT_EVENT_ITEMS : items
+  STOCK_TRANSFER_ITEMS ||--o{ STOCK_TRANSFER_DISCREPANCY_EVENTS : discrepancies
   STOCK_TRANSFER_ITEMS ||--o| STOCK_IN_TRANSIT_BALANCES : tracks
   STOCK_TRANSFER_ITEMS ||--o{ STOCK_MOVEMENTS : logs
 
@@ -271,6 +295,11 @@ At minimum, add:
 - Check that a transfer's source and destination are different.
 - Check that reserved quantity cannot exceed on-hand quantity.
 - Unique or deduplicated idempotency keys for stock operations, reservation expiry/release, receipt issuance/email creation and retryable commands.
+- Unique idempotency keys on stock_transfer_pickup_events and stock_transfer_receipt_events; unique event-item keys or constraints to prevent the same transfer item being duplicated within one event.
+- Index stock_transfer_pickup_events.transfer_id, stock_transfer_receipt_events.transfer_id, stock_transfer_discrepancy_events.status/reported_at and open stock_in_transit_balances for pickup/receipt history and aged in-transit queues.
+- Check that source/destination locations on each pickup event match its parent transfer, and that destination Staff actor is assigned to that destination; enforce the actor/location rule in the application transaction (and database policy/constraint where practical).
+- Check that quantity_cancelled applies only to unpicked requested quantity and that dispatched quantity reconciles to received + in-transit + formally resolved quantity.
+- Pickup-event totals must reconcile to stock_transfer_items.quantity_dispatched; receipt-event totals must reconcile to stock_transfer_items.quantity_received.
 - Index stock_reservations.expires_at for active reservation expiry scans and user_sessions.expires_at for session lookup/cleanup.
 - Unique index on stock_in_transit_balances.transfer_item_id; enforce non-negative in-transit quantity.
 - Ensure orders.fulfilment_location_id is non-null and every reservation for its items uses that same location.
@@ -288,7 +317,11 @@ These operations must be atomic:
 | Expire reservation | Lock/recheck order and active reservation, mark reservation expired, reduce reserved quantity, record expiry/audit event and place order on fulfilment hold; no physical on-hand deduction |
 | Cancel confirmed order | Order status/history, release active reservations exactly once and audit event |
 | Dispatch order | Delivery/order state, reduction of on-hand and reserved, movement rows and audit event |
-| Transfer dispatch | Transfer state, source balance reduction, in-transit balance increase and paired source/in-transit movement events |
+| Standard transfer dispatch | Transfer state, source balance reduction, in-transit balance increase and paired source/in-transit movement events |
+| Sheraton Staff Warehouse pickup | Conditional Staff/destination assignment authorisation, transfer and item locks, Warehouse availability validation, pickup event/items, Warehouse on-hand reduction, in-transit increase, paired movement events and audit event |
+| Sheraton destination receipt | Destination Staff assignment authorisation, receipt event/items, in-transit reduction, Sheraton balance increase, paired movement events and audit event |
+| Cancel transfer | Transfer/item state and quantity_cancelled for unpicked remainder only; no movement for unpicked quantity. Any already-picked quantity remains in transit and cannot be erased by cancellation |
+| Resolve transfer discrepancy | Attributed discrepancy decision, authorised disposition, reduction of affected in-transit quantity only when resolution is approved, stock movement and audit event |
 | Transfer receipt | Destination Staff authorisation, transfer receipt state, in-transit balance reduction, destination balance increase and paired movement/audit events |
 | Resolve transfer discrepancy | Attributed discrepancy decision, reduction of affected in-transit quantity, stock movement and audit event |
 | Receive purchase goods | Goods receipt/items, purchase-order received quantities, destination balances and stock movements |
@@ -340,5 +373,7 @@ Remaining design/configuration details:
 8. Whether cost price changes require effective-dated cost history for valuation.
 9. File retention limits, permitted file types and who may view supporting documents.
 10. Render Postgres backup/recovery verification, restore-test evidence, expected recovery objectives and total cost approval.
+11. Confirm the configured Warehouse and Sheraton location records/codes, and the Staff-to-Sheraton assignments that enable the narrowly scoped pickup action.
+12. Confirm the physical paperwork/reference process used by Sheraton Staff at Warehouse; the permission boundary and stock movement rules for pickup remain as specified.
 
 **Review outcome:** Pending. This is a conceptual database design updated with the confirmed architecture rules, not an approved final schema or a production migration.
