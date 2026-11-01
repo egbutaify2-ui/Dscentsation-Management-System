@@ -274,13 +274,19 @@ Testing must cover business invariants, not just successful page rendering.
 Required high-risk tests include:
 
 - Two concurrent orders cannot reserve the same unavailable stock.
-- Confirming an order twice cannot reserve twice.
+- Confirming an order reserves stock immediately even when the order is unpaid; confirming twice cannot reserve twice.
+- An order reserves all its items at its single fulfilment location and cannot silently source from another location.
 - Cancelling an order releases a reservation once.
-- Dispatch reduces on-hand and reserved quantities consistently.
-- A transfer cannot create stock at the destination before receipt is confirmed.
+- Reservation expiry releases reserved quantity (not on-hand stock) once, only when due and policy-eligible; it must not cancel the order or race with dispatch/cancellation into a double release/consume.
+- A reservation-policy change affects new reservations only; existing reservations keep their original policy version and expiry unless explicitly changed and audited.
+- Transfer dispatch reduces source stock and creates in-transit quantity; destination stock does not increase until Staff assigned to the destination location confirms receipt.
+- Partial transfer receipt leaves the remaining quantity in transit; discrepancies cannot be silently written off.
+- Managers can access all stock locations; Staff cannot access unassigned locations.
+- Staff can record a payment but cannot verify it; only Managers and Owner can verify.
+- Receipt issuance creates one immutable receipt record, and a failed/retried email does not create a duplicate receipt issuance.
+- PostgreSQL-backed sessions survive API restarts and are shared across API instances; production never falls back to an in-memory store.
 - A payment/refund correction preserves its event history.
-- Staff cannot access an unassigned location or restricted Owner/Manager actions.
-- Retrying an email job does not send duplicate receipts.
+- Retrying an email job does not send duplicate notifications.
 - Historical order lines remain accurate after a product is edited or archived.
 
 Use synthetic customer, payment and stock data in all development and automated tests.
