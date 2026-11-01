@@ -99,7 +99,7 @@ export async function up(pgm) {
 
     CREATE FUNCTION assert_product_has_exactly_one_default_variant(target_product_id UUID)
     RETURNS VOID
-    LANGUAGE plpgsql AS $
+    LANGUAGE plpgsql AS $$
     DECLARE
       variant_count INTEGER;
       default_variant_count INTEGER;
@@ -123,10 +123,10 @@ export async function up(pgm) {
           USING ERRCODE = '23514';
       END IF;
     END;
-    $;
+    $$;
 
     CREATE FUNCTION enforce_product_variant_invariants() RETURNS trigger
-    LANGUAGE plpgsql AS $
+    LANGUAGE plpgsql AS $$
     BEGIN
       IF TG_TABLE_NAME = 'products' THEN
         PERFORM assert_product_has_exactly_one_default_variant(NEW.id);
@@ -140,7 +140,7 @@ export async function up(pgm) {
       END IF;
       RETURN NULL;
     END;
-    $;
+    $$;
 
     CREATE CONSTRAINT TRIGGER products_require_exactly_one_default
       AFTER INSERT ON products
