@@ -128,6 +128,41 @@ describe('EmployeeManagementPage', () => {
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy();
   });
 
+  it('confirms invitation reissue and displays the replacement setup link once', async () => {
+    mocks.get.mockResolvedValue([{ ...employee, status: 'invited' }]);
+    render(<EmployeeManagementPage canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Reissue invitation' }));
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('The previous invitation link will stop working'),
+    );
+    await waitFor(() =>
+      expect(mocks.post).toHaveBeenCalledWith(
+        `/users/${employee.id}/invitation/reissue`,
+        {},
+        'synthetic-csrf',
+      ),
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Invitation link reissued for Synthetic Staff' }),
+    ).toBeTruthy();
+    expect((screen.getByLabelText('One-time invitation URL') as HTMLInputElement).value).toBe(
+      'https://dms.example.invalid/#/invite/accept?token=synthetic-high-entropy-token',
+    );
+    expect(screen.getByText(/No email was sent/)).toBeTruthy();
+    expect(screen.getByText(/official Dscentsation company email identity/)).toBeTruthy();
+  });
+
+  it('reports invitation reissue API failures without presenting a replacement link', async () => {
+    mocks.get.mockResolvedValue([{ ...employee, status: 'invited' }]);
+    mocks.post.mockRejectedValueOnce(new Error('Replacement invitation could not be created.'));
+    render(<EmployeeManagementPage canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Reissue invitation' }));
+    expect(
+      (await screen.findByRole('alert')).textContent,
+    ).toContain('Replacement invitation could not be created.');
+    expect(screen.queryByLabelText('One-time invitation URL')).toBeNull();
+  });
+
   it('confirms suspension and reports API errors', async () => {
     render(<EmployeeManagementPage canManage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Suspend' }));

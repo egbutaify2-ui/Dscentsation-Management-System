@@ -448,6 +448,105 @@ export async function revokeEmployeeSessions(
   }
 }
 
+export async function reissueEmployeeInvitation(
+  actorUserId: string,
+  requestId: string,
+  userId: string,
+): Promise<{ employee: EmployeeRecord; setupUrl: string; expiresAt: string }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const target = await client.query<EmployeeRow>(
+      `SELECT u.id, u.email_normalized AS email, u.display_name,
+              r.code AS role_code, r.name AS role_name, u.status,
+              u.created_at, u.last_login_at
+         FROM users u
+         JOIN roles r ON r.id = u.role_id
+        WHERE u.id = $1
+        FOR UPDATE OF u`,
+      [userId],
+    );
+    const employeeRow = target.rows[0];
+    if (!employeeRow) {
+      throw new UserAdminError('Employee account was not found.', 404, 'USER_NOT_FOUND');
+    }
+    if (employeeRow.status !== 'invited') {
+      throw new UserAdminError(
+        'Only invited employee accounts can receive a replacement invitation.',
+        409,
+        'INVITATION_NOT_PENDING',
+      );
+    }
+    if (employeeRow.role_code !== 'MANAGER' && employeeRow.role_code !== 'STAFF') {
+      throw new UserAdminError(
+        'Only Manager and Staff invitations can be reissued.',
+        409,
+        'OWNER_ACCOUNT_PROTECTED',
+      );
+    }
+
+    // Expired invitations still satisfy the partial unique index until explicitly revoked.
+    // Revoke every outstanding invitation, including expired rows, before inserting a new one.
+    const previous = await client.query<{ id: string }>(
+      `UPDATE user_invitations
+          SET revoked_at = now()
+        WHERE user_id = $1
+          AND revoked_at IS NULL
+          AND consumed_at IS NULL
+        RETURNING id`,
+      [userId],
+    );
+
+    const token = randomBytes(32).toString('base64url');
+    const tokenHash = tokenDigest(token);
+    const inserted = await client.query<{ expires_at: Date | string }>(
+      `INSERT INTO user_invitations(user_id, token_hash, expires_at, created_by)
+       VALUES ($1, $2, now() + ($3::int * interval '1 hour'), $4)
+       RETURNING expires_at`,
+      [userId, tokenHash, env.INVITATION_EXPIRY_HOURS, actorUserId],
+    );
+    const expiresAt = new Date(inserted.rows[0]!.expires_at).toISOString();
+
+    await appendAuditEvent(
+      {
+        actorUserId,
+        action: 'user.invitation.reissued',
+        entityType: 'user',
+        entityId: userId,
+        requestId,
+        safeMetadata: {
+          before: {
+            status: employeeRow.status,
+            displayName: employeeRow.display_name,
+            email: employeeRow.email,
+            role: employeeRow.role_code,
+            outstandingInvitationCount: previous.rowCount ?? 0,
+          },
+          after: {
+            status: employeeRow.status,
+            displayName: employeeRow.display_name,
+            email: employeeRow.email,
+            role: employeeRow.role_code,
+            outstandingInvitationCount: 1,
+            expiresAt,
+          },
+          delivery: 'manual_company_email',
+        },
+      },
+      client,
+    );
+    await client.query('COMMIT');
+
+    const setupUrl = `${env.APP_ORIGIN.replace(/\/$/, '')}/#/invite/accept?token=${encodeURIComponent(token)}`;
+    return { employee: mapEmployee(employeeRow), setupUrl, expiresAt };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function revokeEmployeeInvitation(
   actorUserId: string,
   requestId: string,

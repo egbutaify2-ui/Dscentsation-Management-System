@@ -47,6 +47,7 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'MANAGER' | 'STAFF'>('STAFF');
   const [invitation, setInvitation] = useState<InvitationResult | null>(null);
+  const [invitationMode, setInvitationMode] = useState<'created' | 'reissued'>('created');
   const [copied, setCopied] = useState(false);
 
   const loadEmployees = useCallback(
@@ -95,6 +96,7 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
         await getCsrfToken(),
       );
       setInvitation(result);
+      setInvitationMode('created');
       setCopied(false);
       setInviteOpen(false);
       setDisplayName('');
@@ -158,6 +160,37 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
     }
   }
 
+  async function reissueInvitation(employee: Employee) {
+    if (
+      !window.confirm(
+        `Reissue the setup invitation for ${employee.displayName}? The previous invitation link will stop working.`,
+      )
+    )
+      return;
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await api.post<InvitationResult>(
+        `/users/${employee.id}/invitation/reissue`,
+        {},
+        await getCsrfToken(),
+      );
+      setInvitation(result);
+      setInvitationMode('reissued');
+      setCopied(false);
+      setInviteOpen(false);
+      setNotice(
+        'Replacement invitation created. No email was sent; deliver the new link manually using the official Dscentsation company email identity.',
+      );
+      await loadEmployees(search, roleFilter, statusFilter);
+    } catch (actionError) {
+      setError(errorMessage(actionError));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function revokeInvitation(employee: Employee) {
     if (
       !window.confirm(
@@ -206,6 +239,7 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
             className="primary-button employee-primary-action"
             onClick={() => {
               setInvitation(null);
+              setInvitationMode('created');
               setError(null);
               setInviteOpen((open) => !open);
             }}
@@ -234,11 +268,12 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
           <div>
             <p className="eyebrow">ONE-TIME SETUP LINK</p>
             <h2 id="invitation-created-title">
-              Invitation created for {invitation.employee.displayName}
+              {invitationMode === 'reissued' ? 'Invitation link reissued for' : 'Invitation created for'}{' '}
+              {invitation.employee.displayName}
             </h2>
             <p>
-              This link is shown only in this successful creation response. Deliver it securely from
-              the official Dscentsation company email identity. DMS does not send invitations
+              This link is shown only in this successful response. Deliver it securely from the
+              official Dscentsation company email identity. DMS does not send invitations
               automatically.
             </p>
             <p className="employee-expiry">Expires: {dateLabel(invitation.expiresAt)}</p>
@@ -436,14 +471,24 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
                             </button>
                           )}
                           {employee.status === 'invited' && (
-                            <button
-                              type="button"
-                              className="table-link-button danger-link"
-                              disabled={saving}
-                              onClick={() => void revokeInvitation(employee)}
-                            >
-                              Revoke invite
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                className="table-link-button"
+                                disabled={saving}
+                                onClick={() => void reissueInvitation(employee)}
+                              >
+                                Reissue invitation
+                              </button>
+                              <button
+                                type="button"
+                                className="table-link-button danger-link"
+                                disabled={saving}
+                                onClick={() => void revokeInvitation(employee)}
+                              >
+                                Revoke invite
+                              </button>
+                            </>
                           )}
                           {employee.status !== 'invited' && (
                             <button

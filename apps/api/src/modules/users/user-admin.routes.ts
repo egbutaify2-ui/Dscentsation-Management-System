@@ -9,6 +9,7 @@ import {
   acceptEmployeeInvitation,
   createEmployeeInvitation,
   listEmployees,
+  reissueEmployeeInvitation,
   revokeEmployeeInvitation,
   revokeEmployeeSessions,
   setEmployeeStatus,
@@ -207,6 +208,24 @@ router.post(
     try {
       response.json({
         data: await revokeEmployeeSessions(
+          actorId(request),
+          request.requestId,
+          routeId(request.params.userId!),
+        ),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+router.post(
+  '/:userId/invitation/reissue',
+  requirePermission('users.manage'),
+  async (request, response, next) => {
+    try {
+      response.json({
+        data: await reissueEmployeeInvitation(
           actorId(request),
           request.requestId,
           routeId(request.params.userId!),

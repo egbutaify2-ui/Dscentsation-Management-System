@@ -49,26 +49,21 @@ async function csrf(agent: ReturnType<typeof request.agent>): Promise<string> {
 }
 
 async function post(agent: ReturnType<typeof request.agent>, path: string, body: object) {
-  return agent
-    .post(path)
-    .set('Origin', env.APP_ORIGIN)
-    .set('X-CSRF-Token', await csrf(agent))
-    .send(body);
+  const token = await csrf(agent);
+  return agent.post(path).set('Origin', env.APP_ORIGIN).set('X-CSRF-Token', token).send(body);
 }
 
 async function patch(agent: ReturnType<typeof request.agent>, path: string, body: object) {
-  return agent
-    .patch(path)
-    .set('Origin', env.APP_ORIGIN)
-    .set('X-CSRF-Token', await csrf(agent))
-    .send(body);
+  const token = await csrf(agent);
+  return agent.patch(path).set('Origin', env.APP_ORIGIN).set('X-CSRF-Token', token).send(body);
 }
 
 async function signIn(agent: ReturnType<typeof request.agent>, email: string, secret = password) {
+  const token = await csrf(agent);
   return agent
     .post('/api/v1/auth/login')
     .set('Origin', env.APP_ORIGIN)
-    .set('X-CSRF-Token', await csrf(agent))
+    .set('X-CSRF-Token', token)
     .send({ email, password: secret });
 }
 
@@ -119,6 +114,12 @@ describe('Employee Account Administration API', () => {
       const agent = request.agent(app);
       expect((await signIn(agent, account.email)).status).toBe(200);
       await agent.get('/api/v1/users').expect(403);
+      const deniedReissue = await post(
+        agent,
+        `/api/v1/users/${randomUUID()}/invitation/reissue`,
+        {},
+      );
+      expect(deniedReissue.status).toBe(403);
       const denied = await post(agent, '/api/v1/users/invitations', {
         displayName: 'Denied synthetic invite',
         email: `denied.${randomUUID()}@example.invalid`,
@@ -393,6 +394,244 @@ describe('Employee Account Administration API', () => {
       after: { status: 'active' },
     });
     expect(suspended.headers['x-request-id']).toBeTruthy();
+  });
+
+  it('reissues an expired invitation for the same employee and invalidates the old token', async () => {
+    const created = await invite('MANAGER');
+    expect(created.status).toBe(201);
+    const employee = created.body.data.employee as { id: string; email: string; roleCode: string };
+    const oldSetupUrl = created.body.data.setupUrl as string;
+    const oldToken = tokenFromSetupUrl(oldSetupUrl);
+    await pool.query(
+      "UPDATE user_invitations SET expires_at = created_at + interval '1 microsecond' WHERE user_id = $1",
+      [employee.id],
+    );
+
+    const reissued = await post(
+      ownerAgent,
+      `/api/v1/users/${employee.id}/invitation/reissue`,
+      {},
+    );
+    expect(reissued.status).toBe(200);
+    const replacement = reissued.body.data as {
+      employee: { id: string; email: string; roleCode: string; status: string };
+      setupUrl: string;
+      expiresAt: string;
+    };
+    expect(replacement.employee).toMatchObject({
+      id: employee.id,
+      email: employee.email,
+      roleCode: 'MANAGER',
+      status: 'invited',
+    });
+    expect(replacement.setupUrl).not.toBe(oldSetupUrl);
+    expect(new Date(replacement.expiresAt).getTime()).toBeGreaterThan(Date.now());
+    const newToken = tokenFromSetupUrl(replacement.setupUrl);
+    expect(newToken).not.toBe(oldToken);
+
+    const account = await pool.query<{ count: string; email: string; role_code: string }>(
+      `SELECT count(*) OVER ()::text AS count, u.email_normalized AS email, r.code AS role_code
+         FROM users u JOIN roles r ON r.id = u.role_id
+        WHERE u.id = $1`,
+      [employee.id],
+    );
+    expect(account.rows).toHaveLength(1);
+    expect(account.rows[0]).toMatchObject({ count: '1', email: employee.email, role_code: 'MANAGER' });
+
+    const invitations = await pool.query<{
+      token_hash: string;
+      expires_at: Date;
+      revoked_at: Date | null;
+      consumed_at: Date | null;
+    }>(
+      `SELECT token_hash, expires_at, revoked_at, consumed_at
+         FROM user_invitations WHERE user_id = $1 ORDER BY created_at, id`,
+      [employee.id],
+    );
+    expect(invitations.rows).toHaveLength(2);
+    expect(invitations.rows[0]?.revoked_at).toBeTruthy();
+    expect(invitations.rows[0]?.consumed_at).toBeNull();
+    expect(invitations.rows[1]?.token_hash.trim()).toBe(
+      createHash('sha256').update(newToken).digest('hex'),
+    );
+    expect(invitations.rows[1]?.token_hash.trim()).not.toBe(oldToken);
+    const openInvitations = await pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM user_invitations
+        WHERE user_id = $1 AND revoked_at IS NULL AND consumed_at IS NULL`,
+      [employee.id],
+    );
+    expect(openInvitations.rows[0]?.count).toBe('1');
+
+    const rejectedOld = await post(request.agent(app), '/api/v1/users/invitations/accept', {
+      token: oldToken,
+      password: 'Employee-owned-synthetic-password-2026',
+    });
+    expect(rejectedOld.status).toBe(400);
+    const acceptedNew = await post(request.agent(app), '/api/v1/users/invitations/accept', {
+      token: newToken,
+      password: 'Employee-owned-synthetic-password-2026',
+    });
+    expect(acceptedNew.status).toBe(200);
+    const active = await pool.query<{ status: string; email: string }>(
+      'SELECT status, email_normalized AS email FROM users WHERE id = $1',
+      [employee.id],
+    );
+    expect(active.rows[0]).toEqual({ status: 'active', email: employee.email });
+
+    const audit = await pool.query<{
+      actor_user_id: string;
+      request_id: string;
+      safe_metadata: object;
+    }>(
+      `SELECT actor_user_id, request_id, safe_metadata FROM audit_logs
+        WHERE action = 'user.invitation.reissued' AND entity_id = $1`,
+      [employee.id],
+    );
+    expect(audit.rows).toHaveLength(1);
+    expect(audit.rows[0]?.actor_user_id).toBe(owner.id);
+    expect(audit.rows[0]?.request_id).toBe(reissued.headers['x-request-id']);
+    expect(JSON.stringify(audit.rows[0]?.safe_metadata)).not.toContain(oldToken);
+    expect(JSON.stringify(audit.rows[0]?.safe_metadata)).not.toContain(newToken);
+    expect(JSON.stringify(audit.rows[0]?.safe_metadata)).not.toContain(oldSetupUrl);
+    expect(JSON.stringify(audit.rows[0]?.safe_metadata)).not.toContain(replacement.setupUrl);
+  });
+
+  it('reissues a revoked invitation without creating a duplicate employee account', async () => {
+    const created = await invite('STAFF');
+    expect(created.status).toBe(201);
+    const employee = created.body.data.employee as { id: string; email: string; roleCode: string };
+    const oldToken = tokenFromSetupUrl(created.body.data.setupUrl);
+    const revoked = await post(
+      ownerAgent,
+      `/api/v1/users/${employee.id}/invitation/revoke`,
+      {},
+    );
+    expect(revoked.status).toBe(200);
+
+    const reissued = await post(
+      ownerAgent,
+      `/api/v1/users/${employee.id}/invitation/reissue`,
+      {},
+    );
+    expect(reissued.status).toBe(200);
+    const replacement = reissued.body.data as {
+      employee: { id: string; email: string; roleCode: string };
+      setupUrl: string;
+    };
+    expect(replacement.employee).toMatchObject({
+      id: employee.id,
+      email: employee.email,
+      roleCode: 'STAFF',
+    });
+    const newToken = tokenFromSetupUrl(replacement.setupUrl);
+    expect(newToken).not.toBe(oldToken);
+
+    const oldAcceptance = await post(request.agent(app), '/api/v1/users/invitations/accept', {
+      token: oldToken,
+      password: 'Employee-owned-synthetic-password-2026',
+    });
+    expect(oldAcceptance.status).toBe(400);
+    const newAcceptance = await post(request.agent(app), '/api/v1/users/invitations/accept', {
+      token: newToken,
+      password: 'Employee-owned-synthetic-password-2026',
+    });
+    expect(newAcceptance.status).toBe(200);
+
+    const accountCount = await pool.query<{ count: string; status: string }>(
+      'SELECT count(*)::text AS count, max(status) AS status FROM users WHERE email_normalized = $1',
+      [employee.email],
+    );
+    expect(accountCount.rows[0]).toEqual({ count: '1', status: 'active' });
+    const audit = await pool.query<{ actor_user_id: string }>(
+      `SELECT actor_user_id FROM audit_logs
+        WHERE action = 'user.invitation.reissued' AND entity_id = $1`,
+      [employee.id],
+    );
+    expect(audit.rows[0]?.actor_user_id).toBe(owner.id);
+  });
+
+  it('rolls back invitation rotation when the reissue audit insert fails', async () => {
+    const created = await invite('STAFF');
+    expect(created.status).toBe(201);
+    const employeeId = created.body.data.employee.id as string;
+    const oldToken = tokenFromSetupUrl(created.body.data.setupUrl);
+    await pool.query(`
+      CREATE FUNCTION test_fail_user_invitation_reissue_audit() RETURNS trigger
+      LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.action = 'user.invitation.reissued' THEN
+          RAISE EXCEPTION 'Synthetic invitation reissue audit failure';
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+    `);
+    await pool.query(`
+      CREATE TRIGGER test_fail_user_invitation_reissue_audit
+      BEFORE INSERT ON audit_logs
+      FOR EACH ROW EXECUTE FUNCTION test_fail_user_invitation_reissue_audit();
+    `);
+    try {
+      const failed = await post(
+        ownerAgent,
+        `/api/v1/users/${employeeId}/invitation/reissue`,
+        {},
+      );
+      expect(failed.status).toBe(500);
+      const rows = await pool.query<{
+        token_hash: string;
+        revoked_at: Date | null;
+        consumed_at: Date | null;
+      }>(
+        `SELECT token_hash, revoked_at, consumed_at FROM user_invitations
+          WHERE user_id = $1`,
+        [employeeId],
+      );
+      expect(rows.rows).toHaveLength(1);
+      expect(rows.rows[0]?.token_hash.trim()).toBe(
+        createHash('sha256').update(oldToken).digest('hex'),
+      );
+      expect(rows.rows[0]?.revoked_at).toBeNull();
+      expect(rows.rows[0]?.consumed_at).toBeNull();
+    } finally {
+      await pool.query(
+        'DROP TRIGGER IF EXISTS test_fail_user_invitation_reissue_audit ON audit_logs',
+      );
+      await pool.query('DROP FUNCTION IF EXISTS test_fail_user_invitation_reissue_audit()');
+    }
+  });
+
+  it('serialises concurrent invitation reissues to one open token', async () => {
+    const created = await invite('STAFF');
+    expect(created.status).toBe(201);
+    const employeeId = created.body.data.employee.id as string;
+    const firstAgent = request.agent(app);
+    const secondAgent = request.agent(app);
+    expect((await signIn(firstAgent, owner.email)).status).toBe(200);
+    expect((await signIn(secondAgent, owner.email)).status).toBe(200);
+
+    const attempts = await Promise.all([
+      post(firstAgent, `/api/v1/users/${employeeId}/invitation/reissue`, {}),
+      post(secondAgent, `/api/v1/users/${employeeId}/invitation/reissue`, {}),
+    ]);
+    expect(attempts.map((response) => response.status)).toEqual([200, 200]);
+    const open = await pool.query<{ token_hash: string }>(
+      `SELECT token_hash FROM user_invitations
+        WHERE user_id = $1 AND revoked_at IS NULL AND consumed_at IS NULL`,
+      [employeeId],
+    );
+    expect(open.rows).toHaveLength(1);
+    const candidateTokens = attempts.map((response) => tokenFromSetupUrl(response.body.data.setupUrl));
+    expect(candidateTokens.filter((token) =>
+      createHash('sha256').update(token).digest('hex') === open.rows[0]?.token_hash.trim(),
+    )).toHaveLength(1);
+
+    const activeCount = await pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM user_invitations
+        WHERE user_id = $1 AND revoked_at IS NULL AND consumed_at IS NULL`,
+      [employeeId],
+    );
+    expect(activeCount.rows[0]?.count).toBe('1');
   });
 
   it('revokes only the selected employee sessions and never returns session identifiers', async () => {
