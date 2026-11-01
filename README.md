@@ -100,6 +100,8 @@ All items below describe planned functionality; they are not claims that the fea
 - Track order status: Received, Confirmed, Processing, Packed, Dispatched and Delivered.
 - Track cancelled and failed orders with reasons.
 - Record delivery method, rider/courier details and dispatch/delivery dates.
+- Support delivery assignments and a delivery queue so staff can see which rider/courier is responsible for each order.
+- Track delivery attempts, proof/status notes and failed-delivery reasons.
 - Search and review complete order history.
 - Track who created and updated each order.
 
@@ -133,6 +135,9 @@ All items below describe planned functionality; they are not claims that the fea
 - Search customers and identify repeat customers.
 - Keep a history of receipts and customer communications.
 - Record feedback and service notes where appropriate.
+- Support customer segmentation and repeat-customer identification.
+- Optionally record customer birthdays and preferences where supplied appropriately.
+- Support consent-based birthday messages, personalised follow-ups and relevant product recommendations as future customer-retention features.
 - Keep marketing consent separate from transactional communications.
 
 ### 6. Receipts and customer communications
@@ -170,6 +175,7 @@ DMS is an operational management system. Financial reports must clearly distingu
 - Submit expenses for review and approval.
 - Record approval/rejection, approver and decision date.
 - Search and report expenses by date, category and status.
+- Provide a future central document area for business documents such as invoices, supplier files, policies and operational records, with role-restricted access.
 
 ### 9. Supplier and procurement management
 
@@ -214,7 +220,12 @@ DMS is an operational management system. Financial reports must clearly distingu
 
 ### 13. Future business intelligence
 
-After the operational modules are reliable, consider an AI business assistant that answers questions using authorised DMS records, such as:
+After the operational modules are reliable, consider:
+- An AI business assistant that answers operational questions using authorised DMS records.
+- An AI product assistant that helps staff find suitable products or suggest fragrance options using the product information DMS actually contains.
+- Sales and stock-demand forecasting based on sufficient historical business data.
+
+Example questions for the AI business assistant include:
 
 - Which products sold most this month?
 - Which locations need restocking?
@@ -445,14 +456,27 @@ This checklist is the project's shared progress record. It is intended to help f
 - [ ] Fix issues identified during acceptance testing.
 - [ ] Prepare staff instructions and operational handover.
 
-### Phase 9 — Future enhancements
+### Phase 9 — Future enhancements and optional extensions
 
-- [ ] Evaluate WhatsApp Business integration.
-- [ ] Evaluate automatic website-order integration (orders only; not product-catalogue import).
-- [ ] Evaluate SMS notifications.
-- [ ] Add customer feedback and consent-based retention campaigns.
-- [ ] Add advanced business analytics.
-- [ ] Evaluate an AI assistant grounded in authorised DMS data.
+These ideas were raised during product planning. They are documented so future agents and the business can consider them, but they are not commitments for the first release. Prioritisation requires a separate decision.
+
+- [ ] Evaluate WhatsApp Business integration for approved customer communications and operational workflows.
+- [ ] Evaluate automatic website-order integration (orders only; never product-catalogue import/synchronisation unless the business changes that decision).
+- [ ] Evaluate SMS notifications through a suitable Nigerian provider.
+- [ ] Add delivery/rider assignment management and delivery performance reporting.
+- [ ] Add discount rules, coupon codes and promotion tracking.
+- [ ] Add marketing campaign/source attribution to understand which campaigns generate enquiries and sales.
+- [ ] Expand the product image/media library for consistent internal product records.
+- [ ] Build a central, permission-controlled document management area for invoices and company documents.
+- [ ] Add staff task assignment and internal operational reminders.
+- [ ] Evaluate staff attendance and leave tracking if Dscentsation wants HR functionality in this platform.
+- [ ] Add customer feedback requests and consent-based follow-up campaigns.
+- [ ] Add opt-in birthday greetings and customer milestone messages.
+- [ ] Add consent-based personalised product recommendations based on purchase history and recorded preferences.
+- [ ] Add advanced business analytics and sales/stock-demand forecasting when enough reliable history exists.
+- [ ] Evaluate an AI product assistant and an AI business assistant grounded in authorised DMS records.
+
+Marketing campaigns, birthday messages and product recommendations must respect customer consent and applicable privacy requirements. Operational receipts and order updates remain separate from promotional messages.
 
 ### Current project position
 
