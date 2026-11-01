@@ -1,9 +1,58 @@
 # Dscentsation Management System — Database Design
 
-**Document status:** Draft for project-manager review  
-**Task:** 002 — Technical Architecture  
+**Document status:** Conceptual schema draft reconciled with the Task 005 physical foundation; pending project-manager review  
+**Task:** 002 — Technical Architecture, updated for Task 005  
 **Database:** PostgreSQL  
-**Purpose:** Logical schema proposal; this is not an executable migration or evidence that a database has been provisioned.
+**Purpose:** Distinguish the physical eight-table foundation migration from the larger proposed business schema below. The conceptual entity groups are not an executable migration and do not indicate that a production database has been provisioned.
+
+## Task 005 implemented foundation — physical schema
+
+Task 005 was approved and merged into `main` through PR #7 (merge commit `652b5d51d17ecb36e78871a99164c12238a8ac41`). Its sole migration, `apps/api/migrations/001_initial_foundation.js`, creates exactly these eight physical tables:
+
+1. `roles`
+2. `permissions`
+3. `role_permissions`
+4. `users`
+5. `locations`
+6. `user_location_access`
+7. `user_sessions`
+8. `audit_logs`
+
+No product, product-variant, customer, order, delivery, inventory-balance, stock-movement, transfer, payment, refund, expense, supplier, procurement, return, receipt-issuance, file-metadata or email-outbox table has been implemented. The entity groups and relationship model in the following conceptual sections describe the proposed future business schema; they must not be mistaken for migrated tables.
+
+### Implemented database approach
+
+- PostgreSQL is the database technology used by the application foundation.
+- The API uses `pg` 8.23.1 and explicit SQL with parameterised query values. No ORM is used in Task 005.
+- `node-pg-migrate` 9.0.0 manages versioned migrations. Schema changes are migration-controlled; the API checks that the eight foundation tables exist and does not run migrations automatically at startup.
+- Transactions are used for implemented multi-step operations, including initial Owner creation (advisory lock, user insert and audit insert) and successful login metadata/audit writes. This is not evidence that future order, inventory or financial transaction workflows exist.
+- The API integration suite and migration verification run against a disposable PostgreSQL 17 service in GitHub Actions. This is not a production database or provisioning record.
+
+### Seeded roles, permission codes and assignments
+
+The migration seeds three roles: `OWNER` (Owner), `MANAGER` (Manager) and `STAFF` (Staff). It seeds these four permission codes:
+
+- `payments.record`
+- `payments.verify`
+- `inventory.transfer.receive_destination_assigned`
+- `inventory.transfer.pickup_warehouse_to_assigned_sheraton`
+
+The seven role-permission assignments are:
+
+| Role | Seeded permissions | Assignment count |
+|---|---|---:|
+| Owner | `payments.record`, `payments.verify` | 2 |
+| Manager | `payments.record`, `payments.verify` | 2 |
+| Staff | `payments.record`, `inventory.transfer.receive_destination_assigned`, `inventory.transfer.pickup_warehouse_to_assigned_sheraton` | 3 |
+| **Total** | **4 distinct permission codes** | **7** |
+
+These are only the confirmed rules represented in the foundation seed. They are not the complete business permission matrix and do not mean the corresponding order, payment or transfer workflows have been implemented. No locations or Staff location assignments are seeded.
+
+### Physical foundation details
+
+The `user_sessions` table follows the `connect-pg-simple` adapter shape (`sid`, `sess`, `expire`) with additional user attribution and timestamps. It is not identical to the generic conceptual session columns shown in the proposed entity model below. The `audit_logs` table is protected by PostgreSQL triggers that reject UPDATE, DELETE and TRUNCATE operations.
+
+Only the eight tables above exist in the Task 005 migration. No production database was provisioned; all CI migration and integration testing uses disposable synthetic data.
 
 ## 1. Design principles
 
