@@ -33,14 +33,14 @@ export async function assertDatabaseReady(): Promise<void> {
   const result = await pool.query<{ table_name: string; exists: boolean }>(
     `
       SELECT required.table_name,
-             to_regclass(format('public.%I', required.table_name)) IS NOT NULL AS exists
+             to_regclass(format('public.%I', required.table_name)) IS NOT NULL AS present
       FROM unnest($1::text[]) AS required(table_name)
       ORDER BY required.table_name
     `,
     [requiredFoundationTables],
   );
 
-  const missing = result.rows.filter((row) => !row.exists).map((row) => row.table_name);
+  const missing = result.rows.filter((row) => !row.present).map((row) => row.table_name);
 
   if (missing.length > 0) {
     throw new Error(
