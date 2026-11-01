@@ -1,11 +1,11 @@
 # Dscentsation Management System — Architecture Overview
 
-**Document status:** Draft for project-manager review  
-**Task:** 002 — Technical Architecture  
+**Document status:** Implementation-aware architecture draft; proposed technical decisions remain subject to their recorded review status  
+**Task:** 002 — Technical Architecture, reconciled against Task 005  
 **Scope:** Initial internal operations platform for Dscentsation's Nigerian operations  
-**Requirements source:** Repository `README.md` (read in full before this document was prepared)
+**Requirements and implementation sources:** Repository `README.md`, Task 005 merge commit `652b5d51d17ecb36e78871a99164c12238a8ac41`, application manifests, source, migration and CI workflow
 
-> This document describes a proposed architecture. It does not indicate that an application, database, integration or deployment already exists. Decisions marked as proposed remain subject to review.
+> This document distinguishes confirmed product/business rules, the Task 005 implementation that now exists in `main`, and target architecture that remains proposed or requires confirmation. Implementing a proposed choice does not by itself ratify that architecture decision. No production infrastructure or business-module workflow is implied.
 
 ## 1. Architecture goals
 
@@ -21,6 +21,21 @@ DMS will provide one secure internal workspace for recording and managing Dscent
 
 The initial system is a **single-company internal application**, not a multi-tenant SaaS platform.
 
+### Task 005 implemented foundation (merged PR #7)
+
+The following is implementation evidence from the current `main` branch, not a blanket architecture approval:
+
+- A pnpm 12.16.1 workspace/monorepo contains separate `apps/web` and `apps/api` applications. The root engine pins Node.js 26.13.0.
+- The web application uses React 19.3.0, TypeScript 6.0.3 and Vite 8.3.5. Its implemented scope is the responsive sign-in experience, authenticated application shell, placeholder navigation and initial dashboard shell.
+- The API uses Node.js, Express 5.3.0 and TypeScript 6.0.3. It exposes a versioned JSON API under `/api/v1`; current routes cover health and foundation authentication/session/capability operations, not business modules.
+- PostgreSQL is accessed through `pg` 8.23.1 using explicit parameterised SQL. `node-pg-migrate` 9.0.0 manages migrations. There is no ORM in the Task 005 implementation.
+- The only physical schema migration creates `roles`, `permissions`, `role_permissions`, `users`, `locations`, `user_location_access`, `user_sessions` and `audit_logs`. The complete business schema remains unimplemented; see [Database Design](./database-design.md).
+- Authentication uses Argon2id, provisioned accounts, `connect-pg-simple` PostgreSQL sessions, secure cookie configuration, login session rotation, logout/revocation, expiry handling, exact-Origin and session-bound CSRF validation, login throttling and an interactive Owner bootstrap CLI.
+- The migration seeds Owner, Manager and Staff; four confirmed permission codes; and seven role-permission assignments. Audit rows are protected against UPDATE, DELETE and TRUNCATE by PostgreSQL triggers.
+- CI uses GitHub Actions for pull requests targeting `main` and pushes to `main`. The current baseline includes Prettier, ESLint, TypeScript checks, Vitest, Supertest, React Testing Library, PostgreSQL-backed integration tests, migration/seed/rollback/reapplication checks and production builds.
+
+The repository structure is consistent with the proposed modular-monolith direction, but ADR-001 remains Proposed. TypeScript/Vite/API details, database tooling and test-strategy ratification retain their existing decision-register statuses. No production host/database, background worker, email provider, file-storage service or deployment was provisioned by Task 005.
+
 ## 2. Confirmed product boundaries
 
 The following are requirements, not optional architecture suggestions:
@@ -35,9 +50,9 @@ The following are requirements, not optional architecture suggestions:
 - Customer transactional email must use Dscentsation's official company-hosted email identity. The provider and sending method still need verification.
 - WhatsApp conversation ingestion, SMS, marketing automation and AI assistants are not first-release dependencies.
 
-## 3. Proposed system shape
+## 3. Target application architecture beyond the foundation
 
-Use a **modular monolith**: one React web application, one Node.js/Express API application and one PostgreSQL database. Keep business domains separated inside the codebase, while deploying the API as one service initially.
+The Task 005 codebase is organised as a pnpm monorepo with separate React web and Node.js/Express API applications, backed by PostgreSQL access. This structure is consistent with a **modular-monolith proposal**, but ADR-001 remains Proposed until the architecture is formally reviewed. The target design keeps business domains separated inside the codebase and proposes one API deployment initially.
 
 ```mermaid
 flowchart LR
@@ -57,11 +72,11 @@ flowchart LR
   DEPLOY --> API
 ```
 
-The diagram is logical, not a claim that any of these services have been provisioned.
+The diagram is a logical target, not a record of deployed services. Task 005 implemented the web/API code, PostgreSQL access and CI workflow only. The transactional outbox, background worker, company email provider, private object storage, Render deployment pipeline and hosted application/database services shown or described as target components have not been provisioned.
 
 ### 3.1 Frontend — React
 
-**Recommendation:** React with TypeScript and Vite for the internal single-page application. React is the confirmed frontend technology; TypeScript and Vite are proposed implementation choices.
+**Task 005 implementation:** The internal web application uses React 19.3.0, TypeScript 6.0.3 and Vite 8.3.5. React remains the established frontend framework; TypeScript and Vite are adopted in the codebase but remain subject to formal ratification under ADR-002 / DMS-DEC-022. The current UI is limited to sign-in, the authenticated shell, placeholder navigation and an initial dashboard shell.
 
 Organise the frontend by business feature rather than by page alone:
 
@@ -95,7 +110,7 @@ Use server data as the source of truth. Cache and refresh data deliberately; do 
 
 ### 3.2 Backend — Node.js and Express
 
-Use Node.js with Express and TypeScript. Expose a versioned JSON REST API under `/api/v1`.
+The API implementation uses Node.js 26.13.0, Express 5.3.0 and TypeScript 6.0.3, with a versioned JSON REST API under `/api/v1`. These implementation details are recorded as adopted in the codebase; formal ratification remains open under ADR-003 / DMS-DEC-023. Current routes cover health and authentication/session/capability operations only.
 
 Recommended backend layers:
 
@@ -126,7 +141,7 @@ Start as one deployable API with these internal module boundaries. Do not split 
 
 ### 3.3 Database — PostgreSQL
 
-PostgreSQL is the system of record for operational data.
+PostgreSQL is the intended system of record and is the database technology used by the Task 005 API implementation. The API uses `pg` 8.23.1 with explicit parameterised SQL; migrations use `node-pg-migrate` 9.0.0. No ORM is included. These codebase choices remain subject to formal ratification under ADR-004 / DMS-DEC-024. The current physical migration contains only the eight foundation tables listed in [Database Design](./database-design.md); business-domain tables remain conceptual proposals.
 
 Core principles:
 
@@ -230,6 +245,16 @@ Enforce these rules in backend middleware and domain services with deny-by-defau
 
 The detailed permission matrix for other modules (such as exports, refunds, expense approvals and user administration) can be refined separately, but it must not weaken the confirmed role/location/payment rules.
 
+### Task 005 authentication implementation and limitations
+
+The merged foundation implements Argon2id password hashing and provisioned accounts; public self-registration is not provided. Sessions use `express-session` with `connect-pg-simple` 10.0.0 and the migrated `user_sessions` table. The cookie is HttpOnly and SameSite=Lax, with the Secure flag controlled by configuration and required in production. Login regenerates the session identifier; logout destroys the session; a user-session revocation helper is present. The API enforces an absolute session age and the cookie/store applies the configured idle expiry.
+
+State-changing requests require an exact configured Origin and a session-bound CSRF token. Login attempts are throttled by `express-rate-limit`; the current limiter is process-local and is not a shared distributed rate limiter. Production security configuration requires explicit idle and absolute timeout values, secure cookies and an HTTPS application origin; the values in development examples are not approved production policy. Production has no in-memory session-store fallback.
+
+The initial Owner bootstrap is an interactive CLI operation. It prompts for credentials without echoing the password, prevents a second Owner, uses a transaction/advisory lock and records the bootstrap in audit history.
+
+MFA has not been implemented or approved. Production idle/absolute lifetime values, concurrent-session policy and high-risk-action re-authentication remain unresolved. These limitations are tracked in DMS-DEC-025 and DMS-DEC-026; do not treat them as completed features. The four seeded permission codes and seven assignments are only the confirmed subset, not the complete business permission matrix.
+
 ## 6. Email, file storage and other integrations
 
 ### Company-hosted email
@@ -310,6 +335,12 @@ Required high-risk tests include:
 - Retrying an email job does not send duplicate notifications.
 - Historical order lines remain accurate after a product is edited or archived.
 
+### Task 005 verification baseline
+
+The merged CI workflow runs on pull requests targeting `main` and pushes to `main`. It checks Prettier formatting, ESLint and TypeScript; tests use Vitest, Supertest and React Testing Library. A disposable PostgreSQL 17 service is used for API integration/security tests and for clean migration, seed/idempotency, production-`up`, production-`down` guard, non-production rollback, reapplication and schema verification. The workflow also runs the workspace tests, production builds and committed-patch whitespace verification.
+
+This is the current foundation verification baseline, not completion of the full test strategy. Playwright end-to-end journeys are not present in the current manifests/workflow. Concurrent stock reservation, inventory-transfer invariants, receipt/email retries and business financial workflow tests remain future requirements because those business workflows are not implemented.
+
 Use synthetic customer, payment and stock data in all development and automated tests.
 
 ## 9. Deployment and operations architecture
@@ -334,7 +365,7 @@ CI should run formatting/lint checks, TypeScript checks, unit/integration tests 
 
 Production API instances must use the shared PostgreSQL-backed session store. Reservation expiry should run through a retry-safe scheduled/background worker using the same PostgreSQL transaction rules as order dispatch and cancellation.
 
-No service is provisioned and no deployment is part of this task.
+Task 005 did not provision a Render service, production PostgreSQL instance, worker, email provider or file-storage service. No production deployment was performed. Render Postgres remains preferred subject to the backup, recovery and cost verification recorded in ADR-010.
 
 ## 10. Phased implementation boundaries
 
@@ -375,4 +406,4 @@ Remaining questions before implementation:
 9. Confirm the canonical Warehouse and Sheraton location records/codes and the Staff accounts assigned to each Sheraton location.
 10. Confirm any operational paperwork/reference required at Warehouse when a Sheraton Staff member records physical pickup; the access boundary and stock accounting rules in this architecture are fixed.
 
-**Review outcome:** Pending. This architecture reflects the confirmed project-manager rules but is not permission to start application implementation or deployment.
+**Review outcome:** Pending independent review of this reconciliation. The Task 005 foundation has been implemented and merged; the broader target architecture, unresolved technical choices, business modules and production deployment have not thereby been approved.
