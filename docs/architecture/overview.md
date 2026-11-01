@@ -145,36 +145,43 @@ A detailed conceptual schema and relationship map are in [Database Design](./dat
 
 ### 4.1 Record and fulfil an order
 
-1. Staff selects an existing customer or creates a customer record.
-2. Staff records the source channel: WhatsApp, Instagram, website or phone.
-3. Staff adds manually registered products/variants, quantities, price snapshots, discount and delivery fee.
-4. Staff selects the fulfilment location.
-5. On confirmation, the backend locks/checks the relevant stock balances and reserves available stock inside a database transaction.
-6. Payments are recorded separately from order totals; unpaid and partially paid orders remain visible.
-7. Processing, packing and delivery information is recorded against the order.
-8. On dispatch, the backend decreases on-hand stock, releases the matching reservation and writes stock movement records in one transaction.
-9. Delivery attempts and completion/failure are recorded. Order, customer, payment and stock histories remain linked.
+1. Staff selects or creates a customer and records the source channel: WhatsApp, Instagram, website or phone.
+2. Staff selects exactly one fulfilment location for the order and adds manually registered products/variants, quantities, price snapshots, discounts and delivery fee.
+3. All items in the order are sourced from that one location in the first release. Cross-location split fulfilment is not supported. If stock is insufficient at the selected location, the order cannot silently source missing items from another location; staff must correct the order, select another single location before confirmation where authorised, or arrange a stock transfer before fulfilment.
+4. When the order is confirmed, the backend locks the selected location's relevant stock balances and reserves the required stock immediately in one database transaction. This applies whether the order is unpaid, partially paid or paid; payment is not a precondition for reservation.
+5. Each reservation receives an expiry timestamp derived from the active, configurable reservation policy. The policy is stored in PostgreSQL. Policy changes apply to new reservations; changing an existing expiry requires an explicit authorised and audited action.
+6. Staff may record payments. Only Managers and the Owner may verify them. Unverified entries are not counted as verified money received.
+7. Processing, packing and delivery are recorded against the order's single fulfilment location.
+8. At dispatch, the backend reduces on-hand stock and consumes/releases the matching reservation in one transaction, with stock movement and audit records.
+9. If a reservation expires before dispatch, DMS safely releases the reserved quantity and places the order on fulfilment hold/reconfirmation. Expiry does not silently cancel the order or change physical on-hand stock.
+10. Delivery attempts and completion/failure are recorded. Order, customer, payment, receipt and stock histories remain linked.
 
-The exact business event that makes an order eligible for reservation, and the person authorised to confirm payment, require manager approval.
+The initial reservation duration, expiry eligibility (for example, unpaid-only versus all undispatched confirmed orders), and any grace/warning policy remain configurable values to be set before implementation.
 
 ### 4.2 Receive, count and transfer inventory
 
-- Receiving stock increases the balance for the chosen location and creates a corresponding movement record.
-- A transfer has a source, destination, item quantities and explicit lifecycle.
-- Dispatch from the source location records stock leaving that location. The goods are treated as in transit until the destination confirms receipt.
-- Receipt at the destination records the incoming movement. Discrepancies require a reason and review rather than silent balance edits.
+- Receiving stock increases the physical balance for the chosen location and creates a corresponding movement record.
+- A transfer has a source, destination, item quantities and explicit lifecycle. The source and destination must differ.
+- On dispatch, source on-hand decreases and a transfer-item-specific in-transit balance increases in the same transaction. The goods are no longer available at the source and are not yet available at the destination.
+- In-transit quantities remain linked to the transfer item, product variant, source and destination. The stock ledger records the source-location decrease and the in-transit increase.
+- A Staff user assigned to the destination location must confirm receipt. In one transaction, the system reduces in-transit quantity and increases destination on-hand, and records paired ledger events and an audit event. Source Staff cannot confirm destination receipt on the destination team's behalf.
+- Partial receipt reduces the in-transit balance only by the quantity actually confirmed. Unreceived quantities remain in transit until received or formally resolved through a discrepancy workflow.
+- Shortage/damage discrepancies require a reason, staff attribution and review; unresolved quantity remains visible as in transit and cannot be silently written off.
+- Managers can view and manage stock across all locations. Staff may act only at locations assigned to that Staff account.
 - Adjustments, damage, loss and returns must create attributable movement records.
-- Stock balances are transactionally maintained summaries; the movement ledger provides the traceable history.
+- Physical and in-transit balances are transactional summaries; the append-only movement ledger provides the traceable history.
 
 ### 4.3 Record payment and refund activity
 
-Payment entries are separate financial events linked to orders. Corrections should be represented by a reversal or adjustment event, not silent overwriting. Refund records reference the relevant payment/order and preserve who initiated, approved and recorded the refund.
+Payment entries are separate financial events linked to orders. Staff may record payment details, including amount, date, method and reference. Only Managers and the Owner may verify a recorded payment. Until verified, an entry remains unverified and is excluded from verified-receipts totals and calculations that represent money actually received.
 
-The first release is assumed to record payments reported by Staff; it does not assume a payment gateway or automated bank reconciliation.
+Corrections are represented by reversal or adjustment events, not silent overwriting. The first release is a manual operational payment-recording model; it does not assume a payment gateway or automated bank reconciliation.
 
 ### 4.4 Send transactional email
 
 Create an email-outbox entry in the same database transaction as the business event that requires a message. A worker then sends the message through an adapter configured for Dscentsation's verified company-hosted email provider.
+
+Receipt issuance is a separate business record from sending an email. When a receipt is issued, DMS creates an immutable receipt-issuance record with a unique receipt reference, order/payment association where relevant, issuer, timestamp, currency/amount and frozen transaction snapshot. Email delivery attempts reference that issuance record; failed email delivery does not erase or reverse the issued receipt.
 
 This avoids losing an email request if the API process stops after committing an order. Workers must retry temporary failures safely, use idempotency/deduplication keys, and record provider outcomes. A failed email must not roll back an otherwise valid order or payment.
 
@@ -184,26 +191,29 @@ Email credentials belong only in backend secret configuration. The frontend must
 
 Use individual user accounts; do not share a common Staff login.
 
-**Proposed authentication approach:**
+**Authentication and session requirements:**
 
 - Invite/provision users rather than permit unrestricted public registration.
 - Hash passwords with a modern password-hashing function such as Argon2id.
-- Prefer opaque, server-side sessions with secure, `HttpOnly`, `SameSite` cookies over long-lived tokens in browser local storage.
+- Use opaque server-side sessions delivered through secure, HttpOnly, SameSite cookies.
+- Persist session records in PostgreSQL through a PostgreSQL-backed Express session store. Create/manage its table through migrations and index the expiry field for lookup and cleanup.
+- Production must never use Express MemoryStore, any in-memory session store or process-local session state. All API instances share the same PostgreSQL-backed store so sessions survive process restarts and work across instances.
+- Rotate session identifiers after authentication/privilege changes and support revocation on logout, password reset, account suspension and suspected compromise.
 - Require HTTPS in hosted environments; apply CSRF protection to cookie-authenticated state-changing requests.
-- Add login throttling, generic authentication errors, password reset tokens with short expiry and single use, and session revocation.
-- Record successful and failed sign-in/security events without logging passwords, reset tokens or session secrets.
+- Add login throttling, generic authentication errors and short-lived, single-use password-reset tokens.
+- Record sign-in/security events without logging passwords, reset tokens, session IDs or session secrets.
 
-**Role model (high-level proposal):**
+**Confirmed role, location and payment rules:**
 
-| Role | Intended access |
-|---|---|
-| Owner | Full business oversight across all locations; user and security administration; financial visibility; reports; approvals and configuration. |
-| Manager | Day-to-day operations across authorised locations; products, customers, orders, inventory, procurement, returns and permitted reports; approvals within agreed limits. |
-| Staff | Task-based operational access, such as registering customers and orders, recording permitted payments/receipts and carrying out assigned stock actions. No user administration or unrestricted sensitive reporting. |
+| Role | Business and location access | Payment permissions |
+|---|---|---|
+| Owner | Full business oversight and access to all stock locations. | Can record and verify payments. |
+| Manager | Day-to-day management and access to all stock locations. | Can record and verify payments. |
+| Staff | Task-based access and stock actions only at locations explicitly assigned to that Staff account. | Can record payments but cannot verify them. |
 
-Use backend role/permission checks with a deny-by-default policy. Location scoping is an additional authorisation rule: Staff (and, if decided, Managers) can be restricted to assigned stock locations. The database design keeps role permissions and user-location assignments explicit so the detailed matrix can be approved without relying on UI visibility.
+Enforce these rules in backend middleware and domain services with deny-by-default behaviour. Manager access to all locations is global and does not depend on user-location assignment rows. Staff location assignments must be checked on every location-scoped request, including stock reads, order fulfilment actions, transfer dispatch and destination receipt confirmation. A Staff user may confirm a transfer receipt only when assigned to that transfer's destination location.
 
-The exact actions, approval limits, cross-location visibility and payment-verification rules are unresolved and must be approved before implementation.
+The detailed permission matrix for other modules (such as exports, refunds, expense approvals and user administration) can be refined separately, but it must not weaken the confirmed role/location/payment rules.
 
 ## 6. Email, file storage and other integrations
 
@@ -264,35 +274,46 @@ Testing must cover business invariants, not just successful page rendering.
 Required high-risk tests include:
 
 - Two concurrent orders cannot reserve the same unavailable stock.
-- Confirming an order twice cannot reserve twice.
+- Confirming an order reserves stock immediately even when the order is unpaid; confirming twice cannot reserve twice.
+- An order reserves all its items at its single fulfilment location and cannot silently source from another location.
 - Cancelling an order releases a reservation once.
-- Dispatch reduces on-hand and reserved quantities consistently.
-- A transfer cannot create stock at the destination before receipt is confirmed.
+- Reservation expiry releases reserved quantity (not on-hand stock) once, only when due and policy-eligible; it must not cancel the order or race with dispatch/cancellation into a double release/consume.
+- A reservation-policy change affects new reservations only; existing reservations keep their original policy version and expiry unless explicitly changed and audited.
+- Transfer dispatch reduces source stock and creates in-transit quantity; destination stock does not increase until Staff assigned to the destination location confirms receipt.
+- Partial transfer receipt leaves the remaining quantity in transit; discrepancies cannot be silently written off.
+- Managers can access all stock locations; Staff cannot access unassigned locations.
+- Staff can record a payment but cannot verify it; only Managers and Owner can verify.
+- Receipt issuance creates one immutable receipt record, and a failed/retried email does not create a duplicate receipt issuance.
+- PostgreSQL-backed sessions survive API restarts and are shared across API instances; production never falls back to an in-memory store.
 - A payment/refund correction preserves its event history.
-- Staff cannot access an unassigned location or restricted Owner/Manager actions.
-- Retrying an email job does not send duplicate receipts.
+- Retrying an email job does not send duplicate notifications.
 - Historical order lines remain accurate after a product is edited or archived.
 
 Use synthetic customer, payment and stock data in all development and automated tests.
 
 ## 9. Deployment and operations architecture
 
-The README identifies Render as the proposed application host. Recommended initial topology:
+The project manager has confirmed Render Postgres as the preferred database option, subject to verification of backups, recovery and total cost before provisioning.
 
 | Component | Proposed deployment |
 |---|---|
 | React application | Render static site (or equivalent Render-hosted frontend) |
 | Express API | Render web service |
-| PostgreSQL | Managed PostgreSQL with private application connectivity; Render Postgres is a candidate to verify |
-| Background worker | Render worker service if/when asynchronous email processing is introduced |
+| PostgreSQL | Render Postgres preferred, subject to backup/restore, recovery and cost verification |
+| Session store | Persistent PostgreSQL-backed session store shared by all API instances; no production in-memory store |
+| Background worker | Render worker service if/when asynchronous email and reservation-expiry processing are introduced |
 | File objects | Private Supabase Storage bucket or approved equivalent |
 | CI | GitHub Actions for checks on pull requests and protected branches |
+
+Before approving Render Postgres, verify backup frequency and retention, point-in-time recovery support/limits, the actual restore procedure, and perform or document a restore test. Agree recovery objectives (RPO/RTO), verify region/private-network suitability, connection/storage/compute limits and calculate total recurring cost at expected capacity, including database, backup/recovery-related charges, frontend/API/worker services and required plan tiers. Record the findings and obtain project-manager approval. Render Postgres remains preferred, not yet approved for production provisioning until these checks pass.
 
 Use separate development/test, staging and production configuration. Keep production secrets out of repository files and frontend build variables. Run database migrations as a controlled deployment step before the new backend version handles traffic. Do not run schema migrations automatically from every application instance at startup.
 
 CI should run formatting/lint checks, TypeScript checks, unit/integration tests and production builds. Production deployment should be gated by review and acceptance testing. Add health/readiness checks, structured logs, error monitoring, database backup/restore procedures and an operational owner for alerts.
 
-The provider, region, service sizes, backup retention, restore targets, custom domains and production release process are not yet approved. Verify current provider capabilities and costs before provisioning anything.
+Production API instances must use the shared PostgreSQL-backed session store. Reservation expiry should run through a retry-safe scheduled/background worker using the same PostgreSQL transaction rules as order dispatch and cancellation.
+
+No service is provisioned and no deployment is part of this task.
 
 ## 10. Phased implementation boundaries
 
@@ -310,15 +331,26 @@ Future AI, marketing automation, WhatsApp/SMS integrations and website-order ing
 
 ## 11. Review gates and unresolved questions
 
-Before implementation begins, the project manager/business owner should confirm:
+The following project-manager decisions are confirmed and no longer open questions:
 
-1. The precise role/permission matrix, location restrictions and approval limits.
-2. Actual stock locations and whether transfers require one or two people to authorise.
-3. Order reservation timing, partial fulfilment, cancellation and failed-delivery rules.
-4. Payment verification responsibility, accepted methods and treatment of reversals/refunds.
-5. The company email provider and its permitted SMTP/API sending method.
-6. Whether a managed PostgreSQL instance on Render is preferred, and the storage provider/bucket region.
-7. Receipt format, order/receipt reference format and required retention periods.
-8. Whether all users may see customer contact/purchase history, and which fields require additional restriction.
+- Destination Staff assigned to the destination location must confirm stock-transfer receipt.
+- Staff may record payment entries; only Managers and the Owner may verify payments.
+- Managers have access to all stock locations; Staff are restricted to assigned locations.
+- Render Postgres is preferred, subject to backup, recovery and cost verification.
+- Each order has exactly one fulfilment location in the first release.
+- Stock is reserved immediately when an order is confirmed, even if unpaid.
+- Reservation expiry must be configurable.
 
-**Review outcome:** Pending. Do not treat this proposal as permission to start application implementation or deployment.
+Remaining questions before implementation:
+
+1. What are the actual stock locations, codes and Staff-to-location assignments?
+2. What initial reservation duration should be configured, and should expiry apply only to unpaid orders or to all undispatched confirmed orders?
+3. Should a grace period, warning notification or reminder precede expiry?
+4. What exception/escalation process applies if destination Staff are unavailable, or if a transfer has a shortage/damage discrepancy?
+5. What are the detailed permission/approval rules for refunds, expense approvals, exports and user administration?
+6. Which company-hosted email provider and supported SMTP/API sending method will be used?
+7. What are the receipt format, numbering rules and record-retention requirements?
+8. What are the file-storage provider/region, allowed file types, maximum file sizes and retention rules?
+9. Do Render Postgres backup, recovery and cost checks meet the business's expectations?
+
+**Review outcome:** Pending. This architecture reflects the confirmed project-manager rules but is not permission to start application implementation or deployment.
