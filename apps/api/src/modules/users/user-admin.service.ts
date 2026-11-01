@@ -432,7 +432,7 @@ export async function revokeEmployeeInvitation(
       `UPDATE user_invitations
           SET revoked_at = now()
         WHERE user_id = $1 AND revoked_at IS NULL AND consumed_at IS NULL
-          AND expires_at > now()`,
+`,
       [userId],
     );
     if (revoked.rowCount !== 1) {

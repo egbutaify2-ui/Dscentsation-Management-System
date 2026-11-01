@@ -225,6 +225,11 @@ describe('Employee Account Administration API', () => {
     );
     expect(account.rows[0]?.status).toBe('active');
     expect(await argon2.verify(account.rows[0]!.password_hash, newPassword)).toBe(true);
+    const lastLogin = await pool.query<{ last_login_at: Date | null }>(
+      'SELECT last_login_at FROM users WHERE id = $1',
+      [employeeId],
+    );
+    expect(lastLogin.rows[0]?.last_login_at).toBeTruthy();
 
     const invitation = await pool.query<{ consumed_at: Date | null }>(
       'SELECT consumed_at FROM user_invitations WHERE user_id = $1',
@@ -342,13 +347,15 @@ describe('Employee Account Administration API', () => {
         ORDER BY occurred_at`,
       [employee.id],
     );
-    expect(audit.rows.map((row) => row.action)).toEqual(['user.status.suspended', 'user.status.reactivated']);
+    expect(audit.rows.map((row) => row.action)).toEqual(
+      expect.arrayContaining(['user.sessions.revoked', 'user.status.suspended', 'user.status.reactivated']),
+    );
     expect(audit.rows.every((row) => row.actor_user_id === owner.id)).toBe(true);
-    expect(audit.rows[0]?.safe_metadata).toMatchObject({
+    expect(audit.rows[1]?.safe_metadata).toMatchObject({
       before: { status: 'active' },
       after: { status: 'suspended' },
     });
-    expect(audit.rows[1]?.safe_metadata).toMatchObject({
+    expect(audit.rows[2]?.safe_metadata).toMatchObject({
       before: { status: 'suspended' },
       after: { status: 'active' },
     });

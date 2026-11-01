@@ -63,6 +63,24 @@ BEGIN
       JOIN pg_namespace n ON n.oid = c.relnamespace
      WHERE n.nspname = 'public'
        AND c.relname = 'users'
+       AND t.tgname = 'users_no_delete'
+       AND t.tgenabled IN ('O', 'A')
+       AND NOT t.tgisinternal
+       AND position('BEFORE DELETE' IN pg_get_triggerdef(t.oid)) > 0
+       AND position('deactivated, not deleted' IN pg_get_functiondef(t.tgfoid)) > 0
+       AND position('23514' IN pg_get_functiondef(t.tgfoid)) > 0
+       AND position('users_hard_delete_prohibited' IN pg_get_functiondef(t.tgfoid)) > 0
+  ) THEN
+    RAISE EXCEPTION 'Enabled user hard-delete protection trigger or enforcement function is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+      FROM pg_trigger t
+      JOIN pg_class c ON c.oid = t.tgrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public'
+       AND c.relname = 'users'
        AND t.tgname = 'users_protect_last_active_owner'
        AND t.tgenabled IN ('O', 'A')
        AND NOT t.tgisinternal

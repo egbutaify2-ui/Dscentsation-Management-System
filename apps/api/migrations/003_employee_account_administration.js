@@ -54,6 +54,19 @@ export async function up(pgm) {
       BEFORE UPDATE OF status ON users
       FOR EACH ROW EXECUTE FUNCTION protect_last_active_owner();
 
+    CREATE FUNCTION prevent_user_hard_delete() RETURNS trigger
+    LANGUAGE plpgsql AS $
+    BEGIN
+      RAISE EXCEPTION 'User accounts must be deactivated, not deleted'
+        USING ERRCODE = '23514',
+              CONSTRAINT = 'users_hard_delete_prohibited';
+    END;
+    $;
+
+    CREATE TRIGGER users_no_delete
+      BEFORE DELETE ON users
+      FOR EACH ROW EXECUTE FUNCTION prevent_user_hard_delete();
+
     INSERT INTO permissions(code, description) VALUES
       ('users.view', 'View Manager and Staff employee accounts and their safe account status.'),
       ('users.manage', 'Invite employees, change employee account status and revoke employee sessions.')
@@ -79,6 +92,8 @@ export async function down(pgm) {
     END;
     $$;
 
+    DROP TRIGGER IF EXISTS users_no_delete ON users;
+    DROP FUNCTION IF EXISTS prevent_user_hard_delete();
     DROP TRIGGER IF EXISTS users_protect_last_active_owner ON users;
     DROP FUNCTION IF EXISTS protect_last_active_owner();
     DROP TABLE IF EXISTS user_invitations;
