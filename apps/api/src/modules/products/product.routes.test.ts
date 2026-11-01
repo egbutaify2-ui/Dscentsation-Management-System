@@ -45,20 +45,12 @@ async function csrf(agent: ReturnType<typeof request.agent>): Promise<string> {
 
 async function post(agent: ReturnType<typeof request.agent>, path: string, body: object) {
   const token = await csrf(agent);
-  return agent
-    .post(path)
-    .set('Origin', env.APP_ORIGIN)
-    .set('X-CSRF-Token', token)
-    .send(body);
+  return agent.post(path).set('Origin', env.APP_ORIGIN).set('X-CSRF-Token', token).send(body);
 }
 
 async function patch(agent: ReturnType<typeof request.agent>, path: string, body: object) {
   const token = await csrf(agent);
-  return agent
-    .patch(path)
-    .set('Origin', env.APP_ORIGIN)
-    .set('X-CSRF-Token', token)
-    .send(body);
+  return agent.patch(path).set('Origin', env.APP_ORIGIN).set('X-CSRF-Token', token).send(body);
 }
 
 describe('Product Management API', () => {
