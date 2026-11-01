@@ -201,7 +201,7 @@ describe('Product Management database invariants', () => {
       [[firstVariantId, secondVariantId]],
     );
     expect(relationships.rows).toHaveLength(2);
-    const byVariant = new Map(relationships.rows.map(row => [row.variant_id, row]));
+    const byVariant = new Map(relationships.rows.map((row) => [row.variant_id, row]));
     expect(byVariant.get(firstVariantId)).toMatchObject({
       product_id: firstProductId,
       joined_product_id: firstProductId,

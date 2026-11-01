@@ -66,13 +66,6 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
-      - name: Diagnose Prettier output after a formatting failure
-        if: failure()
-        run: |
-          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 apps/api/src/modules/products/product.database.test.ts > /tmp/product.database.test.formatted.ts
-          diff -u apps/api/src/modules/products/product.database.test.ts /tmp/product.database.test.formatted.ts || true
-
-
       - name: Run ESLint
         run: pnpm lint
 
