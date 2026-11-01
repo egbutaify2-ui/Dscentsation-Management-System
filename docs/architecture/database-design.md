@@ -106,6 +106,8 @@ Append-only event tables generally need `id`, `occurred_at`, `actor_user_id` and
 
 ### 2.1 Users, roles, location access and persistent sessions
 
+**Task 010 planning direction, pending formal confirmation under DMS-DEC-001 and DMS-DEC-002:** shared read visibility across both locations, assigned-location direct editing, cross-location approval, Owner-only consolidated financial overview and assigned-Store-Manager pickup/receipt eligibility are target business direction only. This documentation does not change runtime permissions or select an approval schema.
+
 | Table | Key columns | Purpose / relationships |
 |---|---|---|
 | users | id, email (unique, normalised), display_name, password_hash, role_id, status, last_login_at, created_at, updated_at | One individual login per person. Role references roles.id. Never store plaintext passwords. |

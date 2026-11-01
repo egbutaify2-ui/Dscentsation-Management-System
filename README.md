@@ -274,6 +274,8 @@ AI-generated answers must be grounded in actual records, respect user permission
 
 ## Users and permissions
 
+The shared operational visibility, location-scoped direct-edit, cross-location approval and Owner-only financial overview rules below reflect Task 010 planning direction and remain pending formal confirmation under DMS-DEC-001/002. Existing payment-entry/payment-verification permissions remain unchanged.
+
 | Role | Intended access |
 |---|---|
 | **Owner** | Full authority across both locations; may view and operate at Ajose Warehouse and Sheraton Store without location restriction; may approve/reject/override another user's pending cross-location request; and alone may access the consolidated financial overview. |

@@ -132,13 +132,13 @@ Use PostgreSQL as the authoritative relational database. Use migrations in versi
 
 **Context**
 
-The business holds stock at multiple physical locations. Orders have one fulfilment location in the first release. Confirmed orders reserve stock immediately, including when unpaid. Standard transfers require dispatch at the source and explicit receipt confirmation by Staff assigned to the destination. For the separate dedicated Ajose Warehouse-to-Sheraton Store pickup/receipt workflow, the assigned Store Manager using the existing Manager role is also eligible when the active Sheraton assignment and explicit destination action permission pass (ADR-016). Reservation expiry must be configurable.
+The business holds stock at multiple physical locations. Orders have one fulfilment location in the first release. Confirmed orders reserve stock immediately, including when unpaid. Standard transfers require dispatch at the source and explicit receipt confirmation by Staff assigned to the destination. For the separate dedicated Ajose Warehouse-to-Sheraton Store pickup/receipt workflow, Task 010 records planning direction (pending formal confirmation under DMS-DEC-001/002) that the assigned Store Manager using the existing Manager role is also eligible when the active Sheraton assignment and explicit destination action permission pass (ADR-016). Reservation expiry must be configurable.
 
 **Decision**
 
 Track physical on-hand/reserved balances per (location_id, product_variant_id), maintain an append-only stock movement ledger, and store active reservations with expires_at and the reservation-policy version used. Track stock in transit separately from physical location balances using a transfer-item-scoped stock_in_transit_balances record and linked stock-movement events.
 
-A transfer dispatch transaction decreases source on-hand and increases in-transit quantity. For standard transfers, a Staff user assigned to the destination location must confirm receipt; the receipt transaction decreases in-transit and increases destination on-hand. For the dedicated Ajose Warehouse-to-Sheraton Store workflow, the assigned Store Manager using the existing Manager role may confirm receipt when the active Sheraton assignment and explicit destination-receipt permission pass (ADR-016). Partial receipts leave the remainder in transit. Discrepancies require attributed resolution.
+A transfer dispatch transaction decreases source on-hand and increases in-transit quantity. For standard transfers, a Staff user assigned to the destination location must confirm receipt; the receipt transaction decreases in-transit and increases destination on-hand. For the dedicated Ajose Warehouse-to-Sheraton Store workflow, Task 010 records planning direction (pending formal confirmation under DMS-DEC-001/002) that the assigned Store Manager using the existing Manager role may confirm receipt when the active Sheraton assignment and explicit destination-receipt permission pass (ADR-016). Partial receipts leave the remainder in transit. Discrepancies require attributed resolution.
 
 On order confirmation, reserve the required quantity immediately from the order's single selected fulfilment location, whether the order is unpaid, partially paid or paid. A persisted, versioned reservation_policies record controls whether expiry is enabled, its duration and its eligibility scope. Every policy edit creates a new immutable version for future reservations. Each reservation stores a foreign key to the policy version used, its expiry timestamp and that policy version; the expiry worker evaluates eligibility against the referenced version, so configuration changes do not retroactively alter existing reservations.
 
@@ -516,13 +516,13 @@ The following pre-existing project-manager decisions remain confirmed and are no
 
 | Confirmed area | Rule |
 |---|---|
-| Transfer receipt | For standard transfers, Staff assigned to the destination location confirm physical receipt. For the dedicated Ajose Warehouse-to-Sheraton Store workflow, the assigned Store Manager using the existing Manager role is eligible when active Sheraton assignment and explicit destination-receipt permission pass. |
+| Transfer receipt | For standard transfers, Staff assigned to the destination location confirm physical receipt. |
 | Payment permissions | Staff can record payments; only Managers and Owner can verify payments. |
 | Database hosting preference | Render Postgres is preferred, subject to backup, recovery and cost verification before provisioning. |
 | Order fulfilment | One fulfilment location per order in the first release; no cross-location split fulfilment. |
 | Reservation timing | Reserve stock immediately on order confirmation, whether paid or unpaid. |
 | Reservation expiry | Expiry must be configurable and persisted; each reservation snapshots its applied policy/expiry. |
-| Sheraton pickup | A user assigned to the Sheraton destination and holding the explicit pickup permission may use only the dedicated Warehouse-to-assigned-Sheraton pickup action. The existing Manager role is eligible when assignment and action permission pass; this is not general Warehouse write access. |
+| Sheraton pickup | A user assigned to the Sheraton destination and holding the explicit pickup permission may use only the dedicated Warehouse-to-assigned-Sheraton pickup action; this does not grant general Warehouse write access. |
 
 The following Task 010 direction is recorded separately from those pre-existing confirmed decisions and is not formal business-owner approval evidence: shared read-only operational visibility of both locations; direct stock-changing operations limited to the actor's assigned location for non-Owners; cross-location stock-change requests routed for destination-location approval (with the Owner able to act directly and review another user's request); Owner-only consolidated financial overview; and assigned-Store-Manager eligibility for the dedicated Sheraton pickup/receipt actions when the assignment and explicit permission checks pass. DMS-DEC-001 and DMS-DEC-002 remain Pending confirmation. No approver, date or evidence reference has been supplied.
 

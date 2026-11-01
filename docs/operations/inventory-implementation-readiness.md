@@ -321,7 +321,9 @@ All seven decisions below remain **Pending confirmation** in the existing decisi
 
 **Current status:** Pending confirmation
 
-**Already confirmed:** For standard transfers, destination-assigned Staff confirms physical receipt. For the dedicated Ajose Warehouse-to-Sheraton Store workflow, the assigned Store Manager using the existing Manager role is also eligible when the active Sheraton assignment and explicit destination-receipt permission pass. Partial receipt is supported; unreceived quantity remains in transit. A discrepancy has a quantity, reason, reporter and subsequent authorised resolution. Unresolved quantities remain visible. Under ADR-016, picked quantities cannot be silently cancelled, expired or restored to Warehouse; they must be received, separately returned or formally resolved.
+**Existing confirmed transfer rules:** For standard transfers, destination-assigned Staff confirms physical receipt. Partial receipt is supported; unreceived quantity remains in transit. A discrepancy has a quantity, reason, reporter and subsequent authorised resolution. Unresolved quantities remain visible. Under ADR-016, picked quantities cannot be silently cancelled, expired or restored to Warehouse; they must be received, separately returned or formally resolved.
+
+**Task 010 planning direction, pending formal confirmation under DMS-DEC-001/002:** For the dedicated Ajose Warehouse-to-Sheraton Store workflow, the assigned Store Manager using the existing Manager role is also eligible when the active Sheraton assignment and explicit destination-receipt permission pass.
 
 **Still unanswered:** How transfer processing is escalated when no authorised destination-assigned actor is available; whether any substitute can be used and how they receive an active destination assignment and explicit action permission; required shortage/damage/loss/wrong-item evidence; permissible resolution outcomes; approver role/threshold; and ageing/escalation expectations.
 
