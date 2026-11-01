@@ -1,0 +1,169 @@
+name: DMS CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality, migration, API tests and production builds
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: dms_test
+          POSTGRES_PASSWORD: dms_test
+          POSTGRES_DB: dms_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dms_test -d dms_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://dms_test:dms_test@localhost:5432/dms_test
+      DATABASE_SSL: "false"
+      SESSION_SECRET: ci-only-random-looking-secret-value-long-enough
+      SESSION_IDLE_TIMEOUT_MINUTES: "30"
+      SESSION_ABSOLUTE_TIMEOUT_HOURS: "12"
+      COOKIE_SECURE: "false"
+      TRUST_PROXY: "false"
+      APP_ORIGIN: http://localhost:5173
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 26.13.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install frozen workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Run ESLint
+        run: pnpm lint
+
+      - name: Run TypeScript checks
+        run: pnpm typecheck
+
+      - name: Confirm API refuses to start before foundation migrations
+        shell: bash
+        run: |
+          if pnpm --filter @dms/api exec tsx src/server.ts > /tmp/dms-pre-migration.log 2>&1; then
+            cat /tmp/dms-pre-migration.log
+            echo "The API unexpectedly started without the foundation schema."
+            exit 1
+          fi
+          cat /tmp/dms-pre-migration.log
+          grep -F "Required foundation tables are missing" /tmp/dms-pre-migration.log
+
+      - name: Apply migrations to the clean disposable PostgreSQL database
+        run: pnpm db:migrate
+
+      - name: Verify all foundation tables, role seeds, permissions and idempotent seeding
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-foundation.sql
+
+      - name: Verify production migration up remains permitted
+        run: NODE_ENV=production COOKIE_SECURE=true APP_ORIGIN=https://dms.example.invalid pnpm db:migrate
+
+      - name: Verify production rollback is blocked before the migration runner executes
+        shell: bash
+        run: |
+          if NODE_ENV=production COOKIE_SECURE=true APP_ORIGIN=https://dms.example.invalid pnpm --filter @dms/api exec tsx src/cli/migrate.ts down > /tmp/dms-production-rollback.log 2>&1; then
+            cat /tmp/dms-production-rollback.log
+            echo "Production rollback unexpectedly succeeded."
+            exit 1
+          fi
+          cat /tmp/dms-production-rollback.log
+          grep -F "Production database rollback is disabled" /tmp/dms-production-rollback.log
+          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs')")"
+          if [ "$remaining" != "8" ]; then
+            echo "Production rollback guard did not preserve the disposable foundation schema (found $remaining tables)."
+            exit 1
+          fi
+          echo "Production rollback was rejected before migrations ran; all eight foundation tables remain."
+
+      - name: Verify rollback removes the foundation schema in the disposable database
+        shell: bash
+        run: |
+          pnpm db:rollback
+          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs')")"
+          if [ "$remaining" != "0" ]; then
+            echo "Rollback left $remaining foundation tables behind."
+            exit 1
+          fi
+          echo "Rollback removed all eight foundation tables."
+
+      - name: Reapply migrations and reverify the foundation schema
+        run: |
+          pnpm db:migrate
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-foundation.sql
+
+      - name: Run API integration and security tests
+        run: pnpm --filter @dms/api test
+
+      - name: Run frontend tests
+        run: pnpm --filter @dms/web test
+
+      - name: Run complete workspace test command
+        run: pnpm test
+
+      - name: Build API and frontend for production
+        run: pnpm build
+
+      - name: Check committed patch whitespace
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_AFTER_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            git cat-file -e "${PR_BASE_SHA}^{commit}"
+            git cat-file -e "${PR_HEAD_SHA}^{commit}"
+            echo "Checking pull request patch: ${PR_BASE_SHA}...${PR_HEAD_SHA}"
+            git diff --check "${PR_BASE_SHA}...${PR_HEAD_SHA}"
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            git cat-file -e "${PUSH_AFTER_SHA}^{commit}"
+            if [[ "$PUSH_BEFORE_SHA" =~ ^0+$ ]]; then
+              empty_tree="$(git hash-object -t tree -w --stdin < /dev/null)"
+              echo "Initial push detected; checking the full commit against the empty tree."
+              git diff --check "$empty_tree" "$PUSH_AFTER_SHA"
+            else
+              git cat-file -e "${PUSH_BEFORE_SHA}^{commit}"
+              echo "Checking pushed commit range: ${PUSH_BEFORE_SHA} ${PUSH_AFTER_SHA}"
+              git diff --check "$PUSH_BEFORE_SHA" "$PUSH_AFTER_SHA"
+            fi
+          else
+            echo "Unsupported event for committed patch whitespace verification: $EVENT_NAME"
+            exit 1
+          fi

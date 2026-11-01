@@ -1,8 +1,8 @@
 # Dscentsation Management System (DMS)
 
-A centralised internal business management platform for Dscentsation's Nigerian operations. DMS is being planned to bring orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
+A centralised internal business management platform for Dscentsation's Nigerian operations. The planned system will bring orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
 
-> **Project status:** Requirements and initial project documentation are established. Application implementation has not started. The checklist below is the source of truth for progress and will be updated only after work is reviewed and verified.
+> **Project status:** The Task 005 application foundation has been implemented and is recorded in PR #7. This is only the initial application foundation, not the complete business application. The full business schema, complete permission matrix, outstanding architecture/business decisions, production infrastructure and deployment remain pending. The checklist below is the source of truth for progress and will be updated only after work is reviewed and verified.
 
 ## Contents
 
@@ -355,16 +355,16 @@ This checklist is the project's shared progress record. It is intended to help f
 
 ### Phase 1 — Application foundation
 
-- [ ] Define repository structure and development conventions.
-- [ ] Set up frontend and backend applications.
-- [ ] Configure code quality tools, formatting and linting.
-- [ ] Configure development, test and production environment variables.
-- [ ] Establish PostgreSQL database and migration workflow.
-- [ ] Define the database schema and entity relationships.
-- [ ] Implement authentication and secure sessions.
-- [ ] Implement Owner, Manager and Staff roles and backend permissions.
-- [ ] Implement audit logging for sensitive actions.
-- [ ] Build the main application layout, navigation and responsive dashboard shell.
+- [x] Define the repository structure and initial development conventions (pnpm monorepo, workspace scripts and shared TypeScript configuration).
+- [x] Set up the React/Vite frontend and Express/TypeScript backend applications.
+- [x] Configure Prettier, ESLint, TypeScript checks and GitHub Actions CI.
+- [x] Define development/test environment variables and production security validation. Production secrets and service provisioning remain pending.
+- [x] Establish the PostgreSQL development/test connection and versioned migration workflow. CI migration, seed replay, rollback and reapplication have been verified against disposable PostgreSQL only; production database provisioning remains pending.
+- [ ] Define the complete application database schema and entity relationships. The current migration contains only the eight foundation tables; business-module schema design remains open.
+- [x] Implement and test provisioned-account authentication, Argon2id password hashing, PostgreSQL-backed sessions, CSRF protection, session rotation, expiry and revocation.
+- [ ] Complete the Owner, Manager and Staff business permission matrix. The foundation seeds only the three established roles and four currently confirmed permission codes; the full matrix remains open.
+- [x] Implement append-only audit storage and verify authentication/bootstrap audit events and mutation protection.
+- [x] Build the responsive application shell, login screen, role identity display, placeholder navigation and initial dashboard shell.
 
 ### Phase 2 — Products and multi-location inventory
 
@@ -481,13 +481,13 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 ### Current project position
 
-**Completed:** Business discovery, core requirements, product scope decisions, public repository creation, initial project documentation and Task 002 architecture work for the Sheraton-to-Warehouse pickup workflow (ADR-016), independently reviewed and merged in PRs #3 and #4.
+**Completed:** Business discovery, core requirements, product scope decisions, public repository creation, initial project documentation, Task 002 architecture work for the Sheraton-to-Warehouse pickup workflow (ADR-016) merged in PRs #3 and #4, and the Task 005 application-foundation implementation. Task 005 CI has passed on the implementation branch using a disposable PostgreSQL service and synthetic test records.
 
-**Current task:** Resolve the remaining architecture decisions and continue implementation planning. Task 002 and its approved pickup architecture are complete, but overall technical architecture approval and deployment plan approval remain pending.
+**Task 005 status:** The initial application-foundation implementation, its scope and its CI verification evidence are recorded in PR #7. This documents the implementation and verification evidence; it does not assert that PR #7 has been approved or merged.
 
-**Not yet implemented:** No database has been provisioned. The application, authentication, dashboard, business modules, integrations and deployment have not been implemented.
+**Not yet implemented or approved:** The complete business database schema and entity relationships; complete role/permission matrix; real Warehouse/Sheraton location records and Staff assignments; operational business modules; production database/service provisioning; production credentials; company email/storage integrations; production deployment; MFA policy; and overall technical architecture/deployment approval.
 
-**Next development task:** Resolve the remaining architecture decisions, confirm the repository structure and database boundaries, and agree the implementation sequence before application code is introduced.
+**Next development task:** Integrate Task 005 through PR #7 before starting the first business module. The first business module must not begin until the foundation has been approved and merged. Continue to resolve remaining architecture and business decisions where required rather than filling gaps with assumed rules.
 
 ## Working agreement
 
