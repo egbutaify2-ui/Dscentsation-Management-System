@@ -43,11 +43,7 @@ async function csrf(agent: ReturnType<typeof request.agent>): Promise<string> {
   return response.body.data.token as string;
 }
 
-async function post(
-  agent: ReturnType<typeof request.agent>,
-  path: string,
-  body: unknown,
-) {
+async function post(agent: ReturnType<typeof request.agent>, path: string, body: unknown) {
   return agent
     .post(path)
     .set('Origin', env.APP_ORIGIN)
@@ -55,11 +51,7 @@ async function post(
     .send(body);
 }
 
-async function patch(
-  agent: ReturnType<typeof request.agent>,
-  path: string,
-  body: unknown,
-) {
+async function patch(agent: ReturnType<typeof request.agent>, path: string, body: unknown) {
   return agent
     .patch(path)
     .set('Origin', env.APP_ORIGIN)
@@ -362,9 +354,13 @@ describe('Product Management API', () => {
     );
     expect(rows.rows[0]).toEqual({ products: '1', variants: '1' });
 
-    const categoryDeactivate = await patch(ownerAgent, `/api/v1/categories/${category.body.data.id}`, {
-      isActive: false,
-    });
+    const categoryDeactivate = await patch(
+      ownerAgent,
+      `/api/v1/categories/${category.body.data.id}`,
+      {
+        isActive: false,
+      },
+    );
     expect(categoryDeactivate.status).toBe(200);
     expect(categoryDeactivate.body.data.isActive).toBe(false);
     const categoryProduct = await pool.query(
