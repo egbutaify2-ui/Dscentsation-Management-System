@@ -571,5 +571,5 @@ Agents must read this README before making changes. If implementation reveals a 
 
 ---
 
-**Dscentsation Management System (DMS)**  
+**Dscentsation Management System (DMS)**
 *One system. Clear records. Better business operations.*
