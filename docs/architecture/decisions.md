@@ -521,13 +521,13 @@ The following pre-existing project-manager decisions remain confirmed and are no
 | Order fulfilment | One fulfilment location per order in the first release; no cross-location split fulfilment. |
 | Reservation timing | Reserve stock immediately on order confirmation, whether paid or unpaid. |
 | Reservation expiry | Expiry must be configurable and persisted; each reservation snapshots its applied policy/expiry. |
-| Sheraton pickup | Sheraton-assigned Staff may use only the dedicated pickup action for a transfer from Warehouse to their assigned Sheraton location; this is not general Warehouse access. |
+| Sheraton pickup — Task 010 direction pending formal confirmation | An operational user assigned to Sheraton and holding the explicit pickup action permission may use the dedicated Warehouse-to-assigned-Sheraton pickup. The existing Manager role is eligible where assignment and permission checks pass. This is not general Warehouse write access; shared Warehouse read visibility is governed separately. |
 
 The following Task 010 direction is recorded separately from those pre-existing confirmed decisions and is not formal business-owner approval evidence: shared read-only operational visibility of both locations; direct stock-changing operations limited to the actor's assigned location for non-Owners; cross-location stock-change requests routed for destination-location approval (with the Owner able to act directly and review another user's request); Owner-only consolidated financial overview; and assigned-Store-Manager eligibility for the dedicated Sheraton pickup/receipt actions when the assignment and explicit permission checks pass. DMS-DEC-001 and DMS-DEC-002 remain Pending confirmation. No approver, date or evidence reference has been supplied.
 
 Remaining details requiring confirmation:
 
-1. Confirm the canonical Warehouse and Sheraton location records/codes and the Staff-to-Sheraton assignments used by ADR-016.
+1. Approve unique location codes and any required address/identifying details for Ajose Warehouse and Sheraton Store; securely establish the actual employee-account assignments and assignment authority. The location names and role-based direction have been supplied for planning, but DMS-DEC-001 remains Pending confirmation.
 2. Initial reservation duration and expiry eligibility scope (unpaid-only or all undispatched confirmed orders).
 3. Grace period, pre-expiry warning/notification and whether an authorised user may extend an existing reservation.
 4. Transfer exception/escalation when destination Staff are unavailable, and the review/approval process for shortages or damage.
