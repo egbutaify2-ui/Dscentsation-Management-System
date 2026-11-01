@@ -193,6 +193,6 @@ describe('ProductManagementPage', () => {
       target: { value: 'SYN-AMBER' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-    await waitFor(() => expect(mocks.get).toHaveBeenCalledWith('/products?q=SYN-AMBER'));
+    await waitFor(() => expect(mocks.get).toHaveBeenCalledWith('/products?q=SYN-AMBER&status=active'));
   });
 });
