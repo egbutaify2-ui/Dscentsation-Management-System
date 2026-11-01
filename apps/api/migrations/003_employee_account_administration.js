@@ -55,13 +55,13 @@ export async function up(pgm) {
       FOR EACH ROW EXECUTE FUNCTION protect_last_active_owner();
 
     CREATE FUNCTION prevent_user_hard_delete() RETURNS trigger
-    LANGUAGE plpgsql AS $
+    LANGUAGE plpgsql AS $$
     BEGIN
       RAISE EXCEPTION 'User accounts must be deactivated, not deleted'
         USING ERRCODE = '23514',
               CONSTRAINT = 'users_hard_delete_prohibited';
     END;
-    $;
+    $$;
 
     CREATE TRIGGER users_no_delete
       BEFORE DELETE ON users
