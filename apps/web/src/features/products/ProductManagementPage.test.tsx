@@ -12,6 +12,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../lib/api/client.js', () => ({
+  ApiError: class ApiError extends Error {
+    readonly status = 400;
+    readonly code = 'INVALID_REQUEST';
+    readonly requestId = undefined;
+  },
   api: {
     get: mocks.get,
     post: mocks.post,
