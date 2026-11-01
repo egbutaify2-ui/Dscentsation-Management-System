@@ -66,36 +66,49 @@ describe('Product Management database invariants', () => {
   });
 
   it('keeps product and variant records non-deletable and retains category references', async () => {
-    const category = await pool.query<{ id: string }>(
-      'INSERT INTO product_categories(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
-      [`Delete guard category ${randomUUID()}`, actorId],
-    );
-    const product = await pool.query<{ id: string }>(
-      'INSERT INTO products(name, category_id, created_by, updated_by) VALUES ($1, $2, $3, $3) RETURNING id',
-      [`Delete guard product ${randomUUID()}`, category.rows[0]!.id, actorId],
-    );
-    const variant = await pool.query<{ id: string }>(
-      `INSERT INTO product_variants(
-         product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
-         created_by, updated_by
-       ) VALUES ($1, 'Default', 'test-unit-label', 101, 50, $2, $2) RETURNING id`,
-      [product.rows[0]!.id, actorId],
-    );
+    const client = await pool.connect();
+    let categoryId = '';
+    let productId = '';
+    let variantId = '';
+    try {
+      await client.query('BEGIN');
+      const category = await client.query<{ id: string }>(
+        'INSERT INTO product_categories(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Delete guard category ${randomUUID()}`, actorId],
+      );
+      categoryId = category.rows[0]!.id;
+      const product = await client.query<{ id: string }>(
+        'INSERT INTO products(name, category_id, created_by, updated_by) VALUES ($1, $2, $3, $3) RETURNING id',
+        [`Delete guard product ${randomUUID()}`, categoryId, actorId],
+      );
+      productId = product.rows[0]!.id;
+      const variant = await client.query<{ id: string }>(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           is_default, created_by, updated_by
+         ) VALUES ($1, 'Default', 'test-unit-label', 101, 50, true, $2, $2) RETURNING id`,
+        [productId, actorId],
+      );
+      variantId = variant.rows[0]!.id;
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
 
     await expect(
-      pool.query('DELETE FROM product_variants WHERE id = $1', [variant.rows[0]!.id]),
+      pool.query('DELETE FROM product_variants WHERE id = $1', [variantId]),
     ).rejects.toThrow(/must be deactivated or archived/i);
     await expect(
-      pool.query('DELETE FROM products WHERE id = $1', [product.rows[0]!.id]),
+      pool.query('DELETE FROM products WHERE id = $1', [productId]),
     ).rejects.toThrow(/must be deactivated or archived/i);
     await expect(
-      pool.query('DELETE FROM product_categories WHERE id = $1', [category.rows[0]!.id]),
+      pool.query('DELETE FROM product_categories WHERE id = $1', [categoryId]),
     ).rejects.toThrow(/must be deactivated or archived/i);
 
-    const linked = await pool.query('SELECT id FROM products WHERE id = $1 AND category_id = $2', [
-      product.rows[0]!.id,
-      category.rows[0]!.id,
-    ]);
+    const linked = await pool.query('SELECT id FROM products WHERE id = $1 AND category_id = $2', [productId, categoryId]);
     expect(linked.rowCount).toBe(1);
   });
 
@@ -109,24 +122,36 @@ describe('Product Management database invariants', () => {
       { column_name: 'cost_price_minor', data_type: 'bigint' },
       { column_name: 'selling_price_minor', data_type: 'bigint' },
     ]);
-    const product = await pool.query<{ id: string }>(
-      'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
-      [`Currency constraint product ${randomUUID()}`, actorId],
-    );
-    await pool.query(
-      `INSERT INTO product_variants(
-         product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
-         currency, is_default, created_by, updated_by
-       ) VALUES ($1, 'Default', 'unit', 10, 5, 'NGN', true, $2, $2)`,
-      [product.rows[0]!.id, actorId],
-    );
+    const client = await pool.connect();
+    let productId = '';
+    try {
+      await client.query('BEGIN');
+      const product = await client.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Currency constraint product ${randomUUID()}`, actorId],
+      );
+      productId = product.rows[0]!.id;
+      await client.query(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           currency, is_default, created_by, updated_by
+         ) VALUES ($1, 'Default', 'unit', 10, 5, 'NGN', true, $2, $2)`,
+        [productId, actorId],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
     await expect(
       pool.query(
         `INSERT INTO product_variants(
            product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
            currency, created_by, updated_by
          ) VALUES ($1, 'Unsupported currency', 'unit', 10, 5, 'USD', $2, $2)`,
-        [product.rows[0]!.id, actorId],
+        [productId, actorId],
       ),
     ).rejects.toThrow();
   });
