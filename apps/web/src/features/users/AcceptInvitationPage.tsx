@@ -43,9 +43,13 @@ export function AcceptInvitationPage({
     <main className="login-page">
       <section className="login-card" aria-labelledby="invitation-heading">
         <div className="brand-lockup">
-          <div className="brand-mark" aria-hidden="true">D</div>
+          <div className="brand-mark" aria-hidden="true">
+            D
+          </div>
           <div>
-            <p className="brand-name">DSCENT<span>ATION</span></p>
+            <p className="brand-name">
+              DSCENT<span>ATION</span>
+            </p>
             <p className="brand-caption">MANAGEMENT SYSTEM</p>
           </div>
         </div>
@@ -79,14 +83,18 @@ export function AcceptInvitationPage({
             onChange={(event) => setConfirmation(event.target.value)}
             required
           />
-          {error && <p className="form-error" role="alert">{error}</p>}
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
           <button className="primary-button" type="submit" disabled={submitting}>
             {submitting ? 'Activating account…' : 'Set password and activate'}
           </button>
         </form>
         <p className="login-footnote">
-          Invitation links are single-use and expire. Ask the Dscentsation Owner for a new invitation
-          if this link has expired or been revoked.
+          Invitation links are single-use and expire. Ask the Dscentsation Owner for a new
+          invitation if this link has expired or been revoked.
         </p>
       </section>
     </main>

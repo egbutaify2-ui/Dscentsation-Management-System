@@ -41,7 +41,10 @@ export async function destroySession(request: Request): Promise<void> {
   });
 }
 
-export async function revokeSessionsForUser(userId: string, client: Pool | PoolClient = pool): Promise<number> {
+export async function revokeSessionsForUser(
+  userId: string,
+  client: Pool | PoolClient = pool,
+): Promise<number> {
   const result = await client.query('DELETE FROM user_sessions WHERE user_id = $1', [userId]);
   return result.rowCount ?? 0;
 }

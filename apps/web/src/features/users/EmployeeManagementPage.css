@@ -29,7 +29,10 @@
 .invitation-result h2 {
   margin: 0;
   color: var(--green-950);
-  font: 500 24px Georgia, 'Times New Roman', serif;
+  font:
+    500 24px Georgia,
+    'Times New Roman',
+    serif;
 }
 .employee-card-heading .eyebrow,
 .invitation-result .eyebrow {
@@ -69,7 +72,11 @@
   outline: none;
   background: #fff;
   color: var(--ink);
-  font: 400 12px Inter, ui-sans-serif, system-ui, sans-serif;
+  font:
+    400 12px Inter,
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
 }
 .employee-filters input:focus,
 .employee-filters select:focus,

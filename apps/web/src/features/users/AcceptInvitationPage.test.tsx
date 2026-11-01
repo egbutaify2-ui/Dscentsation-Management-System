@@ -22,22 +22,32 @@ describe('AcceptInvitationPage', () => {
     mocks.getCsrfToken.mockResolvedValue('anonymous-csrf');
     mocks.post.mockResolvedValue({ accepted: true });
     render(<AcceptInvitationPage token={'T'.repeat(43)} onAccepted={onAccepted} />);
-    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'employee-password-2026' } });
-    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'employee-password-2026' } });
+    fireEvent.change(screen.getByLabelText('New password'), {
+      target: { value: 'employee-password-2026' },
+    });
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'employee-password-2026' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Set password and activate' }));
-    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith(
-      '/users/invitations/accept',
-      { token: 'T'.repeat(43), password: 'employee-password-2026' },
-      'anonymous-csrf',
-    ));
+    await waitFor(() =>
+      expect(mocks.post).toHaveBeenCalledWith(
+        '/users/invitations/accept',
+        { token: 'T'.repeat(43), password: 'employee-password-2026' },
+        'anonymous-csrf',
+      ),
+    );
     expect(onAccepted).toHaveBeenCalledOnce();
   });
 
   it('rejects mismatched passwords before calling the API', async () => {
     mocks.getCsrfToken.mockResolvedValue('anonymous-csrf');
     render(<AcceptInvitationPage token={'T'.repeat(43)} onAccepted={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'employee-password-2026' } });
-    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'different-password-2026' } });
+    fireEvent.change(screen.getByLabelText('New password'), {
+      target: { value: 'employee-password-2026' },
+    });
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'different-password-2026' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Set password and activate' }));
     expect((await screen.findByRole('alert')).textContent).toContain('The passwords do not match.');
     expect(mocks.post).not.toHaveBeenCalled();
@@ -45,10 +55,16 @@ describe('AcceptInvitationPage', () => {
 
   it('shows expired or invalid invitation errors', async () => {
     mocks.getCsrfToken.mockResolvedValue('anonymous-csrf');
-    mocks.post.mockRejectedValueOnce(new Error('This invitation is invalid, expired or no longer available.'));
+    mocks.post.mockRejectedValueOnce(
+      new Error('This invitation is invalid, expired or no longer available.'),
+    );
     render(<AcceptInvitationPage token={'T'.repeat(43)} onAccepted={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'employee-password-2026' } });
-    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'employee-password-2026' } });
+    fireEvent.change(screen.getByLabelText('New password'), {
+      target: { value: 'employee-password-2026' },
+    });
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'employee-password-2026' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Set password and activate' }));
     expect((await screen.findByRole('alert')).textContent).toContain('invalid, expired');
   });

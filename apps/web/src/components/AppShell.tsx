@@ -57,7 +57,12 @@ export function AppShell({
     setMenuOpen(false);
   }
 
-  const activeLabel = activeSection === 'products' ? 'Products' : activeSection === 'employees' ? 'Employees' : 'Overview';
+  const activeLabel =
+    activeSection === 'products'
+      ? 'Products'
+      : activeSection === 'employees'
+        ? 'Employees'
+        : 'Overview';
 
   return (
     <div className="app-shell">

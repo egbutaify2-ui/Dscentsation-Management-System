@@ -119,7 +119,9 @@ describe('Employee Account Administration database invariants', () => {
       );
       await client.query('SET LOCAL session_replication_role = origin');
 
-      await client.query("UPDATE users SET status = 'suspended' WHERE id = $1", [first.rows[0]!.id]);
+      await client.query("UPDATE users SET status = 'suspended' WHERE id = $1", [
+        first.rows[0]!.id,
+      ]);
       await expect(
         client.query("UPDATE users SET status = 'disabled' WHERE id = $1", [second.rows[0]!.id]),
       ).rejects.toMatchObject({

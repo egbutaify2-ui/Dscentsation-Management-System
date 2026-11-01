@@ -48,13 +48,25 @@ describe('AppShell permission-aware navigation', () => {
   it('shows Employees only when the backend session reports users.view', () => {
     const onNavigate = vi.fn();
     const { rerender } = render(
-      <AppShell user={user} permissions={[]} activeSection="overview" onNavigate={onNavigate} onLogout={async () => undefined}>
+      <AppShell
+        user={user}
+        permissions={[]}
+        activeSection="overview"
+        onNavigate={onNavigate}
+        onLogout={async () => undefined}
+      >
         <p>Overview content</p>
       </AppShell>,
     );
     expect(screen.queryByRole('button', { name: 'Employees' })).toBeNull();
     rerender(
-      <AppShell user={user} permissions={['users.view']} activeSection="overview" onNavigate={onNavigate} onLogout={async () => undefined}>
+      <AppShell
+        user={user}
+        permissions={['users.view']}
+        activeSection="overview"
+        onNavigate={onNavigate}
+        onLogout={async () => undefined}
+      >
         <p>Overview content</p>
       </AppShell>,
     );

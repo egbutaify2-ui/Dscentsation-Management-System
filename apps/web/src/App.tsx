@@ -20,7 +20,9 @@ function invitationTokenFromLocation(): string | null {
 export function App() {
   const { status, user, permissions, error, login, logout, refresh } = useAuth();
   const [activeSection, setActiveSection] = useState<Section>('overview');
-  const [invitationToken, setInvitationToken] = useState<string | null>(invitationTokenFromLocation);
+  const [invitationToken, setInvitationToken] = useState<string | null>(
+    invitationTokenFromLocation,
+  );
   const canViewProducts = permissions.includes('products.view');
   const canViewEmployees = permissions.includes('users.view');
 
