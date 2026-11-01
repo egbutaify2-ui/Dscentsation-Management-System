@@ -365,11 +365,11 @@ A later reporting layer can use database views or read-optimised queries. Do not
 
 ## 8. Design decisions still requiring confirmation
 
-The following business rules have been confirmed: destination Staff assigned to the destination location confirm receipt; Managers have access to every stock location; Staff are restricted to assigned locations; Staff record payments and only Managers/Owner verify; each order has one fulfilment location in the first release; reservations are created immediately on confirmation even if unpaid; and reservation expiry must be configurable.
+The following business rules have been confirmed: destination Staff assigned to the destination location confirm receipt; Managers and Owner have access to all stock locations; Staff are restricted to their assigned locations except for the dedicated Warehouse-to-assigned-Sheraton pickup action described in ADR-016, which does not grant general Warehouse inventory access; Staff record payments and only Managers/Owner verify; each order has one fulfilment location in the first release; reservations are created immediately on confirmation even if unpaid; and reservation expiry must be configurable.
 
 Remaining design/configuration details:
 
-1. Actual location list, location codes and Staff-to-location assignments.
+1. Confirm the canonical Warehouse location record and code, the canonical Sheraton location records and codes, and which Staff accounts are assigned to each Sheraton location.
 2. Initial reservation duration, whether expiry applies to unpaid-only or all undispatched confirmed orders, and whether a grace period or warning notification is required.
 3. Whether an authorised user may extend/release an existing reservation, and the required reason/audit evidence.
 4. Transfer exception handling when destination Staff are unavailable, and approval of shortage/damage discrepancy resolution.
@@ -379,7 +379,6 @@ Remaining design/configuration details:
 8. Whether cost price changes require effective-dated cost history for valuation.
 9. File retention limits, permitted file types and who may view supporting documents.
 10. Render Postgres backup/recovery verification, restore-test evidence, expected recovery objectives and total cost approval.
-11. Confirm the configured Warehouse and Sheraton location records/codes, and the Staff-to-Sheraton assignments that enable the narrowly scoped pickup action.
-12. Confirm the physical paperwork/reference process used by Sheraton Staff at Warehouse; the permission boundary and stock movement rules for pickup remain as specified.
+11. Confirm the physical paperwork/reference process used by Sheraton Staff at Warehouse; the permission boundary and stock movement rules for pickup remain as specified.
 
 **Review outcome:** Pending. This is a conceptual database design updated with the confirmed architecture rules, not an approved final schema or a production migration.
