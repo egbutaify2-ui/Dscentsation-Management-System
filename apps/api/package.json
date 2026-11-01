@@ -1,0 +1,38 @@
+{
+  "name": "@dms/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -p tsconfig.json --outDir dist --noEmit false",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "db:migrate": "tsx src/cli/migrate.ts up",
+    "db:rollback": "tsx src/cli/migrate.ts down",
+    "owner:create": "tsx src/cli/create-owner.ts"
+  },
+  "dependencies": {
+    "argon2": "0.45.1",
+    "connect-pg-simple": "10.0.0",
+    "express": "5.3.0",
+    "express-rate-limit": "8.7.0",
+    "express-session": "1.19.0",
+    "helmet": "8.3.0",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/connect-pg-simple": "7.0.3",
+    "@types/express": "5.0.6",
+    "@types/express-session": "1.19.0",
+    "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "@types/supertest": "7.2.1",
+    "node-pg-migrate": "9.0.0",
+    "supertest": "7.3.1",
+    "tsx": "4.23.15",
+    "vitest": "5.0.5"
+  }
+}
