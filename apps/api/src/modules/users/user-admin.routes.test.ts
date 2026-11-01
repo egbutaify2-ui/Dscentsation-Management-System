@@ -628,9 +628,11 @@ describe('Employee Account Administration API', () => {
     const candidateTokens = attempts.map((response) =>
       tokenFromSetupUrl(response.body.data.setupUrl),
     );
-    expect(candidateTokens.filter((token) =>
-      createHash('sha256').update(token).digest('hex') === open.rows[0]?.token_hash.trim(),
-    )).toHaveLength(1);
+    expect(
+      candidateTokens.filter(
+        (token) => createHash('sha256').update(token).digest('hex') === open.rows[0]?.token_hash.trim(),
+      ),
+    ).toHaveLength(1);
 
     const activeCount = await pool.query<{ count: string }>(
       `SELECT count(*)::text AS count FROM user_invitations
