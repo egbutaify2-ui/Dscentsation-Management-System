@@ -65,7 +65,7 @@ jobs:
 
       - name: Capture exact Prettier output for remaining test files
         run: |
-          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 --write apps/api/src/modules/products/product.routes.test.ts apps/web/src/components/AppShell.test.tsx apps/web/src/features/products/ProductManagementPage.test.tsx
+          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 --write apps/api/src/modules/products/product.routes.test.ts apps/web/src/components/AppShell.test.tsx apps/web/src/features/products/ProductManagementPage.test.tsx apps/web/src/features/products/ProductManagementPage.test.tsx
           echo "__ROUTES_TEST_START__"
           cat apps/api/src/modules/products/product.routes.test.ts
           echo "__ROUTES_TEST_END__"
