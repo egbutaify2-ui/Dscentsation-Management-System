@@ -3,6 +3,8 @@
 A centralised internal business management platform for Dscentsation's Nigerian operations. The planned system will bring orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
 
 > **Project status:** Tasks 005 and 006 architecture reconciliation, Task 007 Product Management (PR #9), and Task 008 Employee Account Administration (PR #10, merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`) are merged into `main`. Employee account administration is implemented with Owner-only permissions, secure Manager/Staff invitations, initial password setup, account suspension/reactivation, session revocation and audit events. Email delivery (DMS-DEC-017), location assignments (DMS-DEC-001), the full permission matrix (DMS-DEC-002), password recovery, session history, comprehensive business-event audit coverage, production infrastructure and deployment remain pending.
+>
+> **Current task:** DMS Task 009 — Inventory Implementation Readiness & Decision Pack. This is a documentation/readiness task only; inventory feature implementation has not started.
 
 ## Contents
 
@@ -14,6 +16,7 @@ A centralised internal business management platform for Dscentsation's Nigerian 
 - [Users and permissions](#users-and-permissions)
 - [Identity, user accounts and activity accountability](#identity-user-accounts-and-activity-accountability)
 - [Inventory rules](#inventory-rules)
+- [Inventory implementation readiness](#inventory-implementation-readiness)
 - [Application architecture and technology status](#application-architecture-and-technology-status)
 - [Security and data integrity](#security-and-data-integrity)
 - [Development roadmap and progress](#development-roadmap-and-progress)
@@ -346,6 +349,10 @@ Inventory accuracy is business-critical. The implementation must follow these ru
 - Adjustments require a reason and an audit record.
 - Returned goods must be inspected before being added back to sellable stock.
 - Critical stock changes must be protected against concurrent updates and recorded transactionally.
+
+## Inventory implementation readiness
+
+DMS Task 009 is the current documentation/readiness task for multi-location inventory. It records the verified implementation baseline, confirmed business rules, unresolved decisions, dependencies and recommended sequence. It does not introduce inventory feature code, migrations, screens, stock balances or real stock records. Inventory implementation has not started and remains blocked pending the approvals in the [Inventory Implementation Readiness & Decision Pack](docs/operations/inventory-implementation-readiness.md).
 
 ## Application architecture and technology status
 
