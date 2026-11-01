@@ -110,7 +110,9 @@ describe('Employee Account Administration API', () => {
 
   it('requires authentication and denies Manager and Staff employee-administration permissions', async () => {
     await request(app).get('/api/v1/users').expect(401);
-    await post(request.agent(app), '/api/v1/users/invitations', {}).then((response) => expect(response.status).toBe(401));
+    await post(request.agent(app), '/api/v1/users/invitations', {}).then((response) =>
+      expect(response.status).toBe(401),
+    );
 
     for (const account of [manager, staff]) {
       const agent = request.agent(app);
@@ -148,11 +150,17 @@ describe('Employee Account Administration API', () => {
         WHERE i.user_id = $1`,
       [employee.id],
     );
-    expect(stored.rows[0]?.token_hash.trim()).toBe(createHash('sha256').update(token).digest('hex'));
+    expect(stored.rows[0]?.token_hash.trim()).toBe(
+      createHash('sha256').update(token).digest('hex'),
+    );
     expect(stored.rows[0]?.token_hash).not.toContain(token);
     expect(stored.rows[0]?.user_status).toBe('invited');
 
-    const audit = await pool.query<{ actor_user_id: string; request_id: string; safe_metadata: object }>(
+    const audit = await pool.query<{
+      actor_user_id: string;
+      request_id: string;
+      safe_metadata: object;
+    }>(
       `SELECT actor_user_id, request_id, safe_metadata
          FROM audit_logs
         WHERE action = 'user.invitation.created' AND entity_id = $1
@@ -183,7 +191,11 @@ describe('Employee Account Administration API', () => {
   it('lists safe employee fields and supports name/email, role and status filters', async () => {
     const created = await invite('STAFF');
     expect(created.status).toBe(201);
-    const employee = created.body.data.employee as { id: string; email: string; displayName: string };
+    const employee = created.body.data.employee as {
+      id: string;
+      email: string;
+      displayName: string;
+    };
     const all = await ownerAgent.get('/api/v1/users').expect(200);
     const row = all.body.data.find((item: { id: string }) => item.id === employee.id);
     expect(row).toMatchObject({
@@ -213,10 +225,15 @@ describe('Employee Account Administration API', () => {
     const newPassword = 'Employee-owned-synthetic-password-2026';
     const agent = request.agent(app);
 
-    const accepted = await post(agent, '/api/v1/users/invitations/accept', { token, password: newPassword });
+    const accepted = await post(agent, '/api/v1/users/invitations/accept', {
+      token,
+      password: newPassword,
+    });
     expect(accepted.status).toBe(200);
     expect(accepted.body.data.accepted).toBe(true);
-    expect((await agent.get('/api/v1/auth/session').expect(200)).body.data.authenticated).toBe(true);
+    expect((await agent.get('/api/v1/auth/session').expect(200)).body.data.authenticated).toBe(
+      true,
+    );
 
     const employeeId = created.body.data.employee.id as string;
     const account = await pool.query<{ status: string; password_hash: string }>(
@@ -245,7 +262,10 @@ describe('Employee Account Administration API', () => {
     expect(audit.rows[0]?.actor_user_id).toBe(employeeId);
     expect(JSON.stringify(audit.rows[0]?.safe_metadata)).not.toContain(newPassword);
 
-    const reused = await post(request.agent(app), '/api/v1/users/invitations/accept', { token, password: newPassword });
+    const reused = await post(request.agent(app), '/api/v1/users/invitations/accept', {
+      token,
+      password: newPassword,
+    });
     expect(reused.status).toBe(400);
   });
 
@@ -259,7 +279,7 @@ describe('Employee Account Administration API', () => {
     const expired = await invite();
     const expiredToken = tokenFromSetupUrl(expired.body.data.setupUrl);
     await pool.query(
-      'UPDATE user_invitations SET expires_at = created_at + interval \'1 microsecond\' WHERE user_id = $1',
+      "UPDATE user_invitations SET expires_at = created_at + interval '1 microsecond' WHERE user_id = $1",
       [expired.body.data.employee.id],
     );
     const expiredResult = await post(request.agent(app), '/api/v1/users/invitations/accept', {
@@ -297,10 +317,9 @@ describe('Employee Account Administration API', () => {
       post(request.agent(app), '/api/v1/users/invitations/accept', { token, password: secret }),
     ]);
     expect(attempts.map((response) => response.status).sort()).toEqual([200, 400]);
-    const account = await pool.query<{ status: string }>(
-      'SELECT status FROM users WHERE id = $1',
-      [created.body.data.employee.id],
-    );
+    const account = await pool.query<{ status: string }>('SELECT status FROM users WHERE id = $1', [
+      created.body.data.employee.id,
+    ]);
     expect(account.rows[0]?.status).toBe('active');
   });
 
@@ -316,7 +335,9 @@ describe('Employee Account Administration API', () => {
     );
     expect(Number(before.rows[0]?.count)).toBe(2);
 
-    const suspended = await patch(ownerAgent, `/api/v1/users/${employee.id}/status`, { status: 'suspended' });
+    const suspended = await patch(ownerAgent, `/api/v1/users/${employee.id}/status`, {
+      status: 'suspended',
+    });
     expect(suspended.status).toBe(200);
     expect(suspended.body.data.sessionsRevoked).toBe(2);
     expect(suspended.body.data.employee.status).toBe('suspended');
@@ -329,7 +350,9 @@ describe('Employee Account Administration API', () => {
     expect((await firstAgent.get('/api/v1/auth/capabilities')).status).toBe(401);
     expect((await secondAgent.get('/api/v1/auth/capabilities')).status).toBe(401);
 
-    const reactivated = await patch(ownerAgent, `/api/v1/users/${employee.id}/status`, { status: 'active' });
+    const reactivated = await patch(ownerAgent, `/api/v1/users/${employee.id}/status`, {
+      status: 'active',
+    });
     expect(reactivated.status).toBe(200);
     expect(reactivated.body.data.employee.status).toBe('active');
     expect(reactivated.body.data.sessionsRevoked).toBe(0);
@@ -340,7 +363,11 @@ describe('Employee Account Administration API', () => {
     expect(afterReactivate.rows[0]?.count).toBe('0');
     expect((await signIn(request.agent(app), employee.email)).status).toBe(200);
 
-    const audit = await pool.query<{ action: string; actor_user_id: string; safe_metadata: { before: { status: string }; after: { status: string } } }>(
+    const audit = await pool.query<{
+      action: string;
+      actor_user_id: string;
+      safe_metadata: { before: { status: string }; after: { status: string } };
+    }>(
       `SELECT action, actor_user_id, safe_metadata
          FROM audit_logs
         WHERE entity_id = $1 AND action IN ('user.status.suspended', 'user.status.reactivated')
@@ -348,7 +375,11 @@ describe('Employee Account Administration API', () => {
       [employee.id],
     );
     expect(audit.rows.map((row) => row.action)).toEqual(
-      expect.arrayContaining(['user.sessions.revoked', 'user.status.suspended', 'user.status.reactivated']),
+      expect.arrayContaining([
+        'user.sessions.revoked',
+        'user.status.suspended',
+        'user.status.reactivated',
+      ]),
     );
     expect(audit.rows.every((row) => row.actor_user_id === owner.id)).toBe(true);
     expect(audit.rows[1]?.safe_metadata).toMatchObject({
@@ -371,12 +402,16 @@ describe('Employee Account Administration API', () => {
     expect(response.body.data).toEqual({ sessionsRevoked: 1 });
     const bodyText = JSON.stringify(response.body);
     expect(bodyText).not.toMatch(/sid|sessionId|cookie/i);
-    const remaining = await pool.query('SELECT 1 FROM user_sessions WHERE user_id = $1', [employee.id]);
+    const remaining = await pool.query('SELECT 1 FROM user_sessions WHERE user_id = $1', [
+      employee.id,
+    ]);
     expect(remaining.rowCount).toBe(0);
   });
 
   it('rejects self-suspension, self-session revocation and Owner account administration', async () => {
-    const selfSuspend = await patch(ownerAgent, `/api/v1/users/${owner.id}/status`, { status: 'suspended' });
+    const selfSuspend = await patch(ownerAgent, `/api/v1/users/${owner.id}/status`, {
+      status: 'suspended',
+    });
     expect(selfSuspend.status).toBe(409);
     expect(selfSuspend.body.error.code).toBe('SELF_STATUS_CHANGE');
     const selfRevoke = await post(ownerAgent, `/api/v1/users/${owner.id}/sessions/revoke`, {});
@@ -384,7 +419,9 @@ describe('Employee Account Administration API', () => {
     expect(selfRevoke.body.error.code).toBe('SELF_SESSION_REVOCATION');
 
     const secondOwner = await createAccount('OWNER');
-    const otherOwner = await patch(ownerAgent, `/api/v1/users/${secondOwner.id}/status`, { status: 'suspended' });
+    const otherOwner = await patch(ownerAgent, `/api/v1/users/${secondOwner.id}/status`, {
+      status: 'suspended',
+    });
     expect(otherOwner.status).toBe(409);
     expect(otherOwner.body.error.code).toBe('OWNER_ACCOUNT_PROTECTED');
   });
@@ -410,7 +447,9 @@ describe('Employee Account Administration API', () => {
       FOR EACH ROW EXECUTE FUNCTION test_fail_user_suspension_audit();
     `);
     try {
-      const failed = await patch(ownerAgent, `/api/v1/users/${employee.id}/status`, { status: 'suspended' });
+      const failed = await patch(ownerAgent, `/api/v1/users/${employee.id}/status`, {
+        status: 'suspended',
+      });
       expect(failed.status).toBe(500);
       const state = await pool.query<{ status: string; sessions: string }>(
         `SELECT u.status, count(s.sid)::text AS sessions

@@ -99,7 +99,11 @@ export async function createEmployeeInvitation(
       [input.role],
     );
     if (!role.rows[0]) {
-      throw new UserAdminError('Only Manager and Staff accounts may be invited.', 400, 'INVALID_ROLE');
+      throw new UserAdminError(
+        'Only Manager and Staff accounts may be invited.',
+        400,
+        'INVALID_ROLE',
+      );
     }
 
     const inserted = await client.query<{ id: string }>(
@@ -161,8 +165,7 @@ export async function createEmployeeInvitation(
     );
     await client.query('COMMIT');
 
-    const setupUrl =
-      `${env.APP_ORIGIN.replace(/\/$/, '')}/#/invite/accept?token=${encodeURIComponent(token)}`;
+    const setupUrl = `${env.APP_ORIGIN.replace(/\/$/, '')}/#/invite/accept?token=${encodeURIComponent(token)}`;
     return { employee: mapEmployee(employee), setupUrl, expiresAt };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -296,9 +299,14 @@ export async function setEmployeeStatus(
       [userId],
     );
     const current = result.rows[0];
-    if (!current) throw new UserAdminError('Employee account was not found.', 404, 'USER_NOT_FOUND');
+    if (!current)
+      throw new UserAdminError('Employee account was not found.', 404, 'USER_NOT_FOUND');
     if (userId === actorUserId) {
-      throw new UserAdminError('You cannot change your own account status here.', 409, 'SELF_STATUS_CHANGE');
+      throw new UserAdminError(
+        'You cannot change your own account status here.',
+        409,
+        'SELF_STATUS_CHANGE',
+      );
     }
     if (current.role_code !== 'MANAGER' && current.role_code !== 'STAFF') {
       throw new UserAdminError(
@@ -308,21 +316,35 @@ export async function setEmployeeStatus(
       );
     }
     if (current.status === status) {
-      throw new UserAdminError('The employee already has that account status.', 409, 'STATUS_UNCHANGED');
+      throw new UserAdminError(
+        'The employee already has that account status.',
+        409,
+        'STATUS_UNCHANGED',
+      );
     }
     if (status === 'active' && current.status !== 'suspended') {
-      throw new UserAdminError('Only suspended accounts can be reactivated.', 409, 'STATUS_TRANSITION_INVALID');
+      throw new UserAdminError(
+        'Only suspended accounts can be reactivated.',
+        409,
+        'STATUS_TRANSITION_INVALID',
+      );
     }
     if (status === 'suspended' && current.status !== 'active') {
-      throw new UserAdminError('Only active accounts can be suspended.', 409, 'STATUS_TRANSITION_INVALID');
+      throw new UserAdminError(
+        'Only active accounts can be suspended.',
+        409,
+        'STATUS_TRANSITION_INVALID',
+      );
     }
 
     const updated = await client.query(
       'UPDATE users SET status = $2, updated_at = now() WHERE id = $1',
       [userId, status],
     );
-    if (updated.rowCount !== 1) throw new UserAdminError('Employee account was not found.', 404, 'USER_NOT_FOUND');
-    const sessionsRevoked = status === 'suspended' ? await revokeSessionsForUser(userId, client) : 0;
+    if (updated.rowCount !== 1)
+      throw new UserAdminError('Employee account was not found.', 404, 'USER_NOT_FOUND');
+    const sessionsRevoked =
+      status === 'suspended' ? await revokeSessionsForUser(userId, client) : 0;
     await appendAuditEvent(
       {
         actorUserId,
@@ -374,12 +396,21 @@ export async function revokeEmployeeSessions(
         FOR UPDATE OF u`,
       [userId],
     );
-    if (!target.rows[0]) throw new UserAdminError('Employee account was not found.', 404, 'USER_NOT_FOUND');
+    if (!target.rows[0])
+      throw new UserAdminError('Employee account was not found.', 404, 'USER_NOT_FOUND');
     if (userId === actorUserId) {
-      throw new UserAdminError('You cannot revoke your own session through employee administration.', 409, 'SELF_SESSION_REVOCATION');
+      throw new UserAdminError(
+        'You cannot revoke your own session through employee administration.',
+        409,
+        'SELF_SESSION_REVOCATION',
+      );
     }
     if (target.rows[0].role_code !== 'MANAGER' && target.rows[0].role_code !== 'STAFF') {
-      throw new UserAdminError('Owner sessions cannot be managed through employee administration.', 409, 'OWNER_ACCOUNT_PROTECTED');
+      throw new UserAdminError(
+        'Owner sessions cannot be managed through employee administration.',
+        409,
+        'OWNER_ACCOUNT_PROTECTED',
+      );
     }
 
     const sessionsRevoked = await revokeSessionsForUser(userId, client);
@@ -422,10 +453,18 @@ export async function revokeEmployeeInvitation(
     const row = target.rows[0];
     if (!row) throw new UserAdminError('Employee account was not found.', 404, 'USER_NOT_FOUND');
     if (row.role_code !== 'MANAGER' && row.role_code !== 'STAFF') {
-      throw new UserAdminError('Owner invitations cannot be managed here.', 409, 'OWNER_ACCOUNT_PROTECTED');
+      throw new UserAdminError(
+        'Owner invitations cannot be managed here.',
+        409,
+        'OWNER_ACCOUNT_PROTECTED',
+      );
     }
     if (row.status !== 'invited') {
-      throw new UserAdminError('Only pending invitations can be revoked.', 409, 'INVITATION_NOT_PENDING');
+      throw new UserAdminError(
+        'Only pending invitations can be revoked.',
+        409,
+        'INVITATION_NOT_PENDING',
+      );
     }
 
     const revoked = await client.query(
@@ -436,7 +475,11 @@ export async function revokeEmployeeInvitation(
       [userId],
     );
     if (revoked.rowCount !== 1) {
-      throw new UserAdminError('No active invitation is available to revoke.', 409, 'INVITATION_NOT_PENDING');
+      throw new UserAdminError(
+        'No active invitation is available to revoke.',
+        409,
+        'INVITATION_NOT_PENDING',
+      );
     }
     await appendAuditEvent(
       {

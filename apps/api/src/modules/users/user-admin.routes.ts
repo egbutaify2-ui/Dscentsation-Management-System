@@ -17,16 +17,25 @@ import { UserAdminError } from './user-admin.errors.js';
 
 const router = Router();
 
-const invitationSchema = z.object({
-  displayName: z.string().trim().min(1).max(120),
-  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
-  role: z.enum(['MANAGER', 'STAFF']),
-}).strict();
+const invitationSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(120),
+    email: z
+      .string()
+      .trim()
+      .email()
+      .max(254)
+      .transform((value) => value.toLowerCase()),
+    role: z.enum(['MANAGER', 'STAFF']),
+  })
+  .strict();
 
-const acceptanceSchema = z.object({
-  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-  password: z.string().min(12).max(1024),
-}).strict();
+const acceptanceSchema = z
+  .object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    password: z.string().min(12).max(1024),
+  })
+  .strict();
 
 const statusSchema = z.object({ status: z.enum(['active', 'suspended']) }).strict();
 
@@ -114,13 +123,21 @@ router.get('/', requirePermission('users.view'), async (request, response, next)
       });
       return;
     }
-    if (rawRole !== undefined && rawRole !== 'all' && rawRole !== 'MANAGER' && rawRole !== 'STAFF') {
+    if (
+      rawRole !== undefined &&
+      rawRole !== 'all' &&
+      rawRole !== 'MANAGER' &&
+      rawRole !== 'STAFF'
+    ) {
       response.status(400).json({
         error: { code: 'INVALID_REQUEST', message: 'Role filter must be Manager or Staff.' },
       });
       return;
     }
-    if (rawStatus !== undefined && !['all', 'active', 'suspended', 'disabled', 'invited'].includes(String(rawStatus))) {
+    if (
+      rawStatus !== undefined &&
+      !['all', 'active', 'suspended', 'disabled', 'invited'].includes(String(rawStatus))
+    ) {
       response.status(400).json({
         error: { code: 'INVALID_REQUEST', message: 'Account status filter is invalid.' },
       });
@@ -145,60 +162,76 @@ router.post('/invitations', requirePermission('users.manage'), async (request, r
       response.status(400).json(validationResponse(parsed.error));
       return;
     }
-    const invitation = await createEmployeeInvitation(actorId(request), request.requestId, parsed.data);
+    const invitation = await createEmployeeInvitation(
+      actorId(request),
+      request.requestId,
+      parsed.data,
+    );
     response.status(201).json({ data: invitation });
   } catch (error) {
     next(error);
   }
 });
 
-router.patch('/:userId/status', requirePermission('users.manage'), async (request, response, next) => {
-  try {
-    const parsed = statusSchema.safeParse(request.body);
-    if (!parsed.success) {
-      response.status(400).json(validationResponse(parsed.error));
-      return;
+router.patch(
+  '/:userId/status',
+  requirePermission('users.manage'),
+  async (request, response, next) => {
+    try {
+      const parsed = statusSchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      response.json({
+        data: await setEmployeeStatus(
+          actorId(request),
+          request.requestId,
+          routeId(request.params.userId!),
+          parsed.data.status,
+        ),
+      });
+    } catch (error) {
+      next(error);
     }
-    response.json({
-      data: await setEmployeeStatus(
-        actorId(request),
-        request.requestId,
-        routeId(request.params.userId!),
-        parsed.data.status,
-      ),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
-router.post('/:userId/sessions/revoke', requirePermission('users.manage'), async (request, response, next) => {
-  try {
-    response.json({
-      data: await revokeEmployeeSessions(
-        actorId(request),
-        request.requestId,
-        routeId(request.params.userId!),
-      ),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+router.post(
+  '/:userId/sessions/revoke',
+  requirePermission('users.manage'),
+  async (request, response, next) => {
+    try {
+      response.json({
+        data: await revokeEmployeeSessions(
+          actorId(request),
+          request.requestId,
+          routeId(request.params.userId!),
+        ),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
-router.post('/:userId/invitation/revoke', requirePermission('users.manage'), async (request, response, next) => {
-  try {
-    response.json({
-      data: await revokeEmployeeInvitation(
-        actorId(request),
-        request.requestId,
-        routeId(request.params.userId!),
-      ),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+router.post(
+  '/:userId/invitation/revoke',
+  requirePermission('users.manage'),
+  async (request, response, next) => {
+    try {
+      response.json({
+        data: await revokeEmployeeInvitation(
+          actorId(request),
+          request.requestId,
+          routeId(request.params.userId!),
+        ),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 const userAdminErrorHandler: ErrorRequestHandler = (error, request, response, next) => {
   if (error instanceof UserAdminError) {
