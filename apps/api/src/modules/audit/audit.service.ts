@@ -17,7 +17,7 @@ function sanitiseMetadata(
   if (!metadata) return safe;
   for (const [key, value] of Object.entries(metadata).slice(0, 30)) {
     if (/password|secret|token|cookie|authorization|credential|session/i.test(key)) continue;
-    safe[key.slice(0, 80)] = typeof value === 'string' ? value.slice(0, 4000) : value;
+    safe[key.slice(0, 80)] = typeof value === 'string' ? value.slice(0, 12000) : value;
   }
   return safe;
 }
