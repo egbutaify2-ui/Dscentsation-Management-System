@@ -107,15 +107,25 @@ describe('Product Management database invariants', () => {
       { column_name: 'cost_price_minor', data_type: 'bigint' },
       { column_name: 'selling_price_minor', data_type: 'bigint' },
     ]);
+    const product = await pool.query<{ id: string }>(
+      'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+      [`Currency constraint product ${randomUUID()}`, actorId],
+    );
+    await pool.query(
+      `INSERT INTO product_variants(
+         product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+         currency, is_default, created_by, updated_by
+       ) VALUES ($1, 'Default', 'unit', 10, 5, 'NGN', true, $2, $2)`,
+      [product.rows[0]!.id, actorId],
+    );
     await expect(
       pool.query(
         `INSERT INTO product_variants(
            product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
            currency, created_by, updated_by
-         ) SELECT id, 'Currency test', 'unit', 10, 5, 'USD', $2, $2
-             FROM products WHERE id = $1`,
-        [randomUUID(), actorId],
+         ) VALUES ($1, 'Unsupported currency', 'unit', 10, 5, 'USD', $2, $2)`,
+        [product.rows[0]!.id, actorId],
       ),
-    ).resolves.toBeDefined();
+    ).rejects.toThrow();
   });
 });
