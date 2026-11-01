@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const money = z
   .string()
-  .regex(/^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$/, 'Use a non-negative amount with up to two decimal places.');
+  .regex(/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/, 'Use a non-negative amount with up to two decimal places.');
 const nullableText = (max: number) => z.string().trim().max(max).nullable().optional();
 
 export const variantInputSchema = z
