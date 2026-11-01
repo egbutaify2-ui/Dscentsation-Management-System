@@ -407,11 +407,7 @@ describe('Employee Account Administration API', () => {
       [employee.id],
     );
 
-    const reissued = await post(
-      ownerAgent,
-      `/api/v1/users/${employee.id}/invitation/reissue`,
-      {},
-    );
+    const reissued = await post(ownerAgent, `/api/v1/users/${employee.id}/invitation/reissue`, {});
     expect(reissued.status).toBe(200);
     const replacement = reissued.body.data as {
       employee: { id: string; email: string; roleCode: string; status: string };
@@ -505,18 +501,10 @@ describe('Employee Account Administration API', () => {
     expect(created.status).toBe(201);
     const employee = created.body.data.employee as { id: string; email: string; roleCode: string };
     const oldToken = tokenFromSetupUrl(created.body.data.setupUrl);
-    const revoked = await post(
-      ownerAgent,
-      `/api/v1/users/${employee.id}/invitation/revoke`,
-      {},
-    );
+    const revoked = await post(ownerAgent, `/api/v1/users/${employee.id}/invitation/revoke`, {});
     expect(revoked.status).toBe(200);
 
-    const reissued = await post(
-      ownerAgent,
-      `/api/v1/users/${employee.id}/invitation/reissue`,
-      {},
-    );
+    const reissued = await post(ownerAgent, `/api/v1/users/${employee.id}/invitation/reissue`, {});
     expect(reissued.status).toBe(200);
     const replacement = reissued.body.data as {
       employee: { id: string; email: string; roleCode: string };
@@ -576,11 +564,7 @@ describe('Employee Account Administration API', () => {
       FOR EACH ROW EXECUTE FUNCTION test_fail_user_invitation_reissue_audit();
     `);
     try {
-      const failed = await post(
-        ownerAgent,
-        `/api/v1/users/${employeeId}/invitation/reissue`,
-        {},
-      );
+      const failed = await post(ownerAgent, `/api/v1/users/${employeeId}/invitation/reissue`, {});
       expect(failed.status).toBe(500);
       const rows = await pool.query<{
         token_hash: string;
@@ -630,7 +614,8 @@ describe('Employee Account Administration API', () => {
     );
     expect(
       candidateTokens.filter(
-        (token) => createHash('sha256').update(token).digest('hex') === open.rows[0]?.token_hash.trim(),
+        (token) =>
+          createHash('sha256').update(token).digest('hex') === open.rows[0]?.token_hash.trim(),
       ),
     ).toHaveLength(1);
 

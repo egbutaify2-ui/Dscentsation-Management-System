@@ -63,11 +63,6 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Diagnose employee API test formatting
-        run: |
-          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 apps/api/src/modules/users/user-admin.routes.test.ts > /tmp/user-admin.routes.test.ts
-          diff -u apps/api/src/modules/users/user-admin.routes.test.ts /tmp/user-admin.routes.test.ts || true
-
       - name: Check formatting
         run: pnpm format:check
 
