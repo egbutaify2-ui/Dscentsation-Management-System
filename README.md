@@ -545,7 +545,7 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 **Not yet implemented or approved:** Real Warehouse/Sheraton location records and Staff assignments; operational business modules; production database/service provisioning; production credentials; background workers; company email and file-storage integrations; production deployment; MFA; approved production session lifetimes and high-risk-action re-authentication; distributed rate limiting; and overall architecture/deployment approval. The technical implementation choices tracked by DMS-DEC-021–024 and DMS-DEC-027 are documented as adopted in the codebase where applicable but retain their existing review statuses.
 
-**Next development task:** Complete Task 006 — architecture documentation reconciliation — and have it independently reviewed and merged before Task 007 begins. Business-module work must then follow the reconciled architecture and explicitly respect all unresolved business/technical decisions; implementation must not invent answers to open decisions.
+**Next development task:** Task 007 — Product Management — is the next planned development task. It may begin only after Task 006's documentation reconciliation has been merged. Its scope must follow the reconciled architecture and preserve all unresolved business and technical decisions; do not invent answers or treat implementation choices as approvals.
 
 ## Working agreement
 
