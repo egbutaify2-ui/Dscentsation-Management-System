@@ -130,7 +130,7 @@ export function ProductManagementPage() {
       setProducts(productRows);
       setCategories(categoryRows);
       setSelectedProduct((current) =>
-        current ? productRows.find((item) => item.id === current.id) ?? null : null,
+        current ? (productRows.find((item) => item.id === current.id) ?? null) : null,
       );
     } catch (loadError) {
       setError(getErrorMessage(loadError));
@@ -200,11 +200,7 @@ export function ProductManagementPage() {
         setSelectedProduct(created);
         setNotice('Product created successfully.');
       } else if (selectedProduct) {
-        const updated = await api.patch<Product>(
-          `/products/${selectedProduct.id}`,
-          details,
-          csrf,
-        );
+        const updated = await api.patch<Product>(`/products/${selectedProduct.id}`, details, csrf);
         setSelectedProduct(updated);
         setNotice('Product details saved.');
       }
@@ -278,11 +274,7 @@ export function ProductManagementPage() {
       const csrf = await getCsrfToken();
       const updated =
         variantDialog === 'create'
-          ? await api.post<Variant>(
-              `/products/${selectedProduct.id}/variants`,
-              payload,
-              csrf,
-            )
+          ? await api.post<Variant>(`/products/${selectedProduct.id}/variants`, payload, csrf)
           : await api.patch<Variant>(
               `/products/${selectedProduct.id}/variants/${editingVariantId}`,
               payload,
@@ -380,11 +372,7 @@ export function ProductManagementPage() {
     setSaving(true);
     setError(null);
     try {
-      await api.patch(
-        `/categories/${category.id}`,
-        { isActive: nextActive },
-        await getCsrfToken(),
-      );
+      await api.patch(`/categories/${category.id}`, { isActive: nextActive }, await getCsrfToken());
       setNotice(nextActive ? 'Category activated.' : 'Category deactivated.');
       await refresh();
     } catch (statusError) {
@@ -453,8 +441,16 @@ export function ProductManagementPage() {
         </button>
       </div>
 
-      {error && <p className="product-alert error" role="alert">{error}</p>}
-      {notice && <p className="product-alert success" role="status">{notice}</p>}
+      {error && (
+        <p className="product-alert error" role="alert">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="product-alert success" role="status">
+          {notice}
+        </p>
+      )}
 
       {view === 'products' && !selectedProduct && (
         <section className="product-card" aria-labelledby="product-list-title">
@@ -490,10 +486,14 @@ export function ProductManagementPage() {
                 <option value="all">All products</option>
               </select>
             </label>
-            <button className="secondary-button search-button" type="submit">Search</button>
+            <button className="secondary-button search-button" type="submit">
+              Search
+            </button>
           </form>
           {loading ? (
-            <div className="product-state" role="status">Loading products…</div>
+            <div className="product-state" role="status">
+              Loading products…
+            </div>
           ) : products.length === 0 ? (
             <div className="product-state empty">
               <strong>No products found</strong>
@@ -509,7 +509,9 @@ export function ProductManagementPage() {
                     <th>Variants</th>
                     <th>Current selling price</th>
                     <th>Status</th>
-                    <th><span className="sr-only">Open</span></th>
+                    <th>
+                      <span className="sr-only">Open</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -525,7 +527,13 @@ export function ProductManagementPage() {
                         <td>{product.variants.length}</td>
                         <td>{activeVariant ? formatNaira(activeVariant.sellingPrice) : '—'}</td>
                         <td>
-                          <span className={product.status === 'active' ? 'status-label active' : 'status-label inactive'}>
+                          <span
+                            className={
+                              product.status === 'active'
+                                ? 'status-label active'
+                                : 'status-label inactive'
+                            }
+                          >
                             {product.status}
                           </span>
                         </td>
@@ -554,7 +562,13 @@ export function ProductManagementPage() {
             <button type="button" className="text-button" onClick={() => setSelectedProduct(null)}>
               ← Back to products
             </button>
-            <span className={selectedProduct.status === 'active' ? 'status-label active' : 'status-label inactive'}>
+            <span
+              className={
+                selectedProduct.status === 'active'
+                  ? 'status-label active'
+                  : 'status-label inactive'
+              }
+            >
               {selectedProduct.status}
             </span>
           </div>
@@ -571,7 +585,9 @@ export function ProductManagementPage() {
                 Edit details
               </button>
               <button
-                className={selectedProduct.status === 'active' ? 'danger-button' : 'secondary-button'}
+                className={
+                  selectedProduct.status === 'active' ? 'danger-button' : 'secondary-button'
+                }
                 disabled={saving}
                 onClick={() => void changeProductStatus(selectedProduct)}
               >
@@ -580,9 +596,18 @@ export function ProductManagementPage() {
             </div>
           </div>
           <dl className="product-facts">
-            <div><dt>Internal code</dt><dd>{selectedProduct.internalCode || '—'}</dd></div>
-            <div><dt>Category</dt><dd>{selectedProduct.categoryName || 'Uncategorised'}</dd></div>
-            <div><dt>Variants</dt><dd>{selectedProduct.variants.length}</dd></div>
+            <div>
+              <dt>Internal code</dt>
+              <dd>{selectedProduct.internalCode || '—'}</dd>
+            </div>
+            <div>
+              <dt>Category</dt>
+              <dd>{selectedProduct.categoryName || 'Uncategorised'}</dd>
+            </div>
+            <div>
+              <dt>Variants</dt>
+              <dd>{selectedProduct.variants.length}</dd>
+            </div>
           </dl>
           <div className="detail-section-heading">
             <div>
@@ -618,13 +643,20 @@ export function ProductManagementPage() {
                     <td>{formatNaira(variant.sellingPrice)}</td>
                     <td>{formatNaira(variant.costPrice)}</td>
                     <td>
-                      <span className={variant.isActive ? 'status-label active' : 'status-label inactive'}>
+                      <span
+                        className={
+                          variant.isActive ? 'status-label active' : 'status-label inactive'
+                        }
+                      >
                         {variant.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td>
                       <div className="table-actions">
-                        <button className="table-link-button" onClick={() => openEditVariant(variant)}>
+                        <button
+                          className="table-link-button"
+                          onClick={() => openEditVariant(variant)}
+                        >
                           Edit
                         </button>
                         <button
@@ -654,7 +686,9 @@ export function ProductManagementPage() {
             <span className="record-count">{categories.length} categories</span>
           </div>
           {loading ? (
-            <div className="product-state" role="status">Loading categories…</div>
+            <div className="product-state" role="status">
+              Loading categories…
+            </div>
           ) : categories.length === 0 ? (
             <div className="product-state empty">
               <strong>No categories yet</strong>
@@ -682,13 +716,20 @@ export function ProductManagementPage() {
                       <td>{category.parentName || '—'}</td>
                       <td>{category.productCount}</td>
                       <td>
-                        <span className={category.isActive ? 'status-label active' : 'status-label inactive'}>
+                        <span
+                          className={
+                            category.isActive ? 'status-label active' : 'status-label inactive'
+                          }
+                        >
                           {category.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td>
                         <div className="table-actions">
-                          <button className="table-link-button" onClick={() => openEditCategory(category)}>
+                          <button
+                            className="table-link-button"
+                            onClick={() => openEditCategory(category)}
+                          >
                             Edit
                           </button>
                           <button
@@ -711,37 +752,76 @@ export function ProductManagementPage() {
 
       {productDialog && (
         <div className="modal-backdrop">
-          <section className="product-modal" role="dialog" aria-modal="true" aria-labelledby="product-form-title">
+          <section
+            className="product-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-form-title"
+          >
             <div className="modal-heading">
               <div>
                 <p className="eyebrow">PRODUCT RECORD</p>
-                <h2 id="product-form-title">{productDialog === 'create' ? 'Add a product' : 'Edit product details'}</h2>
+                <h2 id="product-form-title">
+                  {productDialog === 'create' ? 'Add a product' : 'Edit product details'}
+                </h2>
               </div>
-              <button className="modal-close" type="button" onClick={() => setProductDialog(null)} aria-label="Close">
+              <button
+                className="modal-close"
+                type="button"
+                onClick={() => setProductDialog(null)}
+                aria-label="Close"
+              >
                 ×
               </button>
             </div>
             <form className="record-form" onSubmit={(event) => void submitProduct(event)}>
               <label>
                 Product name
-                <input required maxLength={200} value={productForm.name} onChange={(event) => setProductForm({ ...productForm, name: event.target.value })} />
+                <input
+                  required
+                  maxLength={200}
+                  value={productForm.name}
+                  onChange={(event) => setProductForm({ ...productForm, name: event.target.value })}
+                />
               </label>
               <label>
                 Description
-                <textarea rows={3} maxLength={4000} value={productForm.description} onChange={(event) => setProductForm({ ...productForm, description: event.target.value })} />
+                <textarea
+                  rows={3}
+                  maxLength={4000}
+                  value={productForm.description}
+                  onChange={(event) =>
+                    setProductForm({ ...productForm, description: event.target.value })
+                  }
+                />
               </label>
               <div className="form-grid">
                 <label>
                   Internal code (optional)
-                  <input maxLength={80} value={productForm.internalCode} onChange={(event) => setProductForm({ ...productForm, internalCode: event.target.value })} />
+                  <input
+                    maxLength={80}
+                    value={productForm.internalCode}
+                    onChange={(event) =>
+                      setProductForm({ ...productForm, internalCode: event.target.value })
+                    }
+                  />
                 </label>
                 <label>
                   Category
-                  <select value={productForm.categoryId} onChange={(event) => setProductForm({ ...productForm, categoryId: event.target.value })}>
+                  <select
+                    value={productForm.categoryId}
+                    onChange={(event) =>
+                      setProductForm({ ...productForm, categoryId: event.target.value })
+                    }
+                  >
                     <option value="">No category</option>
-                    {categories.filter((category) => category.isActive).map((category) => (
-                      <option value={category.id} key={category.id}>{category.name}</option>
-                    ))}
+                    {categories
+                      .filter((category) => category.isActive)
+                      .map((category) => (
+                        <option value={category.id} key={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
                   </select>
                 </label>
               </div>
@@ -754,31 +834,77 @@ export function ProductManagementPage() {
                   <div className="form-grid">
                     <label>
                       Variant / size label
-                      <input required maxLength={120} value={productForm.variantName} onChange={(event) => setProductForm({ ...productForm, variantName: event.target.value })} />
+                      <input
+                        required
+                        maxLength={120}
+                        value={productForm.variantName}
+                        onChange={(event) =>
+                          setProductForm({ ...productForm, variantName: event.target.value })
+                        }
+                      />
                     </label>
                     <label>
                       SKU (optional)
-                      <input maxLength={80} value={productForm.sku} onChange={(event) => setProductForm({ ...productForm, sku: event.target.value })} />
+                      <input
+                        maxLength={80}
+                        value={productForm.sku}
+                        onChange={(event) =>
+                          setProductForm({ ...productForm, sku: event.target.value })
+                        }
+                      />
                     </label>
                     <label>
                       Unit of measure
-                      <input required maxLength={40} value={productForm.unitOfMeasure} onChange={(event) => setProductForm({ ...productForm, unitOfMeasure: event.target.value })} />
+                      <input
+                        required
+                        maxLength={40}
+                        value={productForm.unitOfMeasure}
+                        onChange={(event) =>
+                          setProductForm({ ...productForm, unitOfMeasure: event.target.value })
+                        }
+                      />
                     </label>
                     <label>
                       Selling price (NGN)
-                      <input required inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?" value={productForm.sellingPrice} onChange={(event) => setProductForm({ ...productForm, sellingPrice: event.target.value })} />
+                      <input
+                        required
+                        inputMode="decimal"
+                        pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?"
+                        value={productForm.sellingPrice}
+                        onChange={(event) =>
+                          setProductForm({ ...productForm, sellingPrice: event.target.value })
+                        }
+                      />
                     </label>
                     <label>
                       Cost price (NGN)
-                      <input required inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?" value={productForm.costPrice} onChange={(event) => setProductForm({ ...productForm, costPrice: event.target.value })} />
+                      <input
+                        required
+                        inputMode="decimal"
+                        pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?"
+                        value={productForm.costPrice}
+                        onChange={(event) =>
+                          setProductForm({ ...productForm, costPrice: event.target.value })
+                        }
+                      />
                     </label>
                   </div>
                 </>
               )}
               <div className="modal-actions">
-                <button className="secondary-button" type="button" onClick={() => setProductDialog(null)}>Cancel</button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setProductDialog(null)}
+                >
+                  Cancel
+                </button>
                 <button className="primary-button" type="submit" disabled={saving}>
-                  {saving ? 'Saving…' : productDialog === 'create' ? 'Create product' : 'Save changes'}
+                  {saving
+                    ? 'Saving…'
+                    : productDialog === 'create'
+                      ? 'Create product'
+                      : 'Save changes'}
                 </button>
               </div>
             </form>
@@ -788,40 +914,98 @@ export function ProductManagementPage() {
 
       {variantDialog && selectedProduct && (
         <div className="modal-backdrop">
-          <section className="product-modal" role="dialog" aria-modal="true" aria-labelledby="variant-form-title">
+          <section
+            className="product-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="variant-form-title"
+          >
             <div className="modal-heading">
               <div>
                 <p className="eyebrow">VARIANT · {selectedProduct.name}</p>
-                <h2 id="variant-form-title">{variantDialog === 'create' ? 'Add a variant' : 'Edit variant'}</h2>
+                <h2 id="variant-form-title">
+                  {variantDialog === 'create' ? 'Add a variant' : 'Edit variant'}
+                </h2>
               </div>
-              <button className="modal-close" type="button" onClick={() => setVariantDialog(null)} aria-label="Close">×</button>
+              <button
+                className="modal-close"
+                type="button"
+                onClick={() => setVariantDialog(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
             </div>
             <form className="record-form" onSubmit={(event) => void submitVariant(event)}>
               <div className="form-grid">
                 <label>
                   Variant / size label
-                  <input required maxLength={120} value={variantForm.name} onChange={(event) => setVariantForm({ ...variantForm, name: event.target.value })} />
+                  <input
+                    required
+                    maxLength={120}
+                    value={variantForm.name}
+                    onChange={(event) =>
+                      setVariantForm({ ...variantForm, name: event.target.value })
+                    }
+                  />
                 </label>
                 <label>
                   SKU (optional)
-                  <input maxLength={80} value={variantForm.sku} onChange={(event) => setVariantForm({ ...variantForm, sku: event.target.value })} />
+                  <input
+                    maxLength={80}
+                    value={variantForm.sku}
+                    onChange={(event) =>
+                      setVariantForm({ ...variantForm, sku: event.target.value })
+                    }
+                  />
                 </label>
                 <label>
                   Unit of measure
-                  <input required maxLength={40} value={variantForm.unitOfMeasure} onChange={(event) => setVariantForm({ ...variantForm, unitOfMeasure: event.target.value })} />
+                  <input
+                    required
+                    maxLength={40}
+                    value={variantForm.unitOfMeasure}
+                    onChange={(event) =>
+                      setVariantForm({ ...variantForm, unitOfMeasure: event.target.value })
+                    }
+                  />
                 </label>
                 <label>
                   Selling price (NGN)
-                  <input required inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?" value={variantForm.sellingPrice} onChange={(event) => setVariantForm({ ...variantForm, sellingPrice: event.target.value })} />
+                  <input
+                    required
+                    inputMode="decimal"
+                    pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?"
+                    value={variantForm.sellingPrice}
+                    onChange={(event) =>
+                      setVariantForm({ ...variantForm, sellingPrice: event.target.value })
+                    }
+                  />
                 </label>
                 <label>
                   Cost price (NGN)
-                  <input required inputMode="decimal" pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?" value={variantForm.costPrice} onChange={(event) => setVariantForm({ ...variantForm, costPrice: event.target.value })} />
+                  <input
+                    required
+                    inputMode="decimal"
+                    pattern="(?:0|[1-9][0-9]*)(?:\.[0-9]{1,2})?"
+                    value={variantForm.costPrice}
+                    onChange={(event) =>
+                      setVariantForm({ ...variantForm, costPrice: event.target.value })
+                    }
+                  />
                 </label>
               </div>
               <div className="modal-actions">
-                <button className="secondary-button" type="button" onClick={() => setVariantDialog(null)}>Cancel</button>
-                <button className="primary-button" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save variant'}</button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setVariantDialog(null)}
+                >
+                  Cancel
+                </button>
+                <button className="primary-button" type="submit" disabled={saving}>
+                  {saving ? 'Saving…' : 'Save variant'}
+                </button>
               </div>
             </form>
           </section>
@@ -830,35 +1014,78 @@ export function ProductManagementPage() {
 
       {categoryDialog && (
         <div className="modal-backdrop">
-          <section className="product-modal" role="dialog" aria-modal="true" aria-labelledby="category-form-title">
+          <section
+            className="product-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="category-form-title"
+          >
             <div className="modal-heading">
               <div>
                 <p className="eyebrow">PRODUCT ORGANISATION</p>
-                <h2 id="category-form-title">{categoryDialog === 'create' ? 'Add a category' : 'Edit category'}</h2>
+                <h2 id="category-form-title">
+                  {categoryDialog === 'create' ? 'Add a category' : 'Edit category'}
+                </h2>
               </div>
-              <button className="modal-close" type="button" onClick={() => setCategoryDialog(null)} aria-label="Close">×</button>
+              <button
+                className="modal-close"
+                type="button"
+                onClick={() => setCategoryDialog(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
             </div>
             <form className="record-form" onSubmit={(event) => void submitCategory(event)}>
               <label>
                 Category name
-                <input required maxLength={120} value={categoryForm.name} onChange={(event) => setCategoryForm({ ...categoryForm, name: event.target.value })} />
+                <input
+                  required
+                  maxLength={120}
+                  value={categoryForm.name}
+                  onChange={(event) =>
+                    setCategoryForm({ ...categoryForm, name: event.target.value })
+                  }
+                />
               </label>
               <label>
                 Description (optional)
-                <textarea rows={3} maxLength={2000} value={categoryForm.description} onChange={(event) => setCategoryForm({ ...categoryForm, description: event.target.value })} />
+                <textarea
+                  rows={3}
+                  maxLength={2000}
+                  value={categoryForm.description}
+                  onChange={(event) =>
+                    setCategoryForm({ ...categoryForm, description: event.target.value })
+                  }
+                />
               </label>
               <label>
                 Parent category (optional)
-                <select value={categoryForm.parentId} onChange={(event) => setCategoryForm({ ...categoryForm, parentId: event.target.value })}>
+                <select
+                  value={categoryForm.parentId}
+                  onChange={(event) =>
+                    setCategoryForm({ ...categoryForm, parentId: event.target.value })
+                  }
+                >
                   <option value="">No parent</option>
                   {activeCategories.map((category) => (
-                    <option value={category.id} key={category.id}>{category.name}</option>
+                    <option value={category.id} key={category.id}>
+                      {category.name}
+                    </option>
                   ))}
                 </select>
               </label>
               <div className="modal-actions">
-                <button className="secondary-button" type="button" onClick={() => setCategoryDialog(null)}>Cancel</button>
-                <button className="primary-button" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save category'}</button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setCategoryDialog(null)}
+                >
+                  Cancel
+                </button>
+                <button className="primary-button" type="submit" disabled={saving}>
+                  {saving ? 'Saving…' : 'Save category'}
+                </button>
               </div>
             </form>
           </section>
