@@ -63,21 +63,6 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Prepare exact formatter output for the remaining changed files
-        shell: bash
-        run: |
-          files=(
-            apps/api/src/modules/products/product.database.test.ts
-            apps/api/src/modules/products/product.routes.test.ts
-            apps/api/src/modules/products/product.routes.ts
-          )
-          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 --write "${files[@]}"
-          for file in "${files[@]}"; do
-            echo "__DMS_PRETTIER_START__:$file"
-            cat "$file"
-            echo "__DMS_PRETTIER_END__:$file"
-          done
-
       - name: Check formatting
         run: pnpm format:check
 
