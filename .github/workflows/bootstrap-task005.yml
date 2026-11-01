@@ -40,7 +40,7 @@ jobs:
           for name, content in files.items():
               path = Path(name)
               path.parent.mkdir(parents=True, exist_ok=True)
-              with path.open('w', encoding='utf-8', newline='\\n') as handle:
+              with path.open('w', encoding='utf-8') as handle:
                   handle.write(content)
           manifest.unlink()
           Path('.github/workflows/bootstrap-task005.yml').unlink()
@@ -59,7 +59,7 @@ jobs:
       - name: Commit source tree and pnpm lockfile
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "feat: build the DMS application foundation"
           git push origin task-005-application-foundation
