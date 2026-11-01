@@ -356,7 +356,7 @@ The following project-manager decisions are confirmed and no longer open questio
 
 - Destination Staff assigned to the destination location must confirm stock-transfer receipt.
 - Staff may record payment entries; only Managers and the Owner may verify payments.
-- Managers have access to all stock locations; Staff are restricted to assigned locations.
+- Managers and Owner have access to all stock locations. Staff are restricted to their assigned locations, with one additional exception: the dedicated Warehouse-to-assigned-Sheraton pickup action in §4.2.1. This action does not grant general Warehouse inventory access.
 - Render Postgres is preferred, subject to backup, recovery and cost verification.
 - Each order has exactly one fulfilment location in the first release.
 - Stock is reserved immediately when an order is confirmed, even if unpaid.
@@ -364,16 +364,15 @@ The following project-manager decisions are confirmed and no longer open questio
 
 Remaining questions before implementation:
 
-1. What are the actual stock locations, codes and Staff-to-location assignments?
-2. What initial reservation duration should be configured, and should expiry apply only to unpaid orders or to all undispatched confirmed orders?
-3. Should a grace period, warning notification or reminder precede expiry?
-4. What exception/escalation process applies if destination Staff are unavailable, or if a transfer has a shortage/damage discrepancy?
-5. What are the detailed permission/approval rules for refunds, expense approvals, exports and user administration?
-6. Which company-hosted email provider and supported SMTP/API sending method will be used?
-7. What are the receipt format, numbering rules and record-retention requirements?
-8. What are the file-storage provider/region, allowed file types, maximum file sizes and retention rules?
-9. Do Render Postgres backup, recovery and cost checks meet the business's expectations?
-10. Confirm the configured Warehouse and Sheraton location records/codes and which Staff accounts are assigned to each Sheraton location.
-11. Confirm any operational paperwork/reference required at Warehouse when a Sheraton Staff member records physical pickup; the access boundary and stock accounting rules in this architecture are fixed.
+1. What initial reservation duration should be configured, and should expiry apply only to unpaid orders or to all undispatched confirmed orders?
+2. Should a grace period, warning notification or reminder precede expiry?
+3. What exception/escalation process applies if destination Staff are unavailable, or if a transfer has a shortage/damage discrepancy?
+4. What are the detailed permission/approval rules for refunds, expense approvals, exports and user administration?
+5. Which company-hosted email provider and supported SMTP/API sending method will be used?
+6. What are the receipt format, numbering rules and record-retention requirements?
+7. What are the file-storage provider/region, allowed file types, maximum file sizes and retention rules?
+8. Do Render Postgres backup, recovery and cost checks meet the business's expectations?
+9. Confirm the canonical Warehouse and Sheraton location records/codes and the Staff accounts assigned to each Sheraton location.
+10. Confirm any operational paperwork/reference required at Warehouse when a Sheraton Staff member records physical pickup; the access boundary and stock accounting rules in this architecture are fixed.
 
 **Review outcome:** Pending. This architecture reflects the confirmed project-manager rules but is not permission to start application implementation or deployment.
