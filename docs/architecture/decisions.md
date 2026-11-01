@@ -484,6 +484,7 @@ The following project-manager decisions are confirmed and are no longer pending:
 | Order fulfilment | One fulfilment location per order in the first release; no cross-location split fulfilment. |
 | Reservation timing | Reserve stock immediately on order confirmation, whether paid or unpaid. |
 | Reservation expiry | Expiry must be configurable and persisted; each reservation snapshots its applied policy/expiry. |
+| Sheraton pickup | Sheraton-assigned Staff may use only the dedicated pickup action for a transfer from Warehouse to their assigned Sheraton location; this is not general Warehouse access. |
 
 Remaining details requiring confirmation:
 
