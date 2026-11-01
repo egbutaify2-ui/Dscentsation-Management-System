@@ -43,7 +43,7 @@ async function csrf(agent: ReturnType<typeof request.agent>): Promise<string> {
   return response.body.data.token as string;
 }
 
-async function post(agent: ReturnType<typeof request.agent>, path: string, body: unknown) {
+async function post(agent: ReturnType<typeof request.agent>, path: string, body: object) {
   return agent
     .post(path)
     .set('Origin', env.APP_ORIGIN)
@@ -51,7 +51,7 @@ async function post(agent: ReturnType<typeof request.agent>, path: string, body:
     .send(body);
 }
 
-async function patch(agent: ReturnType<typeof request.agent>, path: string, body: unknown) {
+async function patch(agent: ReturnType<typeof request.agent>, path: string, body: object) {
   return agent
     .patch(path)
     .set('Origin', env.APP_ORIGIN)
@@ -395,9 +395,13 @@ describe('Product Management API', () => {
     const all = await ownerAgent.get('/api/v1/products?status=all').expect(200);
     expect(Array.isArray(all.body.data)).toBe(true);
     await ownerAgent.get('/api/v1/products/not-a-uuid').expect(400);
-    await ownerAgent.patch('/api/v1/categories/not-a-uuid', { name: 'Invalid ID' }).expect(400);
     await ownerAgent
-      .patch('/api/v1/products/not-a-uuid/variants/not-a-uuid', { name: 'Invalid ID' })
+      .patch('/api/v1/categories/not-a-uuid')
+      .send({ name: 'Invalid ID' })
+      .expect(400);
+    await ownerAgent
+      .patch('/api/v1/products/not-a-uuid/variants/not-a-uuid')
+      .send({ name: 'Invalid ID' })
       .expect(400);
   });
 
