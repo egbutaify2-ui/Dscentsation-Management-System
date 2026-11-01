@@ -64,5 +64,8 @@ jobs:
           git add -A
           git commit -m "feat: build the DMS application foundation"
           git fetch origin task-005-application-foundation
-          git rebase -X theirs origin/task-005-application-foundation
+          if ! git rebase origin/task-005-application-foundation; then
+            git rm -f .task005-trigger
+            GIT_EDITOR=true git rebase --continue
+          fi
           git push origin task-005-application-foundation
