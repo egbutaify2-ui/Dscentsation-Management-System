@@ -53,8 +53,12 @@ describe('AppShell Product Management navigation', () => {
         <p>Products content</p>
       </AppShell>,
     );
-    expect((screen.getByRole('button', { name: /Orders/ }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: /Inventory/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: /Orders/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: /Inventory/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
     expect(screen.getByText('Products content')).toBeTruthy();
   });
 });
