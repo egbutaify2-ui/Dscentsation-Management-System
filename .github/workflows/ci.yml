@@ -63,26 +63,6 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate exact Prettier output for Product Management files
-        shell: bash
-        run: |
-          files=(
-            apps/api/src/modules/products/product.database.test.ts
-            apps/api/src/modules/products/product.routes.test.ts
-            apps/api/src/modules/products/product.routes.ts
-            apps/api/src/modules/products/product.service.ts
-            apps/api/src/modules/products/product.validation.ts
-            apps/web/src/features/products/ProductManagementPage.css
-            apps/web/src/features/products/ProductManagementPage.test.tsx
-            apps/web/src/features/products/ProductManagementPage.tsx
-          )
-          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 --write "${files[@]}"
-          for file in "${files[@]}"; do
-            echo "__DMS_PRETTIER_START__:$file"
-            cat "$file"
-            echo "__DMS_PRETTIER_END__:$file"
-          done
-
       - name: Check formatting
         run: pnpm format:check
 
@@ -106,8 +86,11 @@ jobs:
       - name: Apply migrations to the clean disposable PostgreSQL database
         run: pnpm db:migrate
 
-      - name: Verify foundation and product tables, role seeds, permission boundaries and idempotent seeding
+      - name: Verify foundation schema and role-permission seeds
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-foundation.sql
+
+      - name: Verify Product Management schema and Owner-only permission seeds
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-product-management.sql
 
       - name: Verify production migration up remains permitted
         run: NODE_ENV=production COOKIE_SECURE=true APP_ORIGIN=https://dms.example.invalid pnpm db:migrate
@@ -133,17 +116,18 @@ jobs:
         shell: bash
         run: |
           pnpm db:rollback
-          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs')")"
+          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants')")"
           if [ "$remaining" != "0" ]; then
-            echo "Rollback left $remaining foundation tables behind."
+            echo "Rollback left $remaining application tables behind."
             exit 1
           fi
-          echo "Rollback removed all eight foundation tables."
+          echo "Rollback removed all eleven application tables."
 
-      - name: Reapply migrations and reverify the foundation schema
+      - name: Reapply migrations and reverify the application schema
         run: |
           pnpm db:migrate
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-foundation.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-product-management.sql
 
       - name: Run API integration and security tests
         run: pnpm --filter @dms/api test
