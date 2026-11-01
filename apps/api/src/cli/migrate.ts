@@ -23,6 +23,7 @@ if (direction === 'down' && env.NODE_ENV === 'production') {
     dir: migrationsDirectory,
     migrationsTable: 'pgmigrations',
     direction,
+    count: direction === 'down' ? 'all' : undefined,
     singleTransaction: true,
     verbose: false,
   });
