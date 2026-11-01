@@ -2,7 +2,7 @@
 
 A centralised internal business management platform for Dscentsation's Nigerian operations. The planned system will bring orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
 
-> **Project status:** Tasks 005 and 006 architecture reconciliation are merged into `main`. Task 007 Product Management was independently reviewed and merged through PR #9 (merge commit `521d94c3242cea55d23770b799b6b025a50d2104`). The first Product Management module is implemented; remaining business modules, the complete permission matrix, DMS-DEC-002, DMS-DEC-015, production infrastructure and deployment remain pending. The checklist below distinguishes completed work from remaining scope.
+> **Project status:** Tasks 005 and 006 architecture reconciliation are merged into `main`. Task 007 Product Management was independently reviewed and merged through PR #9. Task 008 implements Employee Account Administration on branch `task-008-employee-account-administration` and is being delivered as a draft PR for independent review; it is not yet merged. Email delivery (DMS-DEC-017), location assignments (DMS-DEC-001), the full permission matrix (DMS-DEC-002), password recovery, session history, comprehensive business-event audit coverage, production infrastructure and deployment remain pending.
 
 ## Contents
 
@@ -275,7 +275,7 @@ AI-generated answers must be grounded in actual records, respect user permission
 | **Manager** | Day-to-day operations, orders, customers, inventory, suppliers, returns, permitted reports and authorised approvals. |
 | **Staff** | Restricted operational access for assigned tasks, such as registering orders, customers, receipts and permitted stock actions. |
 
-Permissions must be enforced by backend APIs and database access patterns, not only by hiding buttons in the user interface. The exact permission matrix will be defined during architecture and authentication work.
+Permissions must be enforced by backend APIs and database access patterns, not only by hiding buttons in the user interface. Task 008 introduces only the explicit `users.view` and `users.manage` permissions for employee administration and assigns them to Owner only. Manager and Staff do not receive employee-administration permissions. The complete permission matrix remains unresolved under DMS-DEC-002.
 
 ## Identity, user accounts and activity accountability
 
@@ -287,15 +287,15 @@ DMS must identify the individual person performing each authenticated action. Th
 - An account must identify the employee, their active/suspended status and the access role approved for them. Location assignments and permissions must be checked by the backend against approved business rules.
 - An authorised administrator must be able to create or invite an employee, issue a secure account-setup process, suspend/reactivate access and revoke that employee's active sessions. The exact administrator permissions remain subject to the business permission matrix.
 - Employees should set their own password through a secure, single-use, expiring setup or reset link. Passwords must never be sent in plain text, stored in plain text, or placed in Render environment variables.
-- Passwords are stored only as secure password hashes. Task 005 already implements Argon2id password hashing, provisioned accounts and an interactive initial Owner bootstrap CLI. The employee-management interface, invitation flow, password recovery and ongoing account-administration workflows remain to be implemented.
+- Passwords are stored only as secure password hashes. Task 005 implements Argon2id password hashing, provisioned accounts and an interactive initial Owner bootstrap CLI. Task 008 adds the Owner-facing employee directory, Manager/Staff invitations, one-time initial password setup, suspension/reactivation and session revocation on its draft branch. Password recovery/reset remains out of scope.
 - Render environment variables are for application/service configuration and secrets (for example, database connection and session signing secrets), not for maintaining each employee's login credentials. Employee account records and password hashes belong in the protected PostgreSQL user store.
 
 ### Session and login accountability
 
 - The system must associate each authenticated session with the individual user account that created it. The backend must derive the actor identity and role from the validated server-side session, never from a user ID, role or timestamp supplied by the browser.
 - Record successful and failed login attempts and logout events. The foundation already records these authentication events and stores sessions in PostgreSQL.
-- The complete session-history capability must make it possible for authorised administrators to see relevant session events and status, including sign-in time, sign-out/expiry/revocation where available, and the account to which the session belongs.
-- Provide a controlled way to revoke sessions when an account is suspended, compromised or no longer authorised. Do not expose raw session cookies, session secrets or reusable session identifiers in the activity interface.
+- The complete searchable session-history capability must eventually make it possible for authorised administrators to see session events and status, including sign-in time, sign-out/expiry/revocation where available. Task 008 exposes account creation time and last successful login only; it does not implement session-history browsing.
+- Task 008 revokes every employee session transactionally when an account is suspended and allows the Owner to revoke sessions manually. Reactivation does not restore previous sessions. Do not expose raw session cookies, session secrets or reusable session identifiers.
 - MFA, approved session idle/absolute lifetimes, high-risk-action re-authentication and the detailed session-management policy remain unresolved and must not be assumed.
 
 ### Immutable activity and change history
@@ -327,9 +327,9 @@ Examples include creating or editing a customer, changing an order status, chang
 
 ### Current implementation boundary
 
-Task 005 provides the foundation: individual provisioned user accounts, Argon2id password hashes, PostgreSQL-backed sessions, Owner bootstrap, login success/failure and logout audit events, an append-only audit table, request IDs and database protection against audit UPDATE, DELETE and TRUNCATE.
+Task 005 provides the authentication foundation: individual provisioned user accounts, Argon2id password hashes, PostgreSQL-backed sessions, Owner bootstrap, login success/failure and logout audit events, an append-only audit table, request IDs and database protection against audit UPDATE, DELETE and TRUNCATE. Task 007 adds Product Management audit events. Task 008 adds the employee directory, Owner-only employee administration permissions, manual Manager/Staff invitation links, secure initial password setup, status changes, session revocation and transactional audit events.
 
-The following are still future work: employee-management UI, secure invitation and password-recovery flows, an administrator session-history view, comprehensive audit coverage for every business-module action, before/after field-level change history, and a searchable management activity screen. These must be implemented and tested as the relevant account and business modules are built; they must not be described as already complete.
+Still future work includes password recovery/reset, administrator session-history browsing, a searchable audit-history dashboard, before/after field-level history across every business record and comprehensive business-event audit coverage. Task 008 does not implement those capabilities.
 
 ## Inventory rules
 
@@ -356,9 +356,9 @@ Task 005 established the initial application foundation in `main`. The table bel
 | Workspace | pnpm 12.16.1 workspace/monorepo; Node.js 26.13.0; separate `apps/web` and `apps/api` applications. | The code structure is consistent with a modular-monolith proposal; formal architecture ratification remains tracked in DMS-DEC-021. |
 | Web frontend | React 19.3.0, TypeScript 6.0.3 and Vite 8.3.5; sign-in, authenticated shell, dashboard and the merged permission-aware Product Management experience. | Other operational screens are not implemented. TypeScript/Vite formal ratification remains open. |
 | API | Node.js 26.13.0, Express 5.3.0 and TypeScript 6.0.3; authenticated Product Management routes under `/api/v1` are merged into `main`. | Inventory, Customer, Order and Finance routes remain unimplemented. The API is not a public customer/ecommerce API. |
-| Database | PostgreSQL via `pg` 8.23.1, explicit parameterised SQL, `node-pg-migrate` 9.0.0 and no ORM. The merged Task 007 migration adds `product_categories`, `products` and `product_variants` after the eight-table foundation. | Other business schema is not implemented. CI uses disposable PostgreSQL; no production database has been provisioned. |
-| Authentication | Argon2id hashes, provisioned accounts, PostgreSQL-backed sessions, HttpOnly/SameSite cookies, login rotation, logout/revocation, expiry handling, exact-Origin/session-bound CSRF protection, login throttling and an interactive Owner bootstrap CLI. | MFA, approved production idle/absolute session values, high-risk-action re-authentication and a distributed rate limiter remain unresolved or unimplemented. |
-| Roles, permissions and audit | Six explicit `products.*` permissions are assigned to Owner only, and product, category and variant actions write before/after audit events; existing append-only audit protections remain. | DMS-DEC-002 remains open; Owner-only is scoped to this first module, not the complete role-permission matrix. |
+| Database | PostgreSQL via `pg` 8.23.1, explicit parameterised SQL, `node-pg-migrate` 9.0.0 and no ORM. Task 007 adds three product tables; Task 008 adds `user_invitations` and the invited status/last-active-Owner protections on its draft branch. | Other business schema is not implemented. CI uses disposable PostgreSQL; no production database has been provisioned. |
+| Authentication | Task 005 provides Argon2id login, PostgreSQL-backed sessions, secure cookies, CSRF and the Owner bootstrap. Task 008 adds employee invitations, initial password setup, last-login display, suspension/reactivation and transactional session revocation. | Password recovery, session-history browsing, MFA, approved production idle/absolute session values, high-risk-action re-authentication and a distributed rate limiter remain unresolved or unimplemented. |
+| Roles, permissions and audit | Six `products.*` permissions and two `users.*` permissions are assigned to Owner only. Product and employee-account lifecycle events use transactional before/after audit records; append-only audit protections remain. | DMS-DEC-002 remains open; these Owner-only assignments do not define the complete role-permission matrix. Audit coverage for future business modules remains incomplete. |
 | Verification | Prettier, ESLint, TypeScript checks, Vitest, Supertest, React Testing Library, PostgreSQL-backed API integration tests, migration/seed/rollback/reapplication checks and production builds in GitHub Actions. | Comprehensive Playwright journeys and business-specific stock-concurrency, inventory-transfer and financial-workflow coverage remain future work. |
 | Infrastructure and integrations | No Task 005 production infrastructure or external integration was provisioned. | Render hosting/database, background workers, email delivery, file storage, production secrets, backups and deployment remain subject to separate verification and approval. |
 
@@ -541,11 +541,11 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 **Task 005 status:** Approved and merged. Merge commit: `652b5d51d17ecb36e78871a99164c12238a8ac41`. The application foundation is now part of `main`; this does not represent approval of the full target architecture or implementation of the business application.
 
-**Current implementation boundary:** `main` contains the eight-table foundation, authenticated application shell and the merged Task 007 Product Management module (three tables, Owner-only permissions, API, audit events, frontend and tests). Inventory, Customer, Order, Finance and Supplier modules remain incomplete.
+**Current implementation boundary:** `main` contains the Task 005 eight-table foundation and the merged Task 007 Product Management module (three tables, Owner-only permissions, API, audit events, frontend and tests). The Task 008 draft branch adds Employee Account Administration (invitation table and lifecycle constraints, Owner-only permissions, API, frontend, audit events and tests); it is not merged into `main`. Inventory, Customer, Order, Finance and Supplier modules remain incomplete.
 
-**Not yet implemented or approved:** Real Warehouse/Sheraton location records and Staff assignments; operational business modules; production database/service provisioning; production credentials; background workers; company email and file-storage integrations; production deployment; MFA; approved production session lifetimes and high-risk-action re-authentication; distributed rate limiting; and overall architecture/deployment approval. The technical implementation choices tracked by DMS-DEC-021–024 and DMS-DEC-027 are documented as adopted in the codebase where applicable but retain their existing review statuses.
+**Not yet implemented or approved:** Real Warehouse/Sheraton location records and Staff assignments (DMS-DEC-001); automated company email delivery (DMS-DEC-017; Task 008 returns a one-time URL for secure manual delivery using the official company email identity); the full role/permission matrix (DMS-DEC-002); password recovery; session-history and searchable audit-history screens; comprehensive business-event audit coverage; operational business modules; production database/service provisioning; production credentials; background workers; file-storage integrations; production deployment; MFA; approved production session lifetimes and high-risk-action re-authentication; distributed rate limiting; and overall architecture/deployment approval. The technical implementation choices tracked by DMS-DEC-021–024 and DMS-DEC-027 are documented as adopted in the codebase where applicable but retain their existing review statuses.
 
-**Current development task:** Task 007 — Product Management — is complete and merged through PR #9. Task 008 is next and has not been started.
+**Current development task:** Task 007 — Product Management — is complete and merged through PR #9. Task 008 — Employee Account Administration — is implemented on `task-008-employee-account-administration` and being submitted as a draft PR for independent review. It must not be treated as merged until that review and merge are complete.
 
 ## Working agreement
 

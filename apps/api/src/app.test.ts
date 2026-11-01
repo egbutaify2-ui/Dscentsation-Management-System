@@ -275,7 +275,15 @@ describe('DMS foundation API', () => {
       'payments.record',
       'payments.verify',
       ...productPermissions,
+      'users.manage',
+      'users.view',
     ]);
+    expect(owner.permissions).toContain('users.view');
+    expect(owner.permissions).toContain('users.manage');
+    expect(manager.permissions).not.toContain('users.view');
+    expect(manager.permissions).not.toContain('users.manage');
+    expect(staff.permissions).not.toContain('users.view');
+    expect(staff.permissions).not.toContain('users.manage');
     expect(staff.permissions).toContain('payments.record');
     expect(staff.permissions).not.toContain('payments.verify');
     expect(manager.permissions).toContain('payments.verify');

@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { Request } from 'express';
+import type { Pool, PoolClient } from 'pg';
 import { pool } from '../../db/pool.js';
 
 function regenerate(request: Request): Promise<void> {
@@ -40,6 +41,10 @@ export async function destroySession(request: Request): Promise<void> {
   });
 }
 
-export async function revokeSessionsForUser(userId: string): Promise<void> {
-  await pool.query('DELETE FROM user_sessions WHERE user_id = $1', [userId]);
+export async function revokeSessionsForUser(
+  userId: string,
+  client: Pool | PoolClient = pool,
+): Promise<number> {
+  const result = await client.query('DELETE FROM user_sessions WHERE user_id = $1', [userId]);
+  return result.rowCount ?? 0;
 }
