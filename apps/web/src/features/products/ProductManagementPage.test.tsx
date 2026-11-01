@@ -162,6 +162,9 @@ describe('ProductManagementPage', () => {
     mocks.post.mockRejectedValueOnce(new Error('Product name is required.'));
     fireEvent.click(await screen.findByRole('button', { name: 'Back to products' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add product' }));
+    fireEvent.change(screen.getByLabelText('Product name'), {
+      target: { value: 'Synthetic API rejection target' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Create product' }));
     expect(await screen.findByRole('alert')).toBeTruthy();
   });
