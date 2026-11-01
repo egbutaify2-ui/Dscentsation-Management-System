@@ -120,7 +120,7 @@ router.get('/', requirePermission('users.view'), async (request, response, next)
       });
       return;
     }
-    if (rawStatus !== undefined && !['all', 'active', 'suspended', 'invited'].includes(String(rawStatus))) {
+    if (rawStatus !== undefined && !['all', 'active', 'suspended', 'disabled', 'invited'].includes(String(rawStatus))) {
       response.status(400).json({
         error: { code: 'INVALID_REQUEST', message: 'Account status filter is invalid.' },
       });
@@ -130,7 +130,7 @@ router.get('/', requirePermission('users.view'), async (request, response, next)
       data: await listEmployees({
         search: typeof rawSearch === 'string' ? rawSearch.trim() : undefined,
         role: rawRole as 'MANAGER' | 'STAFF' | 'all' | undefined,
-        status: rawStatus as 'active' | 'suspended' | 'invited' | 'all' | undefined,
+        status: rawStatus as 'active' | 'suspended' | 'disabled' | 'invited' | 'all' | undefined,
       }),
     });
   } catch (error) {

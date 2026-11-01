@@ -8,7 +8,7 @@ import { appendAuditEvent } from '../audit/audit.service.js';
 import { UserAdminError } from './user-admin.errors.js';
 
 type EmployeeRole = 'MANAGER' | 'STAFF';
-type EmployeeStatus = 'active' | 'suspended' | 'invited';
+type EmployeeStatus = 'active' | 'suspended' | 'disabled' | 'invited';
 
 export interface EmployeeFilters {
   search?: string;

@@ -8,7 +8,7 @@ interface Employee {
   displayName: string;
   roleCode: 'MANAGER' | 'STAFF';
   roleName: string;
-  status: 'active' | 'suspended' | 'invited';
+  status: 'active' | 'suspended' | 'disabled' | 'invited';
   createdAt: string;
   lastLoginAt: string | null;
 }
@@ -295,6 +295,7 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
               <option value="active">Active</option>
               <option value="invited">Invited</option>
               <option value="suspended">Suspended</option>
+              <option value="disabled">Disabled</option>
             </select>
           </label>
           <button className="search-button" type="submit">Apply filters</button>
