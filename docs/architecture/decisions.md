@@ -165,10 +165,10 @@ Use explicit permissions mapped to the three roles and enforce them with deny-by
 
 - **Owner:** full business access and access to all stock locations; may record and verify payments.
 - **Manager:** management access and access to all stock locations; may record and verify payments.
-- **Staff:** may access and act on stock locations assigned to that Staff account only; may record payment entries but may not verify them.
+- **Staff:** may access and act on stock locations assigned to that Staff account only, except for the specific Warehouse-to-assigned-Sheraton pickup action defined in ADR-016. That exception does not provide general Warehouse balance, adjustment or operational access; Staff may record payment entries but may not verify them.
 - **Transfer receipt:** a Staff account assigned to the destination location must confirm that transfer's receipt.
 
-A Manager's global stock-location access does not depend on user_location_access assignment rows. Staff access is granted/revoked through explicit user-location rows. Location restrictions apply to stock reads and all location-scoped stock/order/transfer operations, not only writes.
+A Manager's global stock-location access does not depend on user_location_access assignment rows. Staff access is granted/revoked through explicit user-location rows. Location restrictions apply to stock reads and all location-scoped stock/order/transfer operations, not only writes. The only exception is the narrowly scoped destination-addressed Warehouse pickup action in ADR-016; it is an action permission conditional on the transfer's exact Warehouse source, assigned Sheraton destination and Staff assignment, not a Warehouse location grant.
 
 **Why**
 
@@ -176,10 +176,12 @@ A Manager's global stock-location access does not depend on user_location_access
 - Backend checks protect direct API requests as well as normal UI interactions.
 - Separate payment recording from verification adds a second-person control over payment confirmation.
 - Destination Staff confirmation makes the receiving location accountable for stock physically arriving.
+- The controlled Sheraton pickup exception allows the person physically collecting goods to record the event while preserving the Warehouse inventory security boundary.
 
 **Consequences**
 
 - Every protected endpoint/domain service checks role and, where relevant, location assignment.
+- Sheraton Staff receive only the dedicated pickup action for transfers from the configured Warehouse to a Sheraton location assigned to them; they do not receive Warehouse inventory-read, adjustment or general transfer permissions.
 - A Staff payment entry remains pending/unverified until a Manager or Owner verifies it.
 - Unverified entries are excluded from verified-receipts reporting.
 - Changes to roles, location assignments and payment verification create audit events.
@@ -429,6 +431,46 @@ If stock is insufficient at the selected location, the system must not silently 
 - Multi-location/split fulfilment requires a separately approved future change.
 
 
+## ADR-016 — Allow destination-scoped Sheraton Staff pickup from Warehouse without granting Warehouse access
+
+**Status:** Confirmed business workflow and permission boundary.
+
+**Context**
+
+Sheraton Stock and Warehouse Stock are separate physical inventory balances. Sheraton Staff sometimes travel to Warehouse, physically collect products and take them back to Sheraton. Existing Staff access is restricted to assigned locations. The person recording pickup must not gain general access to Warehouse balances, adjustments or unrelated Warehouse operations.
+
+**Decision**
+
+Add a dedicated `destination_staff_pickup` transfer mode and a narrow backend action for Sheraton-assigned Staff:
+
+- A Staff member may create a pickup transfer only with source = the configured Warehouse location and destination = one Sheraton location actively assigned to that Staff member.
+- A Staff member may open/read only a pickup transfer with that exact Warehouse-to-assigned-Sheraton source/destination pair and a pickup-eligible state. The staff view is limited to that transfer's products and requested/picked quantities.
+- The Staff member records the actual quantity physically collected for each transfer item. The backend validates the transfer and user assignment from PostgreSQL, then checks Warehouse available stock inside the pickup transaction.
+- The command must not expose the Warehouse's exact balance or provide Warehouse balance browsing, adjustment, general transfer management, or unrelated Warehouse operations. Insufficient stock returns a generic validation error without revealing Warehouse quantities.
+- Pickup reduces Warehouse on-hand and increases the transfer-item in-transit balance by the same quantity in one transaction. Paired stock ledger events, an immutable pickup event, the acting Staff user and timestamp are recorded.
+- A Staff member assigned to Sheraton confirms the quantity physically received there. Receipt reduces in-transit and increases Sheraton on-hand atomically. The same person may perform both actions; pickup and receipt remain separate events with separate actor/time attribution.
+- Partial pickups and receipts are supported. Unpicked requested quantities remain open; unreceived quantities remain in transit.
+- Insufficient Warehouse stock rejects the submitted pickup event without partial writes. A smaller actual quantity may be submitted as a separate partial pickup. The system never returns the overall Warehouse balance to the Sheraton Staff interface.
+- Discrepancies require a recorded quantity, reason, reporter and subsequent authorised resolution. No balance is silently adjusted to hide a mismatch.
+- A transfer with no pickup may be cancelled without stock movements. After partial pickup, only the unpicked remainder may be cancelled; picked quantities remain in transit and must still be received, returned through a separately recorded reverse transfer, or formally resolved. It cannot be marked fully cancelled while picked quantity remains unreceived/unresolved.
+- Transfers that remain in transit stay visible in ageing/open-transfer reporting; picked stock is not automatically expired or released.
+- Pickup and receipt requests use idempotency keys. Same-key/same-payload retries return the original outcome; same-key/different-payload reuse is rejected.
+
+**Why**
+
+- The person physically collecting stock can record what was collected at the point of handover.
+- Warehouse stock is reduced at the real point of collection, while Sheraton stock increases only when the receiving location confirms delivery.
+- The dedicated command solves the operational need without weakening the default Staff location boundary or exposing unrelated Warehouse records.
+- Event-level actors and immutable movements support accountability, reconciliation and duplicate prevention.
+
+**Consequences**
+
+- The backend must enforce both the role capability and row-specific source/destination/assignment checks; frontend route hiding is not sufficient.
+- The Warehouse balance lookup is permitted only as an internal validation step for the particular transfer items and must not be returned to the caller.
+- The transfer header/item plus pickup/receipt event tables are the audit source for partial actions; movement events reconcile Warehouse, in-transit and Sheraton quantities.
+- Managers and Owner retain their existing global location access and normal transfer permissions; this decision adds a Staff pickup capability without removing or reducing those permissions.
+- The configured Warehouse/Sheraton location records and Staff assignments must be established before enabling the action.
+
 ## 3. Decisions requiring project-manager confirmation
 
 The following project-manager decisions are confirmed and are no longer pending:
@@ -445,7 +487,7 @@ The following project-manager decisions are confirmed and are no longer pending:
 
 Remaining details requiring confirmation:
 
-1. Actual stock locations, codes and Staff-to-location assignments.
+1. Confirm the canonical Warehouse and Sheraton location records/codes and the Staff-to-Sheraton assignments used by ADR-016.
 2. Initial reservation duration and expiry eligibility scope (unpaid-only or all undispatched confirmed orders).
 3. Grace period, pre-expiry warning/notification and whether an authorised user may extend an existing reservation.
 4. Transfer exception/escalation when destination Staff are unavailable, and the review/approval process for shortages or damage.
