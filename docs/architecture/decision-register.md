@@ -1,8 +1,8 @@
 # DMS Architecture Decision Register
 
-**Task:** 004 — Consolidate Remaining Architecture Decisions  
-**Purpose:** Record the business information, approvals and technical choices that remain open before architecture approval and implementation planning.  
-**Scope:** Initial DMS release for Dscentsation's Nigerian operations.  
+**Task:** 004 — Consolidate Remaining Architecture Decisions
+**Purpose:** Record the business information, approvals and technical choices that remain open before architecture approval and implementation planning.
+**Scope:** Initial DMS release for Dscentsation's Nigerian operations.
 **Source documents reviewed:** `README.md`, `docs/architecture/overview.md`, `docs/architecture/database-design.md` and `docs/architecture/decisions.md`, including ADR-001 through ADR-016.
 
 > This register is a consolidation of the current documentation, not a replacement for the source architecture documents. It does not approve a proposal, choose an answer on behalf of the business, authorise implementation or amend an existing ADR. Where a question is unanswered, it is left unanswered.
@@ -354,5 +354,5 @@ A count of zero in the Confirmed row is intentional: already-confirmed decisions
 5. If business and technical documents conflict, record the conflict and request a decision. Do not select one version silently.
 6. No item in this register authorises application code, migrations, service provisioning, credentials, deployment or production data use.
 
-**Register status:** Prepared for business confirmation and technical architecture review.  
+**Register status:** Prepared for business confirmation and technical architecture review.
 **Implementation status:** No application implementation, schema change, provisioning or deployment is authorised by this document.
