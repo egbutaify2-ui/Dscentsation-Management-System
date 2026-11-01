@@ -93,6 +93,21 @@ export async function up(pgm) {
     CREATE INDEX product_variants_active_idx ON product_variants(product_id, is_active);
     CREATE UNIQUE INDEX product_variants_one_default_idx ON product_variants(product_id)
       WHERE is_default = true;
+
+    CREATE FUNCTION prevent_product_variant_reparenting() RETURNS trigger
+    LANGUAGE plpgsql AS $
+    BEGIN
+      IF NEW.product_id IS DISTINCT FROM OLD.product_id THEN
+        RAISE EXCEPTION 'Product variants cannot be reassigned to another product'
+          USING ERRCODE = '23514',
+                CONSTRAINT = 'product_variants_product_id_immutable';
+      END IF;
+      RETURN NEW;
+    END;
+    $;
+    CREATE TRIGGER product_variants_product_id_immutable
+      BEFORE UPDATE OF product_id ON product_variants
+      FOR EACH ROW EXECUTE FUNCTION prevent_product_variant_reparenting();
     CREATE TRIGGER product_variants_no_delete
       BEFORE DELETE ON product_variants
       FOR EACH ROW EXECUTE FUNCTION prevent_product_master_hard_delete();
@@ -176,6 +191,8 @@ export async function up(pgm) {
 
 export async function down(pgm) {
   pgm.sql(`
+    DROP TRIGGER IF EXISTS product_variants_product_id_immutable ON product_variants;
+    DROP FUNCTION IF EXISTS prevent_product_variant_reparenting();
     DROP TRIGGER IF EXISTS variants_require_exactly_one_default ON product_variants;
     DROP TRIGGER IF EXISTS products_require_exactly_one_default ON products;
     DROP FUNCTION IF EXISTS enforce_product_variant_invariants();

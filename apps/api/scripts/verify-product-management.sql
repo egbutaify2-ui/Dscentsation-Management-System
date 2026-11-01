@@ -40,6 +40,32 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
+    SELECT 1
+      FROM pg_trigger t
+      JOIN pg_class c ON c.oid = t.tgrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public'
+       AND c.relname = 'product_variants'
+       AND t.tgname = 'product_variants_product_id_immutable'
+       AND t.tgenabled IN ('O', 'A')
+       AND NOT t.tgisinternal
+       AND position(
+         'before update of product_id' IN lower(pg_get_triggerdef(t.oid))
+       ) > 0
+       AND position(
+         'new.product_id is distinct from old.product_id'
+         IN lower(pg_get_functiondef(t.tgfoid))
+       ) > 0
+       AND position('23514' IN pg_get_functiondef(t.tgfoid)) > 0
+       AND position(
+         'product_variants_product_id_immutable'
+         IN pg_get_functiondef(t.tgfoid)
+       ) > 0
+  ) THEN
+    RAISE EXCEPTION 'Enabled variant reparenting guard trigger or its enforcement definition is missing';
+  END IF;
+
+  IF NOT EXISTS (
     SELECT 1 FROM pg_trigger
      WHERE tgname = 'products_require_exactly_one_default'
        AND tgdeferrable = true
