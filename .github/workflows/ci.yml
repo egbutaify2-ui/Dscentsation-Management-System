@@ -68,6 +68,7 @@ jobs:
         run: |
           files=(
             apps/api/src/modules/products/product.database.test.ts
+            apps/api/src/modules/products/product.routes.test.ts
             apps/api/src/modules/products/product.routes.ts
           )
           pnpm exec prettier --single-quote --trailing-comma all --print-width 100 --write "${files[@]}"
