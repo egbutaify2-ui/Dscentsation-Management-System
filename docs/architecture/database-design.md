@@ -1,6 +1,6 @@
 # Dscentsation Management System — Database Design
 
-**Document status:** Conceptual schema draft reconciled with the Task 005 physical foundation; pending project-manager review
+**Document status:** The eight-table physical Task 005 foundation is documented; the conceptual business schema remains proposed. This is not an approved final business schema or a production migration.
 **Task:** 002 — Technical Architecture, updated for Task 005
 
 **Database:** PostgreSQL  
@@ -431,4 +431,4 @@ Remaining design/configuration details:
 10. Render Postgres backup/recovery verification, restore-test evidence, expected recovery objectives and total cost approval.
 11. Confirm the physical paperwork/reference process used by Sheraton Staff at Warehouse; the permission boundary and stock movement rules for pickup remain as specified.
 
-**Review outcome:** Pending. This is a conceptual database design updated with the confirmed architecture rules, not an approved final schema or a production migration.
+**Schema status:** The eight-table physical Task 005 foundation is documented. The conceptual business schema remains proposed and requires separate business and architecture approval before implementation. This document is not an approved final business schema or a production migration.
