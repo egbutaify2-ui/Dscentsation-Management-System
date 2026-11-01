@@ -15,12 +15,21 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   DATABASE_URL: z.string().min(1),
-  DATABASE_SSL: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  DATABASE_SSL: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   SESSION_SECRET: z.string().min(32),
   SESSION_IDLE_TIMEOUT_MINUTES: z.coerce.number().int().positive().optional(),
   SESSION_ABSOLUTE_TIMEOUT_HOURS: z.coerce.number().int().positive().optional(),
-  COOKIE_SECURE: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
-  TRUST_PROXY: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  COOKIE_SECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  TRUST_PROXY: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   APP_ORIGIN: z.string().url().default('http://localhost:5173'),
 });
 

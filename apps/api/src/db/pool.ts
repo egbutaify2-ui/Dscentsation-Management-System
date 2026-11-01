@@ -40,9 +40,7 @@ export async function assertDatabaseReady(): Promise<void> {
     [requiredFoundationTables],
   );
 
-  const missing = result.rows
-    .filter((row) => !row.exists)
-    .map((row) => row.table_name);
+  const missing = result.rows.filter((row) => !row.exists).map((row) => row.table_name);
 
   if (missing.length > 0) {
     throw new Error(

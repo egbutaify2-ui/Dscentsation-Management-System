@@ -51,13 +51,14 @@ describe('requirePermission middleware', () => {
   });
 
   it('rejects Staff because Staff do not have payment-verification permission', async () => {
-    const response = await request(permissionTestApp(staff))
-      .get('/verify-payment')
-      .expect(403);
+    const response = await request(permissionTestApp(staff)).get('/verify-payment').expect(403);
     expect(response.body.error.code).toBe('PERMISSION_DENIED');
   });
 
-  it.each([manager, owner])('allows the $roleCode role when permission is assigned', async (user) => {
-    await request(permissionTestApp(user)).get('/verify-payment').expect(204);
-  });
+  it.each([manager, owner])(
+    'allows the $roleCode role when permission is assigned',
+    async (user) => {
+      await request(permissionTestApp(user)).get('/verify-payment').expect(204);
+    },
+  );
 });
