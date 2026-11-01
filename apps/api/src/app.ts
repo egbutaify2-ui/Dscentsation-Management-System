@@ -43,6 +43,8 @@ export function createApp(): express.Express {
       response: express.Response,
       _next: express.NextFunction,
     ) => {
+      // Express identifies error middleware by its four-argument signature.
+      void _next;
       console.error('DMS API request failed.', {
         requestId: request.requestId,
         errorName: error instanceof Error ? error.name : 'UnknownError',
