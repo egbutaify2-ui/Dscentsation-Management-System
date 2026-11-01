@@ -54,6 +54,13 @@ async function createTestUser(
   };
 }
 
+function sessionCookieFromHeader(header: string | string[] | undefined): string | undefined {
+  const values = header === undefined ? [] : Array.isArray(header) ? header : [header];
+  return values
+    .find((cookie) => cookie.startsWith(`${env.cookieName}=`))
+    ?.split(';', 1)[0];
+}
+
 async function signIn(agent: ReturnType<typeof request.agent>, email: string): Promise<void> {
   const csrf = await agent.get('/api/v1/auth/csrf').expect(200);
   await agent
@@ -129,9 +136,7 @@ describe('DMS foundation API', () => {
   it('rotates the session identifier after successful login', async () => {
     const agent = request.agent(app);
     const csrf = await agent.get('/api/v1/auth/csrf').expect(200);
-    const beforeCookie = csrf.headers['set-cookie']
-      ?.find((cookie) => cookie.startsWith(`${env.cookieName}=`))
-      ?.split(';', 1)[0];
+    const beforeCookie = sessionCookieFromHeader(csrf.headers['set-cookie']);
 
     const login = await agent
       .post('/api/v1/auth/login')
@@ -139,9 +144,7 @@ describe('DMS foundation API', () => {
       .set('X-CSRF-Token', csrf.body.data.token as string)
       .send({ email: emails.staff, password })
       .expect(200);
-    const afterCookie = login.headers['set-cookie']
-      ?.find((cookie) => cookie.startsWith(`${env.cookieName}=`))
-      ?.split(';', 1)[0];
+    const afterCookie = sessionCookieFromHeader(login.headers['set-cookie']);
 
     expect(beforeCookie).toBeTruthy();
     expect(afterCookie).toBeTruthy();
