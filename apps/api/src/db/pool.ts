@@ -30,7 +30,7 @@ const requiredFoundationTables = [
 ] as const;
 
 export async function assertDatabaseReady(): Promise<void> {
-  const result = await pool.query<{ table_name: string; exists: boolean }>(
+  const result = await pool.query<{ table_name: string; present: boolean }>(
     `
       SELECT required.table_name,
              to_regclass(format('public.%I', required.table_name)) IS NOT NULL AS present
