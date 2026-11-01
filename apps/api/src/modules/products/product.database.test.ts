@@ -101,14 +101,17 @@ describe('Product Management database invariants', () => {
     await expect(
       pool.query('DELETE FROM product_variants WHERE id = $1', [variantId]),
     ).rejects.toThrow(/must be deactivated or archived/i);
-    await expect(
-      pool.query('DELETE FROM products WHERE id = $1', [productId]),
-    ).rejects.toThrow(/must be deactivated or archived/i);
+    await expect(pool.query('DELETE FROM products WHERE id = $1', [productId])).rejects.toThrow(
+      /must be deactivated or archived/i,
+    );
     await expect(
       pool.query('DELETE FROM product_categories WHERE id = $1', [categoryId]),
     ).rejects.toThrow(/must be deactivated or archived/i);
 
-    const linked = await pool.query('SELECT id FROM products WHERE id = $1 AND category_id = $2', [productId, categoryId]);
+    const linked = await pool.query('SELECT id FROM products WHERE id = $1 AND category_id = $2', [
+      productId,
+      categoryId,
+    ]);
     expect(linked.rowCount).toBe(1);
   });
 
