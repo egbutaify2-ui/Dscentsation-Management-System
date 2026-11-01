@@ -143,13 +143,16 @@ router.get('/', requirePermission('users.view'), async (request, response, next)
       });
       return;
     }
-    response.json({
-      data: await listEmployees({
-        search: typeof rawSearch === 'string' ? rawSearch.trim() : undefined,
-        role: rawRole as 'MANAGER' | 'STAFF' | 'all' | undefined,
-        status: rawStatus as 'active' | 'suspended' | 'disabled' | 'invited' | 'all' | undefined,
-      }),
-    });
+    const filters = {
+      ...(typeof rawSearch === 'string' ? { search: rawSearch.trim() } : {}),
+      ...(rawRole !== undefined ? { role: rawRole as 'MANAGER' | 'STAFF' | 'all' } : {}),
+      ...(rawStatus !== undefined
+        ? {
+            status: rawStatus as 'active' | 'suspended' | 'disabled' | 'invited' | 'all',
+          }
+        : {}),
+    };
+    response.json({ data: await listEmployees(filters) });
   } catch (error) {
     next(error);
   }

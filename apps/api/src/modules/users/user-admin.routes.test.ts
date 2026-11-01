@@ -15,6 +15,9 @@ interface TestAccount {
   email: string;
 }
 
+let owner: TestAccount;
+let ownerAgent: ReturnType<typeof request.agent>;
+
 async function createAccount(roleCode: 'OWNER' | 'MANAGER' | 'STAFF'): Promise<TestAccount> {
   const role = await pool.query<{ id: string }>('SELECT id FROM roles WHERE code = $1', [roleCode]);
   if (!role.rows[0]) throw new Error(`Missing role seed: ${roleCode}`);
@@ -90,10 +93,8 @@ function tokenFromSetupUrl(setupUrl: string): string {
 }
 
 describe('Employee Account Administration API', () => {
-  let owner: TestAccount;
   let manager: TestAccount;
   let staff: TestAccount;
-  let ownerAgent: ReturnType<typeof request.agent>;
 
   beforeAll(async () => {
     await pool.query('SELECT 1');
