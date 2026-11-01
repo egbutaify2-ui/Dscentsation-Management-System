@@ -81,12 +81,12 @@ jobs:
             exit 1
           fi
           cat /tmp/dms-pre-migration.log
-          grep -F "Required foundation tables are missing" /tmp/dms-pre-migration.log
+          grep -F "Required application tables are missing" /tmp/dms-pre-migration.log
 
       - name: Apply migrations to the clean disposable PostgreSQL database
         run: pnpm db:migrate
 
-      - name: Verify all foundation tables, role seeds, permissions and idempotent seeding
+      - name: Verify foundation and product tables, role seeds, permission boundaries and idempotent seeding
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-foundation.sql
 
       - name: Verify production migration up remains permitted
@@ -102,14 +102,14 @@ jobs:
           fi
           cat /tmp/dms-production-rollback.log
           grep -F "Production database rollback is disabled" /tmp/dms-production-rollback.log
-          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs')")"
+          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants')")"
           if [ "$remaining" != "8" ]; then
             echo "Production rollback guard did not preserve the disposable foundation schema (found $remaining tables)."
             exit 1
           fi
-          echo "Production rollback was rejected before migrations ran; all eight foundation tables remain."
+          echo "Production rollback was rejected before migrations ran; all eleven application tables remain."
 
-      - name: Verify rollback removes the foundation schema in the disposable database
+      - name: Verify rollback removes Product Management only in the disposable database
         shell: bash
         run: |
           pnpm db:rollback
