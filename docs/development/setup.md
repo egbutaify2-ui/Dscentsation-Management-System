@@ -59,7 +59,7 @@ The initial migration creates only:
 
 Apply migrations explicitly with `pnpm db:migrate`. The API does not run migrations on startup; it checks that the foundation migration was already applied and fails with an instruction if the schema is missing.
 
-A rollback command is available as `pnpm db:rollback`. Rollbacks are operator-controlled recovery actions, not automatic startup behavior. Before a rollback, review its `down` function, confirm whether records exist, back up local data and understand the data-loss impact. The initial rollback drops the foundation tables and their data.
+A rollback command is available as `pnpm db:rollback` for non-production environments only. The migration CLI refuses the `down` direction when `NODE_ENV=production`, exits non-zero and does so before invoking the migration runner. Normal `up` migrations remain available in production. For verification or recovery exercises, use a clean disposable development/test PostgreSQL database, inspect the migration `down` function and confirm the database contains no valuable data before running `pnpm db:rollback`; then reapply with `pnpm db:migrate` as appropriate. The initial rollback drops the foundation tables and their data. Never bypass this guard or run a destructive rollback against production data.
 
 Role/permission seeds use stable codes and `ON CONFLICT DO NOTHING`. No physical locations or Staff assignments are seeded. Actual Warehouse/Sheraton records and assignments remain unprovided and are not invented.
 

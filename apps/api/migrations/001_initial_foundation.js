@@ -108,7 +108,7 @@ export async function up(pgm) {
     CREATE FUNCTION prevent_audit_log_mutation() RETURNS trigger
     LANGUAGE plpgsql AS $$
     BEGIN
-      RAISE EXCEPTION 'audit_logs is append-only; updates and deletes are prohibited';
+      RAISE EXCEPTION 'audit_logs is append-only; UPDATE, DELETE and TRUNCATE operations are prohibited';
     END;
     $$;
 
@@ -119,6 +119,10 @@ export async function up(pgm) {
     CREATE TRIGGER audit_logs_no_delete
       BEFORE DELETE ON audit_logs
       FOR EACH ROW EXECUTE FUNCTION prevent_audit_log_mutation();
+
+    CREATE TRIGGER audit_logs_no_truncate
+      BEFORE TRUNCATE ON audit_logs
+      FOR EACH STATEMENT EXECUTE FUNCTION prevent_audit_log_mutation();
 
     INSERT INTO roles(code, name, description) VALUES
       ('OWNER', 'Owner', 'Full business oversight and global stock-location access.'),
@@ -159,6 +163,7 @@ export async function up(pgm) {
 
 export async function down(pgm) {
   pgm.sql(`
+    DROP TRIGGER IF EXISTS audit_logs_no_truncate ON audit_logs;
     DROP TRIGGER IF EXISTS audit_logs_no_delete ON audit_logs;
     DROP TRIGGER IF EXISTS audit_logs_no_update ON audit_logs;
     DROP FUNCTION IF EXISTS prevent_audit_log_mutation();

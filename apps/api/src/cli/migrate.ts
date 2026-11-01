@@ -7,16 +7,23 @@ if (direction !== 'up' && direction !== 'down') {
   throw new Error('Usage: pnpm db:migrate | pnpm db:rollback');
 }
 
-const migrationsDirectory = fileURLToPath(new URL('../../migrations/', import.meta.url));
-const databaseUrl = env.DATABASE_SSL
-  ? { connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: true } }
-  : env.DATABASE_URL;
+if (direction === 'down' && env.NODE_ENV === 'production') {
+  console.error(
+    'Production database rollback is disabled. Do not run migration down operations in production; use an explicitly reviewed recovery procedure.',
+  );
+  process.exitCode = 1;
+} else {
+  const migrationsDirectory = fileURLToPath(new URL('../../migrations/', import.meta.url));
+  const databaseUrl = env.DATABASE_SSL
+    ? { connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: true } }
+    : env.DATABASE_URL;
 
-await runner({
-  databaseUrl,
-  dir: migrationsDirectory,
-  migrationsTable: 'pgmigrations',
-  direction,
-  singleTransaction: true,
-  verbose: false,
-});
+  await runner({
+    databaseUrl,
+    dir: migrationsDirectory,
+    migrationsTable: 'pgmigrations',
+    direction,
+    singleTransaction: true,
+    verbose: false,
+  });
+}

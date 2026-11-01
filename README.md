@@ -1,8 +1,8 @@
 # Dscentsation Management System (DMS)
 
-A centralised internal business management platform for Dscentsation's Nigerian operations. DMS is being planned to bring orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
+A centralised internal business management platform for Dscentsation's Nigerian operations. The planned system will bring orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
 
-> **Project status:** Requirements and initial project documentation are established. Application implementation has not started. The checklist below is the source of truth for progress and will be updated only after work is reviewed and verified.
+> **Project status:** The Task 005 application foundation has been implemented on `task-005-application-foundation` and is awaiting independent review and approval in draft PR #7. It has not been accepted or merged. The broader business application is not complete; the full business schema, complete permission matrix, outstanding architecture/business decisions, production infrastructure and deployment remain pending. The checklist below is the source of truth for progress and will be updated only after work is reviewed and verified.
 
 ## Contents
 

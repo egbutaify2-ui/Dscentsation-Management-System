@@ -361,9 +361,42 @@ describe('DMS foundation API', () => {
     ).toBe(false);
   });
 
-  it('prevents ordinary updates to append-only audit records', async () => {
+  it('rejects UPDATE operations on append-only audit records', async () => {
+    const result = await pool.query<{ id: string }>(
+      'SELECT id FROM audit_logs WHERE actor_user_id = $1 ORDER BY occurred_at DESC LIMIT 1',
+      [staff.id],
+    );
+    const auditId = result.rows[0]?.id;
+    if (!auditId) throw new Error('Expected a synthetic audit record for the Staff test user.');
+
     await expect(
-      pool.query("UPDATE audit_logs SET action = 'tampered' WHERE actor_user_id = $1", [staff.id]),
+      pool.query("UPDATE audit_logs SET action = 'tampered' WHERE id = $1", [auditId]),
     ).rejects.toThrow(/append-only/i);
+  });
+
+  it('rejects DELETE operations on append-only audit records', async () => {
+    const result = await pool.query<{ id: string }>(
+      'SELECT id FROM audit_logs WHERE actor_user_id = $1 ORDER BY occurred_at DESC LIMIT 1',
+      [staff.id],
+    );
+    const auditId = result.rows[0]?.id;
+    if (!auditId) throw new Error('Expected a synthetic audit record for the Staff test user.');
+
+    await expect(pool.query('DELETE FROM audit_logs WHERE id = $1', [auditId])).rejects.toThrow(
+      /append-only/i,
+    );
+  });
+
+  it('rejects TRUNCATE without risking unrelated audit data', async () => {
+    const client = await pool.connect();
+    try {
+      // Keep the operation transactional: if protection regresses and TRUNCATE succeeds,
+      // the rollback below restores every audit row in this disposable test database.
+      await client.query('BEGIN');
+      await expect(client.query('TRUNCATE TABLE audit_logs')).rejects.toThrow(/append-only/i);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
   });
 });

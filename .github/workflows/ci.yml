@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - task-005-application-foundation
 
 permissions:
   contents: read
@@ -45,6 +44,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -88,6 +89,26 @@ jobs:
       - name: Verify all foundation tables, role seeds, permissions and idempotent seeding
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-foundation.sql
 
+      - name: Verify production migration up remains permitted
+        run: NODE_ENV=production COOKIE_SECURE=true APP_ORIGIN=https://dms.example.invalid pnpm db:migrate
+
+      - name: Verify production rollback is blocked before the migration runner executes
+        shell: bash
+        run: |
+          if NODE_ENV=production COOKIE_SECURE=true APP_ORIGIN=https://dms.example.invalid pnpm --filter @dms/api exec tsx src/cli/migrate.ts down > /tmp/dms-production-rollback.log 2>&1; then
+            cat /tmp/dms-production-rollback.log
+            echo "Production rollback unexpectedly succeeded."
+            exit 1
+          fi
+          cat /tmp/dms-production-rollback.log
+          grep -F "Production database rollback is disabled" /tmp/dms-production-rollback.log
+          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs')")"
+          if [ "$remaining" != "8" ]; then
+            echo "Production rollback guard did not preserve the disposable foundation schema (found $remaining tables)."
+            exit 1
+          fi
+          echo "Production rollback was rejected before migrations ran; all eight foundation tables remain."
+
       - name: Verify rollback removes the foundation schema in the disposable database
         shell: bash
         run: |
@@ -116,5 +137,33 @@ jobs:
       - name: Build API and frontend for production
         run: pnpm build
 
-      - name: Check patch whitespace
-        run: git diff --check
+      - name: Check committed patch whitespace
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_AFTER_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            git cat-file -e "${PR_BASE_SHA}^{commit}"
+            git cat-file -e "${PR_HEAD_SHA}^{commit}"
+            echo "Checking pull request patch: ${PR_BASE_SHA}...${PR_HEAD_SHA}"
+            git diff --check "${PR_BASE_SHA}...${PR_HEAD_SHA}"
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            git cat-file -e "${PUSH_AFTER_SHA}^{commit}"
+            if [[ "$PUSH_BEFORE_SHA" =~ ^0+$ ]]; then
+              empty_tree="$(git hash-object -t tree -w --stdin < /dev/null)"
+              echo "Initial push detected; checking the full commit against the empty tree."
+              git diff --check "$empty_tree" "$PUSH_AFTER_SHA"
+            else
+              git cat-file -e "${PUSH_BEFORE_SHA}^{commit}"
+              echo "Checking pushed commit range: ${PUSH_BEFORE_SHA} ${PUSH_AFTER_SHA}"
+              git diff --check "$PUSH_BEFORE_SHA" "$PUSH_AFTER_SHA"
+            fi
+          else
+            echo "Unsupported event for committed patch whitespace verification: $EVENT_NAME"
+            exit 1
+          fi
