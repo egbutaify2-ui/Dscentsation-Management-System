@@ -2,7 +2,10 @@ import { z } from 'zod';
 
 const money = z
   .string()
-  .regex(/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/, 'Use a non-negative amount with up to two decimal places.');
+  .regex(
+    /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/,
+    'Use a non-negative amount with up to two decimal places.',
+  );
 const nullableText = (max: number) => z.string().trim().max(max).nullable().optional();
 
 export const variantInputSchema = z
@@ -33,7 +36,10 @@ export const updateProductSchema = z
     categoryId: z.string().uuid().nullable().optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, 'Provide at least one product field to update.');
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    'Provide at least one product field to update.',
+  );
 
 export const createCategorySchema = z
   .object({
@@ -51,7 +57,10 @@ export const updateCategorySchema = z
     isActive: z.boolean().optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, 'Provide at least one category field to update.');
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    'Provide at least one category field to update.',
+  );
 
 export const createVariantSchema = variantInputSchema;
 export const updateVariantSchema = z
@@ -63,7 +72,10 @@ export const updateVariantSchema = z
     costPrice: money.optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, 'Provide at least one variant field to update.');
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    'Provide at least one variant field to update.',
+  );
 
 export const statusSchema = z.object({ isActive: z.boolean() }).strict();
 export const productStatusSchema = z.object({ status: z.enum(['active', 'archived']) }).strict();
