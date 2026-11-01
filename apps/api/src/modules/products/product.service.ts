@@ -6,7 +6,7 @@ import { fromMinorUnits, toMinorUnits } from './product.money.js';
 
 export interface VariantInput {
   name: string;
-  sku?: string | null;
+  sku?: string | null | undefined;
   unitOfMeasure: string;
   sellingPrice: string;
   costPrice: string;
@@ -14,38 +14,38 @@ export interface VariantInput {
 
 export interface ProductCreateInput {
   name: string;
-  description?: string | null;
-  internalCode?: string | null;
-  categoryId?: string | null;
+  description?: string | null | undefined;
+  internalCode?: string | null | undefined;
+  categoryId?: string | null | undefined;
   variant: VariantInput;
 }
 
 export interface ProductUpdateInput {
-  name?: string;
-  description?: string | null;
-  internalCode?: string | null;
-  categoryId?: string | null;
+  name?: string | undefined;
+  description?: string | null | undefined;
+  internalCode?: string | null | undefined;
+  categoryId?: string | null | undefined;
 }
 
 export interface CategoryCreateInput {
   name: string;
-  description?: string | null;
-  parentId?: string | null;
+  description?: string | null | undefined;
+  parentId?: string | null | undefined;
 }
 
 export interface CategoryUpdateInput {
-  name?: string;
-  description?: string | null;
-  parentId?: string | null;
-  isActive?: boolean;
+  name?: string | undefined;
+  description?: string | null | undefined;
+  parentId?: string | null | undefined;
+  isActive?: boolean | undefined;
 }
 
 export interface VariantUpdateInput {
-  name?: string;
-  sku?: string | null;
-  unitOfMeasure?: string;
-  sellingPrice?: string;
-  costPrice?: string;
+  name?: string | undefined;
+  sku?: string | null | undefined;
+  unitOfMeasure?: string | undefined;
+  sellingPrice?: string | undefined;
+  costPrice?: string | undefined;
 }
 
 interface ProductRow extends QueryResultRow {
