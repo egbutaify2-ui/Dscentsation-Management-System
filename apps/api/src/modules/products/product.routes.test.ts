@@ -397,12 +397,16 @@ describe('Product Management API', () => {
     const all = await ownerAgent.get('/api/v1/products?status=all').expect(200);
     expect(Array.isArray(all.body.data)).toBe(true);
     await ownerAgent.get('/api/v1/products/not-a-uuid').expect(400);
-    await patch(ownerAgent, '/api/v1/categories/not-a-uuid', { name: 'Invalid ID' }).expect(400);
-    await patch(
+    const invalidCategory = await patch(ownerAgent, '/api/v1/categories/not-a-uuid', {
+      name: 'Invalid ID',
+    });
+    expect(invalidCategory.status).toBe(400);
+    const invalidVariant = await patch(
       ownerAgent,
       '/api/v1/products/not-a-uuid/variants/not-a-uuid',
       { name: 'Invalid ID' },
-    ).expect(400);
+    );
+    expect(invalidVariant.status).toBe(400);
   });
 
   it('does not impose SKU uniqueness and prevents invalid product-category relationships', async () => {
