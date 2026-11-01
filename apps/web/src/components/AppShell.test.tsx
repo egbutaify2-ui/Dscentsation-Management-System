@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from './AppShell.js';
 
 const user = {
@@ -11,6 +11,8 @@ const user = {
   roleCode: 'OWNER' as const,
   roleName: 'Owner',
 };
+
+afterEach(() => cleanup());
 
 describe('AppShell Product Management navigation', () => {
   it('shows Products only when the backend session reports products.view', () => {
