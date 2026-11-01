@@ -44,18 +44,20 @@ async function csrf(agent: ReturnType<typeof request.agent>): Promise<string> {
 }
 
 async function post(agent: ReturnType<typeof request.agent>, path: string, body: object) {
+  const token = await csrf(agent);
   return agent
     .post(path)
     .set('Origin', env.APP_ORIGIN)
-    .set('X-CSRF-Token', await csrf(agent))
+    .set('X-CSRF-Token', token)
     .send(body);
 }
 
 async function patch(agent: ReturnType<typeof request.agent>, path: string, body: object) {
+  const token = await csrf(agent);
   return agent
     .patch(path)
     .set('Origin', env.APP_ORIGIN)
-    .set('X-CSRF-Token', await csrf(agent))
+    .set('X-CSRF-Token', token)
     .send(body);
 }
 
@@ -395,14 +397,12 @@ describe('Product Management API', () => {
     const all = await ownerAgent.get('/api/v1/products?status=all').expect(200);
     expect(Array.isArray(all.body.data)).toBe(true);
     await ownerAgent.get('/api/v1/products/not-a-uuid').expect(400);
-    await ownerAgent
-      .patch('/api/v1/categories/not-a-uuid')
-      .send({ name: 'Invalid ID' })
-      .expect(400);
-    await ownerAgent
-      .patch('/api/v1/products/not-a-uuid/variants/not-a-uuid')
-      .send({ name: 'Invalid ID' })
-      .expect(400);
+    await patch(ownerAgent, '/api/v1/categories/not-a-uuid', { name: 'Invalid ID' }).expect(400);
+    await patch(
+      ownerAgent,
+      '/api/v1/products/not-a-uuid/variants/not-a-uuid',
+      { name: 'Invalid ID' },
+    ).expect(400);
   });
 
   it('does not impose SKU uniqueness and prevents invalid product-category relationships', async () => {
