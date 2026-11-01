@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProductManagementPage } from './ProductManagementPage.js';
 
 const mocks = vi.hoisted(() => ({
@@ -53,6 +53,8 @@ const sampleCategory = {
   isActive: true,
   productCount: 1,
 };
+
+afterEach(() => cleanup());
 
 describe('ProductManagementPage', () => {
   beforeEach(() => {
