@@ -6,6 +6,7 @@ import { env } from './config/env.js';
 import { pool } from './db/pool.js';
 import { createApp } from './app.js';
 import type { AuthenticatedUser } from './modules/auth/auth.types.js';
+import { revokeSessionsForUser } from './modules/auth/auth.session.js';
 import {
   canAccessStockLocation,
   canUseWarehouseSheratonPickup,
@@ -18,6 +19,7 @@ const emails = {
   staff: `task005.staff.${suffix}@example.invalid`,
   manager: `task005.manager.${suffix}@example.invalid`,
   owner: `task005.owner.${suffix}@example.invalid`,
+  suspended: `task005.suspended.${suffix}@example.invalid`,
 };
 
 async function createTestUser(
@@ -41,6 +43,7 @@ async function createTestUser(
      WHERE rp.role_id = $1 ORDER BY p.code`,
     [role.rows[0].id],
   );
+
   return {
     id,
     email,
@@ -65,12 +68,14 @@ describe('DMS foundation API', () => {
   let staff: AuthenticatedUser;
   let manager: AuthenticatedUser;
   let owner: AuthenticatedUser;
+  let suspendedUser: AuthenticatedUser;
 
   beforeAll(async () => {
     await pool.query('SELECT 1');
     staff = await createTestUser(emails.staff, 'STAFF');
     manager = await createTestUser(emails.manager, 'MANAGER');
     owner = await createTestUser(emails.owner, 'OWNER');
+    suspendedUser = await createTestUser(emails.suspended, 'STAFF');
   });
 
   afterAll(async () => {
@@ -88,14 +93,59 @@ describe('DMS foundation API', () => {
     await request(app).get('/api/v1/auth/capabilities').expect(401);
   });
 
-  it('requires a same-origin CSRF token for login', async () => {
+  it('requires a same-origin CSRF token before login', async () => {
     const agent = request.agent(app);
     await agent.get('/api/v1/auth/csrf').expect(200);
-    await agent
+    const response = await agent
       .post('/api/v1/auth/login')
       .set('Origin', env.APP_ORIGIN)
       .send({ email: emails.staff, password })
       .expect(403);
+    expect(response.body.error.code).toBe('CSRF_TOKEN_REQUIRED');
+  });
+
+  it('rejects an incorrect CSRF token', async () => {
+    const agent = request.agent(app);
+    await agent.get('/api/v1/auth/csrf').expect(200);
+    const response = await agent
+      .post('/api/v1/auth/logout')
+      .set('Origin', env.APP_ORIGIN)
+      .set('X-CSRF-Token', 'not-the-session-token')
+      .expect(403);
+    expect(response.body.error.code).toBe('CSRF_TOKEN_INVALID');
+  });
+
+  it('rejects a mismatched Origin even when the CSRF token is valid', async () => {
+    const agent = request.agent(app);
+    const csrf = await agent.get('/api/v1/auth/csrf').expect(200);
+    const response = await agent
+      .post('/api/v1/auth/logout')
+      .set('Origin', 'https://attacker.example.invalid')
+      .set('X-CSRF-Token', csrf.body.data.token as string)
+      .expect(403);
+    expect(response.body.error.code).toBe('CSRF_ORIGIN_REJECTED');
+  });
+
+  it('rotates the session identifier after successful login', async () => {
+    const agent = request.agent(app);
+    const csrf = await agent.get('/api/v1/auth/csrf').expect(200);
+    const beforeCookie = csrf.headers['set-cookie']
+      ?.find((cookie) => cookie.startsWith(`${env.cookieName}=`))
+      ?.split(';', 1)[0];
+
+    const login = await agent
+      .post('/api/v1/auth/login')
+      .set('Origin', env.APP_ORIGIN)
+      .set('X-CSRF-Token', csrf.body.data.token as string)
+      .send({ email: emails.staff, password })
+      .expect(200);
+    const afterCookie = login.headers['set-cookie']
+      ?.find((cookie) => cookie.startsWith(`${env.cookieName}=`))
+      ?.split(';', 1)[0];
+
+    expect(beforeCookie).toBeTruthy();
+    expect(afterCookie).toBeTruthy();
+    expect(afterCookie).not.toBe(beforeCookie);
   });
 
   it('persists sessions in PostgreSQL and returns safe identity data', async () => {
@@ -112,16 +162,61 @@ describe('DMS foundation API', () => {
       'SELECT sid FROM user_sessions WHERE user_id = $1 LIMIT 1',
       [staff.id],
     );
-    expect(sessionRow.rowCount).toBe(1);
+    expect(sessionRow.rowCount).toBeGreaterThan(0);
 
     const audit = await pool.query(
       "SELECT 1 FROM audit_logs WHERE actor_user_id = $1 AND action = 'auth.login.succeeded'",
       [staff.id],
     );
-    expect(audit.rowCount).toBe(1);
+    expect(audit.rowCount).toBeGreaterThan(0);
   });
 
-  it('grants payment verification only to Manager and Owner', async () => {
+  it('rejects a session after its absolute lifetime expires and deletes the stored session', async () => {
+    const agent = request.agent(app);
+    await signIn(agent, emails.staff);
+
+    const sessionRow = await pool.query<{ sid: string }>(
+      'SELECT sid FROM user_sessions WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 1',
+      [staff.id],
+    );
+    const sessionId = sessionRow.rows[0]?.sid;
+    expect(sessionId).toBeTruthy();
+
+    const expiredAt = Date.now() - env.sessionAbsoluteTimeoutMs - 1;
+    await pool.query(
+      `UPDATE user_sessions
+       SET sess = jsonb_set(sess::jsonb, '{authIssuedAt}', to_jsonb($2::bigint), true)::json
+       WHERE sid = $1`,
+      [sessionId, expiredAt],
+    );
+
+    const response = await agent.get('/api/v1/auth/session').expect(200);
+    expect(response.body.data.authenticated).toBe(false);
+
+    const remaining = await pool.query('SELECT 1 FROM user_sessions WHERE sid = $1', [sessionId]);
+    expect(remaining.rowCount).toBe(0);
+  });
+
+  it('does not allow a suspended user to continue an existing session', async () => {
+    const agent = request.agent(app);
+    await signIn(agent, emails.suspended);
+    await pool.query("UPDATE users SET status = 'suspended' WHERE id = $1", [suspendedUser.id]);
+
+    const session = await agent.get('/api/v1/auth/session').expect(200);
+    expect(session.body.data.authenticated).toBe(false);
+    await agent.get('/api/v1/auth/capabilities').expect(401);
+  });
+
+  it('does not allow a revoked persistent session to be reused', async () => {
+    const agent = request.agent(app);
+    await signIn(agent, emails.staff);
+
+    await revokeSessionsForUser(staff.id);
+    const protectedResponse = await agent.get('/api/v1/auth/capabilities').expect(401);
+    expect(protectedResponse.body.error.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it('grants payment-verification permission only to Manager and Owner', async () => {
     for (const [user, email] of [
       [manager, emails.manager],
       [owner, emails.owner],
@@ -134,7 +229,7 @@ describe('DMS foundation API', () => {
     }
   });
 
-  it('destroys a persistent session on logout', async () => {
+  it('destroys the persistent session on a valid same-origin logout', async () => {
     const agent = request.agent(app);
     await signIn(agent, emails.staff);
     const csrf = await agent.get('/api/v1/auth/csrf').expect(200);
@@ -159,13 +254,13 @@ describe('DMS foundation API', () => {
       .expect(401);
   });
 
-  it('seeds only the three established roles and confirmed permission assignments', async () => {
+  it('seeds only the three established roles and four confirmed permission codes', async () => {
     const roles = await pool.query<{ code: string }>('SELECT code FROM roles ORDER BY code');
-    const permissionCodes = await pool.query<{ code: string }>(
+    const permissions = await pool.query<{ code: string }>(
       'SELECT code FROM permissions ORDER BY code',
     );
     expect(roles.rows.map((row) => row.code)).toEqual(['MANAGER', 'OWNER', 'STAFF']);
-    expect(permissionCodes.rows.map((row) => row.code)).toEqual([
+    expect(permissions.rows.map((row) => row.code)).toEqual([
       'inventory.transfer.pickup_warehouse_to_assigned_sheraton',
       'inventory.transfer.receive_destination_assigned',
       'payments.record',
@@ -199,17 +294,24 @@ describe('DMS foundation API', () => {
     expect(await canAccessStockLocation(owner, unassigned)).toBe(true);
   });
 
-  it('keeps the ADR-016 pickup exception scoped to configured locations and the assigned destination', async () => {
+  it('keeps the ADR-016 pickup exception limited to a configured source and assigned destination', async () => {
     const warehouse = randomUUID();
     const sheraton = randomUUID();
-    await pool.query('INSERT INTO locations(id, code, name) VALUES ($1, $2, $3), ($4, $5, $6)', [
-      warehouse,
-      `SYN-${suffix.slice(0, 8)}-W`,
-      'Synthetic Warehouse test',
-      sheraton,
-      `SYN-${suffix.slice(0, 8)}-S`,
-      'Synthetic Sheraton test',
-    ]);
+    const unassignedSheraton = randomUUID();
+    await pool.query(
+      'INSERT INTO locations(id, code, name) VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9)',
+      [
+        warehouse,
+        `SYN-${suffix.slice(0, 8)}-W`,
+        'Synthetic Warehouse test',
+        sheraton,
+        `SYN-${suffix.slice(0, 8)}-S`,
+        'Synthetic assigned Sheraton test',
+        unassignedSheraton,
+        `SYN-${suffix.slice(0, 8)}-U`,
+        'Synthetic unassigned Sheraton test',
+      ],
+    );
     await pool.query('INSERT INTO user_location_access(user_id, location_id) VALUES ($1, $2)', [
       staff.id,
       sheraton,
@@ -223,7 +325,7 @@ describe('DMS foundation API', () => {
         pickupMode: 'destination_staff_pickup',
       },
       configuredWarehouseLocationId: warehouse,
-      configuredSheratonLocationIds: [sheraton],
+      configuredSheratonLocationIds: [sheraton, unassignedSheraton],
     };
     expect(await canUseWarehouseSheratonPickup(valid)).toBe(true);
     expect(
@@ -236,6 +338,24 @@ describe('DMS foundation API', () => {
       await canUseWarehouseSheratonPickup({
         ...valid,
         configuredSheratonLocationIds: [],
+      }),
+    ).toBe(false);
+    expect(
+      await canUseWarehouseSheratonPickup({
+        ...valid,
+        transfer: { ...valid.transfer, sourceLocationId: sheraton },
+      }),
+    ).toBe(false);
+    expect(
+      await canUseWarehouseSheratonPickup({
+        ...valid,
+        transfer: { ...valid.transfer, destinationLocationId: warehouse },
+      }),
+    ).toBe(false);
+    expect(
+      await canUseWarehouseSheratonPickup({
+        ...valid,
+        transfer: { ...valid.transfer, destinationLocationId: unassignedSheraton },
       }),
     ).toBe(false);
   });
