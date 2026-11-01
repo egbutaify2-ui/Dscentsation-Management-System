@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthenticatedUser } from '../features/auth/AuthProvider.js';
 
-type Section = 'overview' | 'products';
+type Section = 'overview' | 'products' | 'employees';
 type NavigationItem = { label: string; section?: Section; symbol: string; enabled: boolean };
 
 export function AppShell({
@@ -24,10 +24,14 @@ export function AppShell({
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const productVisible = permissions.includes('products.view');
+  const employeesVisible = permissions.includes('users.view');
   const navigation: NavigationItem[] = [
     { label: 'Overview', section: 'overview' as const, symbol: '◫', enabled: true },
     ...(productVisible
       ? [{ label: 'Products', section: 'products' as const, symbol: '◈', enabled: true }]
+      : []),
+    ...(employeesVisible
+      ? [{ label: 'Employees', section: 'employees' as const, symbol: '♙', enabled: true }]
       : []),
     { label: 'Orders', symbol: '▤', enabled: false },
     { label: 'Inventory', symbol: '▥', enabled: false },
@@ -53,7 +57,7 @@ export function AppShell({
     setMenuOpen(false);
   }
 
-  const activeLabel = activeSection === 'products' ? 'Products' : 'Overview';
+  const activeLabel = activeSection === 'products' ? 'Products' : activeSection === 'employees' ? 'Employees' : 'Overview';
 
   return (
     <div className="app-shell">
@@ -146,7 +150,7 @@ export function AppShell({
         <main>{children}</main>
         <footer className="app-footer">
           <span>Dscentsation Management System</span>
-          <span>Internal workspace · Product Management release</span>
+          <span>Internal workspace · Account and Product Management</span>
         </footer>
       </div>
     </div>

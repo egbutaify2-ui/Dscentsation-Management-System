@@ -14,7 +14,7 @@ const user = {
 
 afterEach(() => cleanup());
 
-describe('AppShell Product Management navigation', () => {
+describe('AppShell permission-aware navigation', () => {
   it('shows Products only when the backend session reports products.view', () => {
     const onNavigate = vi.fn();
     const { rerender } = render(
@@ -43,6 +43,23 @@ describe('AppShell Product Management navigation', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Products' }));
     expect(onNavigate).toHaveBeenCalledWith('products');
+  });
+
+  it('shows Employees only when the backend session reports users.view', () => {
+    const onNavigate = vi.fn();
+    const { rerender } = render(
+      <AppShell user={user} permissions={[]} activeSection="overview" onNavigate={onNavigate} onLogout={async () => undefined}>
+        <p>Overview content</p>
+      </AppShell>,
+    );
+    expect(screen.queryByRole('button', { name: 'Employees' })).toBeNull();
+    rerender(
+      <AppShell user={user} permissions={['users.view']} activeSection="overview" onNavigate={onNavigate} onLogout={async () => undefined}>
+        <p>Overview content</p>
+      </AppShell>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Employees' }));
+    expect(onNavigate).toHaveBeenCalledWith('employees');
   });
 
   it('keeps unfinished business modules disabled', () => {
