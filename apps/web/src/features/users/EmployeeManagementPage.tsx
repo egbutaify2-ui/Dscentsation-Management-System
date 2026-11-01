@@ -336,7 +336,7 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
                 />
               </label>
               <label>
-                Role
+                Employee role
                 <select
                   value={role}
                   onChange={(event) => setRole(event.target.value as 'MANAGER' | 'STAFF')}

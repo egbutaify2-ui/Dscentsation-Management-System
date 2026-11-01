@@ -92,7 +92,9 @@ describe('EmployeeManagementPage', () => {
     fireEvent.change(screen.getByLabelText('Company email address'), {
       target: { value: 'new@example.invalid' },
     });
-    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'MANAGER' } });
+    fireEvent.change(screen.getByLabelText('Employee role'), {
+      target: { value: 'MANAGER' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Create invitation' }));
     await waitFor(() =>
       expect(mocks.post).toHaveBeenCalledWith(
@@ -106,7 +108,9 @@ describe('EmployeeManagementPage', () => {
       'https://dms.example.invalid/#/invite/accept?token=synthetic-high-entropy-token',
     );
     expect(screen.getByText(/DMS does not send invitations automatically/)).toBeTruthy();
-    expect(screen.getByText(/official Dscentsation company email identity/)).toBeTruthy();
+    expect(
+      screen.getAllByText(/official Dscentsation company email identity/).length,
+    ).toBeGreaterThan(0);
   });
 
   it('copies the invitation URL when clipboard support is available', async () => {
@@ -149,7 +153,9 @@ describe('EmployeeManagementPage', () => {
       'https://dms.example.invalid/#/invite/accept?token=synthetic-high-entropy-token',
     );
     expect(screen.getByText(/No email was sent/)).toBeTruthy();
-    expect(screen.getByText(/official Dscentsation company email identity/)).toBeTruthy();
+    expect(
+      screen.getAllByText(/official Dscentsation company email identity/).length,
+    ).toBeGreaterThan(0);
   });
 
   it('reports invitation reissue API failures without presenting a replacement link', async () => {
