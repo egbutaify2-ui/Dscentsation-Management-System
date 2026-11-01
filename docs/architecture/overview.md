@@ -162,14 +162,27 @@ The initial reservation duration, expiry eligibility (for example, unpaid-only v
 
 - Receiving stock increases the physical balance for the chosen location and creates a corresponding movement record.
 - A transfer has a source, destination, item quantities and explicit lifecycle. The source and destination must differ.
-- On dispatch, source on-hand decreases and a transfer-item-specific in-transit balance increases in the same transaction. The goods are no longer available at the source and are not yet available at the destination.
+- On source dispatch, source on-hand decreases and a transfer-item-specific in-transit balance increases in the same transaction. The goods are no longer available at the source and are not yet available at the destination.
 - In-transit quantities remain linked to the transfer item, product variant, source and destination. The stock ledger records the source-location decrease and the in-transit increase.
-- A Staff user assigned to the destination location must confirm receipt. In one transaction, the system reduces in-transit quantity and increases destination on-hand, and records paired ledger events and an audit event. Source Staff cannot confirm destination receipt on the destination team's behalf.
-- Partial receipt reduces the in-transit balance only by the quantity actually confirmed. Unreceived quantities remain in transit until received or formally resolved through a discrepancy workflow.
-- Shortage/damage discrepancies require a reason, staff attribution and review; unresolved quantity remains visible as in transit and cannot be silently written off.
-- Managers can view and manage stock across all locations. Staff may act only at locations assigned to that Staff account.
+- Destination receipt is confirmed by a Staff user assigned to the destination location. In one transaction, the system reduces in-transit quantity and increases destination on-hand, and records paired ledger events and an audit event.
+- Partial receipt reduces the in-transit balance only by the quantity physically received. Unreceived quantities remain in transit until received or formally resolved through a discrepancy workflow.
+- Shortage/damage discrepancies require a reason, staff attribution and review. Unresolved quantities remain visible in the transfer/in-transit ledger and cannot be silently written off.
+- Managers can view and manage stock across all locations. Staff may act only at their assigned locations, except for the narrowly scoped Sheraton pickup action defined below.
 - Adjustments, damage, loss and returns must create attributable movement records.
 - Physical and in-transit balances are transactional summaries; the append-only movement ledger provides the traceable history.
+
+#### 4.2.1 Sheraton-to-Warehouse stock pickup
+
+Sheraton Stock and Warehouse Stock are separate inventory balances. Sheraton-assigned Staff need a narrow pickup capability when they physically travel to Warehouse to collect products; this does not grant general Warehouse inventory access.
+
+1. **Open or create the pickup transfer:** A Staff member assigned to the Sheraton location may create a transfer with source = Warehouse and destination = that assigned Sheraton location, or open an existing transfer only when it has exactly that source and destination. The transfer records its requested product variants and quantities.
+2. **Record what was physically collected:** At Warehouse, the Sheraton Staff member records the actual collected quantity against each transfer item. The system does not treat the staff member as a Warehouse inventory operator.
+3. **Validate and post pickup atomically:** The backend loads the transfer and assignment from trusted database records, locks the relevant transfer/item and Warehouse balance rows, and verifies that the transfer is open, the destination is assigned to the acting Staff member, the source is Warehouse, the quantity does not exceed the transfer's unpicked remainder, and Warehouse available stock is sufficient. In one transaction it reduces Warehouse on-hand, increases the transfer item's in-transit balance, appends the Warehouse-out and in-transit-in movement events, records the pickup event and actor, and updates cumulative picked quantity/status.
+4. **Keep Warehouse stock private:** The Sheraton pickup interface may show the product and the transfer's own requested/picked quantities. It must not show Warehouse balance screens, general Warehouse product availability, Warehouse adjustments, unrelated Warehouse transfers or other Warehouse operational records. An insufficient-stock response must not disclose the Warehouse's overall or exact available balance.
+5. **Confirm physical receipt at Sheraton:** A Staff member assigned to the destination Sheraton location records the actual quantity received. The same person may perform pickup and receipt when appropriate. In one transaction the backend decreases in-transit quantity, increases Sheraton on-hand, appends paired movement events, records the receipt event and actor, and updates cumulative received quantity/status.
+6. **Close only when accounted for:** A transfer is complete only when all picked quantities have been received or formally resolved. Pickup and receipt actors/timestamps remain in the event history.
+
+This capability is a resource/action exception, not a location assignment: Sheraton Staff do not receive Warehouse read access or general Warehouse stock permissions. Managers and Owner retain their existing cross-location access and normal transfer permissions.
 
 ### 4.3 Record payment and refund activity
 
@@ -209,9 +222,11 @@ Use individual user accounts; do not share a common Staff login.
 |---|---|---|
 | Owner | Full business oversight and access to all stock locations. | Can record and verify payments. |
 | Manager | Day-to-day management and access to all stock locations. | Can record and verify payments. |
-| Staff | Task-based access and stock actions only at locations explicitly assigned to that Staff account. | Can record payments but cannot verify them. |
+| Staff | Task-based access and stock actions only at locations explicitly assigned to that Staff account, except the narrowly scoped Sheraton-to-Warehouse pickup action in §4.2.1. This exception grants no general Warehouse balance or operational access. | Can record payments but cannot verify them. |
 
 Enforce these rules in backend middleware and domain services with deny-by-default behaviour. Manager access to all locations is global and does not depend on user-location assignment rows. Staff location assignments must be checked on every location-scoped request, including stock reads, order fulfilment actions, transfer dispatch and destination receipt confirmation. A Staff user may confirm a transfer receipt only when assigned to that transfer's destination location.
+
+**Narrow Sheraton pickup authorisation:** expose a dedicated pickup action/service rather than granting Sheraton Staff the normal Warehouse inventory permissions. A Staff member may create/open and record pickup quantities only for a transfer whose source is the configured Warehouse location and whose destination is a Sheraton location explicitly assigned to that user. The backend must derive the user's location assignments and the transfer's source/destination from PostgreSQL, not trust client-supplied location IDs or role claims. The action may return only the particular transfer's product and requested/picked quantities plus a generic stock-validation result. It must not return Warehouse balance values or allow general Warehouse stock browsing, stock adjustments, unrelated transfer viewing/management or other Warehouse operations. The normal Staff location restriction remains unchanged for every other action.
 
 The detailed permission matrix for other modules (such as exports, refunds, expense approvals and user administration) can be refined separately, but it must not weaken the confirmed role/location/payment rules.
 
@@ -279,9 +294,15 @@ Required high-risk tests include:
 - Cancelling an order releases a reservation once.
 - Reservation expiry releases reserved quantity (not on-hand stock) once, only when due and policy-eligible; it must not cancel the order or race with dispatch/cancellation into a double release/consume.
 - A reservation-policy change affects new reservations only; existing reservations keep their original policy version and expiry unless explicitly changed and audited.
-- Transfer dispatch reduces source stock and creates in-transit quantity; destination stock does not increase until Staff assigned to the destination location confirms receipt.
-- Partial transfer receipt leaves the remaining quantity in transit; discrepancies cannot be silently written off.
-- Managers can access all stock locations; Staff cannot access unassigned locations.
+- A normal transfer dispatch reduces source stock and creates in-transit quantity; destination stock does not increase until destination Staff confirms receipt.
+- A Sheraton-assigned Staff member can create/open and record pickup only for a Warehouse-to-their-assigned-Sheraton transfer, without being able to read Warehouse balances or access unrelated Warehouse operations.
+- The Sheraton pickup action validates the transfer and assignment server-side and atomically reduces Warehouse on-hand while increasing in-transit quantity.
+- A Staff member assigned to Sheraton can confirm receipt; the same person may pick up and receive. Receipt atomically reduces in-transit and increases Sheraton on-hand.
+- Partial pickup and partial receipt preserve outstanding quantities; discrepancies, shortages and damaged goods stay visible and require explicit resolution.
+- Insufficient Warehouse stock causes the pickup transaction to fail with no stock changes and without exposing the Warehouse's exact balance.
+- Cancelled transfers with no pickup leave stock unchanged; cancellation after partial pickup cannot erase in-transit stock or silently return it to Warehouse.
+- Duplicate pickup/receipt submissions and retries cannot create duplicate movements or quantity changes.
+- Managers can access all stock locations; Staff cannot access unassigned locations except the specific Sheraton pickup action.
 - Staff can record a payment but cannot verify it; only Managers and Owner can verify.
 - Receipt issuance creates one immutable receipt record, and a failed/retried email does not create a duplicate receipt issuance.
 - PostgreSQL-backed sessions survive API restarts and are shared across API instances; production never falls back to an in-memory store.
@@ -352,5 +373,7 @@ Remaining questions before implementation:
 7. What are the receipt format, numbering rules and record-retention requirements?
 8. What are the file-storage provider/region, allowed file types, maximum file sizes and retention rules?
 9. Do Render Postgres backup, recovery and cost checks meet the business's expectations?
+10. Confirm the configured Warehouse and Sheraton location records/codes and which Staff accounts are assigned to each Sheraton location.
+11. Confirm any operational paperwork/reference required at Warehouse when a Sheraton Staff member records physical pickup; the access boundary and stock accounting rules in this architecture are fixed.
 
 **Review outcome:** Pending. This architecture reflects the confirmed project-manager rules but is not permission to start application implementation or deployment.
