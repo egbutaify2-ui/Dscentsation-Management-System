@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { AuthenticatedUser } from '../features/auth/AuthProvider.js';
 
 type Section = 'overview' | 'products';
+type NavigationItem = { label: string; section?: Section; symbol: string; enabled: boolean };
 
 export function AppShell({
   user,
@@ -23,7 +24,7 @@ export function AppShell({
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const productVisible = permissions.includes('products.view');
-  const navigation = [
+  const navigation: NavigationItem[] = [
     { label: 'Overview', section: 'overview' as const, symbol: '◫', enabled: true },
     ...(productVisible
       ? [{ label: 'Products', section: 'products' as const, symbol: '◈', enabled: true }]
