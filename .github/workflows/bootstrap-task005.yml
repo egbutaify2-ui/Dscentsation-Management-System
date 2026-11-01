@@ -43,6 +43,7 @@ jobs:
               with path.open('w', encoding='utf-8') as handle:
                   handle.write(content)
           manifest.unlink()
+          Path('.task005-trigger').unlink()
           Path('.github/workflows/bootstrap-task005.yml').unlink()
           print(f"Materialised {len(files)} files.")
           PY
