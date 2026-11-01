@@ -40,15 +40,26 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-     WHERE conname = 'products_require_variant'
-       AND condeferrable = true
+    SELECT 1 FROM pg_trigger
+     WHERE tgname = 'products_require_exactly_one_default'
+       AND tgdeferrable = true
+       AND tginitdeferred = true
+       AND NOT tgisinternal
   ) OR NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-     WHERE conname = 'variants_cannot_remove_last'
-       AND condeferrable = true
+    SELECT 1 FROM pg_trigger
+     WHERE tgname = 'variants_require_exactly_one_default'
+       AND tgdeferrable = true
+       AND tginitdeferred = true
+       AND NOT tgisinternal
   ) THEN
-    RAISE EXCEPTION 'Deferred product-has-variant constraints are missing';
+    RAISE EXCEPTION 'Deferred exactly-one-default-variant enforcement triggers are missing';
+  END IF;
+
+  IF position(
+       'default_variant_count <> 1'
+       IN pg_get_functiondef('assert_product_has_exactly_one_default_variant(uuid)'::regprocedure)
+     ) = 0 THEN
+    RAISE EXCEPTION 'The deferred database invariant does not enforce exactly one default variant';
   END IF;
 
   SELECT array_agg(code ORDER BY code)

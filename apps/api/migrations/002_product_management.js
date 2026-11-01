@@ -97,32 +97,60 @@ export async function up(pgm) {
       BEFORE DELETE ON product_variants
       FOR EACH ROW EXECUTE FUNCTION prevent_product_master_hard_delete();
 
-    CREATE FUNCTION enforce_product_has_variant() RETURNS trigger
-    LANGUAGE plpgsql AS $$
+    CREATE FUNCTION assert_product_has_exactly_one_default_variant(target_product_id UUID)
+    RETURNS VOID
+    LANGUAGE plpgsql AS $
     DECLARE
-      target_product_id UUID;
+      variant_count INTEGER;
+      default_variant_count INTEGER;
     BEGIN
-      IF TG_TABLE_NAME = 'products' THEN
-        target_product_id := NEW.id;
-      ELSE
-        target_product_id := OLD.product_id;
+      IF NOT EXISTS (SELECT 1 FROM products WHERE id = target_product_id) THEN
+        RETURN;
       END IF;
-      IF EXISTS (SELECT 1 FROM products WHERE id = target_product_id)
-         AND NOT EXISTS (
-           SELECT 1 FROM product_variants WHERE product_id = target_product_id
-         ) THEN
+
+      SELECT count(*), count(*) FILTER (WHERE is_default = true)
+        INTO variant_count, default_variant_count
+        FROM product_variants
+       WHERE product_id = target_product_id;
+
+      IF variant_count = 0 THEN
         RAISE EXCEPTION 'Every product must retain at least one variant'
           USING ERRCODE = '23514';
       END IF;
+
+      IF default_variant_count <> 1 THEN
+        RAISE EXCEPTION 'Every product must have exactly one default variant'
+          USING ERRCODE = '23514';
+      END IF;
+    END;
+    $;
+
+    CREATE FUNCTION enforce_product_variant_invariants() RETURNS trigger
+    LANGUAGE plpgsql AS $
+    BEGIN
+      IF TG_TABLE_NAME = 'products' THEN
+        PERFORM assert_product_has_exactly_one_default_variant(NEW.id);
+      ELSE
+        IF TG_OP <> 'INSERT' THEN
+          PERFORM assert_product_has_exactly_one_default_variant(OLD.product_id);
+        END IF;
+        IF TG_OP <> 'DELETE' THEN
+          PERFORM assert_product_has_exactly_one_default_variant(NEW.product_id);
+        END IF;
+      END IF;
       RETURN NULL;
     END;
-    $$;
-    CREATE CONSTRAINT TRIGGER products_require_variant
-      AFTER INSERT ON products DEFERRABLE INITIALLY DEFERRED
-      FOR EACH ROW EXECUTE FUNCTION enforce_product_has_variant();
-    CREATE CONSTRAINT TRIGGER variants_cannot_remove_last
-      AFTER DELETE ON product_variants DEFERRABLE INITIALLY DEFERRED
-      FOR EACH ROW EXECUTE FUNCTION enforce_product_has_variant();
+    $;
+
+    CREATE CONSTRAINT TRIGGER products_require_exactly_one_default
+      AFTER INSERT ON products
+      DEFERRABLE INITIALLY DEFERRED
+      FOR EACH ROW EXECUTE FUNCTION enforce_product_variant_invariants();
+
+    CREATE CONSTRAINT TRIGGER variants_require_exactly_one_default
+      AFTER INSERT OR UPDATE OR DELETE ON product_variants
+      DEFERRABLE INITIALLY DEFERRED
+      FOR EACH ROW EXECUTE FUNCTION enforce_product_variant_invariants();
 
     INSERT INTO permissions(code, description) VALUES
       ('products.view', 'View manually maintained DMS products, categories and variants.'),
@@ -148,9 +176,10 @@ export async function up(pgm) {
 
 export async function down(pgm) {
   pgm.sql(`
-    DROP TRIGGER IF EXISTS variants_cannot_remove_last ON product_variants;
-    DROP TRIGGER IF EXISTS products_require_variant ON products;
-    DROP FUNCTION IF EXISTS enforce_product_has_variant();
+    DROP TRIGGER IF EXISTS variants_require_exactly_one_default ON product_variants;
+    DROP TRIGGER IF EXISTS products_require_exactly_one_default ON products;
+    DROP FUNCTION IF EXISTS enforce_product_variant_invariants();
+    DROP FUNCTION IF EXISTS assert_product_has_exactly_one_default_variant(UUID);
     DROP TRIGGER IF EXISTS product_variants_no_delete ON product_variants;
     DROP TABLE IF EXISTS product_variants;
     DROP TRIGGER IF EXISTS products_no_delete ON products;

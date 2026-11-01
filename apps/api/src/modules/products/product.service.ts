@@ -1,6 +1,6 @@
 import type { PoolClient, QueryResultRow } from 'pg';
 import { pool } from '../../db/pool.js';
-import { appendAuditEvent } from '../audit/audit.service.js';
+import { appendAuditEvent, type AuditJsonValue } from '../audit/audit.service.js';
 import { conflict, invalid, notFound } from './product.errors.js';
 import { fromMinorUnits, toMinorUnits } from './product.money.js';
 
@@ -215,7 +215,7 @@ async function loadProduct(client: PoolClient, productId: string, lock = false):
   return productFromRow(row, await loadVariants(client, productId));
 }
 
-function productFields(product: Product): Record<string, unknown> {
+function productFields(product: Product): Record<string, AuditJsonValue> {
   return {
     id: product.id,
     name: product.name,
@@ -227,7 +227,7 @@ function productFields(product: Product): Record<string, unknown> {
   };
 }
 
-function categoryFields(category: Category): Record<string, unknown> {
+function categoryFields(category: Category): Record<string, AuditJsonValue> {
   return {
     id: category.id,
     name: category.name,
@@ -238,7 +238,7 @@ function categoryFields(category: Category): Record<string, unknown> {
   };
 }
 
-function variantFields(variant: ProductVariant): Record<string, unknown> {
+function variantFields(variant: ProductVariant): Record<string, AuditJsonValue> {
   return {
     id: variant.id,
     productId: variant.productId,
@@ -392,7 +392,7 @@ export async function createCategory(
         entityType: 'product_category',
         entityId: category.id,
         requestId,
-        safeMetadata: { before: 'null', after: JSON.stringify(categoryFields(category)) },
+        safeMetadata: { before: null, after: categoryFields(category) },
       },
       client,
     );
@@ -465,8 +465,8 @@ export async function updateCategory(
         entityId: categoryId,
         requestId,
         safeMetadata: {
-          before: JSON.stringify(categoryFields(before)),
-          after: JSON.stringify(categoryFields(after)),
+          before: categoryFields(before),
+          after: categoryFields(after),
         },
       },
       client,
@@ -518,11 +518,11 @@ export async function createProduct(
         entityId: productId,
         requestId,
         safeMetadata: {
-          before: 'null',
-          after: JSON.stringify({
+          before: null,
+          after: {
             product: productFields(product),
-            initialVariant: product.variants[0] ? variantFields(product.variants[0]) : null,
-          }),
+            initialVariant: variantFields(initialVariant),
+          },
         },
       },
       client,
@@ -535,8 +535,8 @@ export async function createProduct(
         entityId: initialVariant.id,
         requestId,
         safeMetadata: {
-          before: 'null',
-          after: JSON.stringify(variantFields(initialVariant)),
+          before: null,
+          after: variantFields(initialVariant),
         },
       },
       client,
@@ -585,8 +585,8 @@ export async function updateProduct(
         entityId: productId,
         requestId,
         safeMetadata: {
-          before: JSON.stringify(productFields(before)),
-          after: JSON.stringify(productFields(after)),
+          before: productFields(before),
+          after: productFields(after),
         },
       },
       client,
@@ -620,8 +620,8 @@ export async function setProductStatus(
         entityId: productId,
         requestId,
         safeMetadata: {
-          before: JSON.stringify(productFields(before)),
-          after: JSON.stringify(productFields(after)),
+          before: productFields(before),
+          after: productFields(after),
         },
       },
       client,
@@ -664,7 +664,7 @@ export async function createVariant(
         entityType: 'product_variant',
         entityId: variant.id,
         requestId,
-        safeMetadata: { before: 'null', after: JSON.stringify(variantFields(variant)) },
+        safeMetadata: { before: null, after: variantFields(variant) },
       },
       client,
     );
@@ -724,8 +724,8 @@ export async function updateVariant(
         entityId: variantId,
         requestId,
         safeMetadata: {
-          before: JSON.stringify(variantFields(before)),
-          after: JSON.stringify(variantFields(after)),
+          before: variantFields(before),
+          after: variantFields(after),
         },
       },
       client,
@@ -778,8 +778,8 @@ export async function setVariantActive(
         entityId: variantId,
         requestId,
         safeMetadata: {
-          before: JSON.stringify(variantFields(before)),
-          after: JSON.stringify(variantFields(after)),
+          before: variantFields(before),
+          after: variantFields(after),
         },
       },
       client,

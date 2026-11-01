@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { env } from '../../config/env.js';
 import { pool } from '../../db/pool.js';
 import { createApp } from '../../app.js';
+import type { AuditJsonValue } from '../audit/audit.service.js';
 
 const app = createApp();
 const password = 'DMS-task007-synthetic-password';
@@ -152,7 +153,7 @@ describe('Product Management API', () => {
       entity_type: string;
       entity_id: string;
       request_id: string;
-      safe_metadata: { before: string; after: string };
+      safe_metadata: { before: AuditJsonValue; after: AuditJsonValue };
     }>(
       `SELECT actor_user_id, action, entity_type, entity_id, request_id, safe_metadata
          FROM audit_logs WHERE entity_id = $1 AND action = 'product.created'
@@ -163,8 +164,8 @@ describe('Product Management API', () => {
     expect(audit.rows[0]?.entity_type).toBe('product');
     expect(audit.rows[0]?.entity_id).toBe(productId);
     expect(audit.rows[0]?.request_id).toBe(response.headers['x-request-id']);
-    expect(audit.rows[0]?.safe_metadata.before).toBe('null');
-    const after = JSON.parse(audit.rows[0]!.safe_metadata.after) as {
+    expect(audit.rows[0]?.safe_metadata.before).toBeNull();
+    const after = audit.rows[0]!.safe_metadata.after as {
       product: { name: string };
       initialVariant: { sellingPrice: string; costPrice: string; currency: string };
     };
@@ -179,7 +180,7 @@ describe('Product Management API', () => {
       action: string;
       entity_type: string;
       entity_id: string;
-      safe_metadata: { before: string; after: string };
+      safe_metadata: { before: AuditJsonValue; after: AuditJsonValue };
     }>(
       `SELECT actor_user_id, action, entity_type, entity_id, safe_metadata
          FROM audit_logs
@@ -194,7 +195,7 @@ describe('Product Management API', () => {
       entity_type: 'product_variant',
       entity_id: response.body.data.variants[0].id,
     });
-    expect(JSON.parse(initialVariantAudit.rows[0]!.safe_metadata.before)).toBeNull();
+    expect(initialVariantAudit.rows[0]!.safe_metadata.before).toBeNull();
 
     const details = await ownerAgent.get(`/api/v1/products/${productId}`).expect(200);
     expect(details.body.data.id).toBe(productId);
@@ -305,7 +306,7 @@ describe('Product Management API', () => {
     const audit = await pool.query<{
       action: string;
       actor_user_id: string;
-      safe_metadata: { before: string; after: string };
+      safe_metadata: { before: AuditJsonValue; after: AuditJsonValue };
     }>(
       `SELECT action, actor_user_id, safe_metadata FROM audit_logs
         WHERE entity_id = $1 AND action IN (
@@ -320,24 +321,67 @@ describe('Product Management API', () => {
       action: string;
       actor_user_id: string;
       entity_id: string;
-      safe_metadata: { before: string; after: string };
+      safe_metadata: { before: AuditJsonValue; after: AuditJsonValue };
     }>(
       `SELECT action, actor_user_id, entity_id, safe_metadata FROM audit_logs
         WHERE entity_id = $1 AND action = 'product.variant.updated'`,
       [variantId],
     );
     expect(variantAudit.rows[0]?.actor_user_id).toBe(owner.id);
-    const before = JSON.parse(variantAudit.rows[0]!.safe_metadata.before) as {
+    const before = variantAudit.rows[0]!.safe_metadata.before as {
       sellingPrice: string;
       costPrice: string;
     };
-    const after = JSON.parse(variantAudit.rows[0]!.safe_metadata.after) as {
+    const after = variantAudit.rows[0]!.safe_metadata.after as {
       sellingPrice: string;
       costPrice: string;
     };
     expect(before).toMatchObject({ sellingPrice: '80.00', costPrice: '25.00' });
     expect(after).toMatchObject({ sellingPrice: '95.75', costPrice: '31.20' });
     expect(audit.rows.every((row) => row.actor_user_id === owner.id)).toBe(true);
+  });
+
+  it('preserves complete maximum-length escaped descriptions in product audit snapshots', async () => {
+    const beforeDescription = '\u0001'.repeat(4000);
+    const afterDescription = '\u0002'.repeat(4000);
+    const created = await post(ownerAgent, '/api/v1/products', {
+      name: `Escaped audit snapshot ${suffix.slice(0, 8)}`,
+      description: beforeDescription,
+      variant: {
+        name: 'Default',
+        unitOfMeasure: 'unit',
+        sellingPrice: '10.00',
+        costPrice: '5.00',
+      },
+    });
+    expect(created.status).toBe(201);
+
+    const productId = created.body.data.id as string;
+    const updated = await patch(ownerAgent, `/api/v1/products/${productId}`, {
+      description: afterDescription,
+    });
+    expect(updated.status).toBe(200);
+
+    const event = await pool.query<{
+      safe_metadata: {
+        before: { description: string };
+        after: { description: string };
+      };
+    }>(
+      `SELECT safe_metadata
+         FROM audit_logs
+        WHERE entity_type = 'product'
+          AND entity_id = $1
+          AND action = 'product.updated'
+        ORDER BY occurred_at DESC
+        LIMIT 1`,
+      [productId],
+    );
+    const snapshots = event.rows[0]!.safe_metadata;
+    expect(snapshots.before.description).toBe(beforeDescription);
+    expect(snapshots.after.description).toBe(afterDescription);
+    expect(JSON.parse(JSON.stringify(snapshots))).toEqual(snapshots);
+    expect(JSON.stringify(snapshots).length).toBeGreaterThan(12000);
   });
 
   it('archives products without deleting products, variants or category associations', async () => {

@@ -48,6 +48,94 @@ describe('Product Management database invariants', () => {
     }
   });
 
+  it('rejects a product whose only variant is not marked as the default', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const product = await client.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Non-default variant product ${randomUUID()}`, actorId],
+      );
+      await client.query(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           is_default, created_by, updated_by
+         ) VALUES ($1, 'Non-default', 'unit', 100, 50, false, $2, $2)`,
+        [product.rows[0]!.id, actorId],
+      );
+      await expect(client.query('COMMIT')).rejects.toThrow(/exactly one default variant/i);
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+  });
+
+  it('prevents a product from having two default variants', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const product = await client.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Two default variants product ${randomUUID()}`, actorId],
+      );
+      const productId = product.rows[0]!.id;
+      await client.query(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           is_default, created_by, updated_by
+         ) VALUES ($1, 'Default one', 'unit', 100, 50, true, $2, $2)`,
+        [productId, actorId],
+      );
+      await expect(
+        client.query(
+          `INSERT INTO product_variants(
+             product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+             is_default, created_by, updated_by
+           ) VALUES ($1, 'Default two', 'unit', 200, 75, true, $2, $2)`,
+          [productId, actorId],
+        ),
+      ).rejects.toThrow(/product_variants_one_default_idx|duplicate key/i);
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+  });
+
+  it('commits a product with exactly one default variant', async () => {
+    const client = await pool.connect();
+    let productId = '';
+    try {
+      await client.query('BEGIN');
+      const product = await client.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Exactly one default product ${randomUUID()}`, actorId],
+      );
+      productId = product.rows[0]!.id;
+      await client.query(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           is_default, created_by, updated_by
+         ) VALUES ($1, 'Default', 'unit', 100, 50, true, $2, $2)`,
+        [productId, actorId],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    const invariant = await pool.query<{ variants: string; defaults: string }>(
+      `SELECT count(*)::text AS variants,
+              count(*) FILTER (WHERE is_default)::text AS defaults
+         FROM product_variants
+        WHERE product_id = $1`,
+      [productId],
+    );
+    expect(invariant.rows[0]).toEqual({ variants: '1', defaults: '1' });
+  });
+
   it('prevents category cycles at the database boundary', async () => {
     const root = await pool.query<{ id: string }>(
       'INSERT INTO product_categories(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
