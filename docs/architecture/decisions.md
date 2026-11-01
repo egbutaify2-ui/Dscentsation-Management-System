@@ -1,10 +1,10 @@
 # Dscentsation Management System — Architecture Decisions
 
-**Document status:** Proposed decisions for project-manager review  
-**Task:** 002 — Technical Architecture  
-**Decision rule:** Nothing in this document is considered approved until reviewed by the project manager/business owner.
+**Document status:** Implementation-aware architecture decisions for project-manager review  
+**Task:** 002 — Technical Architecture, reconciled against Task 005  
+**Decision rule:** Each ADR's own status is authoritative. Implementation evidence records what exists in the codebase; it does not approve a Proposed choice or change a Pending status. Confirmed business rules remain confirmed only where an ADR explicitly says so.
 
-This register records the reasons behind the proposed architecture and separates confirmed product constraints from technical recommendations.
+This document records the rationale for architecture decisions, preserves existing approval statuses and distinguishes confirmed product constraints, proposed target design and implementation choices adopted in the codebase. Task 005 was approved and merged through PR #7; that merge did not approve the whole target architecture or the unimplemented business modules.
 
 ## ADR-001 — Use a modular monolith for the first release
 
@@ -31,6 +31,8 @@ Build one React application, one Node.js/Express API and one PostgreSQL database
 - Transactions across modules remain possible inside the single application/database boundary.
 - A future service extraction will need explicit API/event contracts.
 
+**Task 005 implementation evidence (PR #7, merged):** The repository now has a pnpm monorepo with separate `apps/web` and `apps/api` applications, and the API code is divided into foundation modules for authentication, users, roles and audit. This is consistent with the modular-monolith direction at codebase level. No background worker, email service, file-storage service, Render service or production environment has been provisioned. ADR-001 remains **Proposed**; implementation does not formally ratify the modular-monolith decision, final module boundaries or worker timing.
+
 ## ADR-002 — Use React with TypeScript for the web interface
 
 **Status:** Proposed technology detail; React is confirmed by the README
@@ -55,6 +57,8 @@ Use React as the frontend framework, with TypeScript and Vite as the proposed la
 - The frontend is a presentation layer, not an enforcement boundary.
 - Business totals and permission decisions must be calculated/validated by the backend.
 - UI tests should cover user-visible states and validation, while business invariants are tested at the API/domain layer.
+
+**Task 005 implementation evidence (PR #7, merged):** The web app uses React 19.3.0, TypeScript 6.0.3 and Vite 8.3.5. It currently contains a responsive sign-in screen, authenticated shell, placeholder navigation and initial dashboard shell; business screens are not implemented. TypeScript and Vite are adopted in the codebase but are not thereby formally approved. ADR-002 remains **Proposed technology detail** pending DMS-DEC-022.
 
 ## ADR-003 — Expose a versioned REST API with Node.js and Express
 
@@ -82,6 +86,8 @@ Use Node.js and Express with TypeScript. Expose a JSON REST API under `/api/v1`.
 - API contract documentation should be added during implementation.
 - No public customer/ecommerce API is implied.
 
+**Task 005 implementation evidence (PR #7, merged):** The API uses Node.js 26.13.0, Express 5.3.0 and TypeScript 6.0.3. It exposes a versioned JSON API under `/api/v1`; current routes cover health and foundation authentication/session/capability operations only. No business-module or public ecommerce routes have been implemented. TypeScript and the versioned API contract remain implementation choices awaiting formal ratification under DMS-DEC-023; ADR-003 remains **Proposed technology detail**.
+
 ## ADR-004 — Use PostgreSQL as the system of record
 
 **Status:** Proposed technology; PostgreSQL is confirmed by the README
@@ -106,6 +112,8 @@ Use PostgreSQL as the authoritative relational database. Use migrations in versi
 - Production schema changes require reviewed migrations.
 - The ORM/data-access library remains an implementation choice to settle when repository scaffolding begins.
 - A managed database provider, region, size, backup policy and restore capability must be selected before deployment.
+
+**Task 005 implementation evidence (PR #7, merged):** The API accesses PostgreSQL through `pg` 8.23.1 using explicit parameterised SQL and uses `node-pg-migrate` 9.0.0 for versioned migrations. No ORM is included. The initial migration creates only the eight foundation tables recorded in `docs/architecture/database-design.md`. The CI integration/migration checks use disposable PostgreSQL 17. This records the codebase's adopted query/migration tooling, not formal architecture ratification; ADR-004's status remains **Proposed technology** and DMS-DEC-024 remains Pending confirmation.
 
 ### Data representation conventions
 
@@ -187,6 +195,8 @@ A Manager's global stock-location access does not depend on user_location_access
 - Changes to roles, location assignments and payment verification create audit events.
 - Detailed view/edit/export/refund/expense/user-administration permissions remain a separate matrix; they cannot override the confirmed constraints above.
 
+**Task 005 implementation evidence (PR #7, merged):** The migration seeds Owner, Manager and Staff; the four codes `payments.record`, `payments.verify`, `inventory.transfer.receive_destination_assigned` and `inventory.transfer.pickup_warehouse_to_assigned_sheraton`; and seven assignments (Owner: two, Manager: two, Staff: three). The foundation also contains permission and location-access helpers. No stock-transfer, payment or other business workflow route has been implemented, and this seed subset is not the complete business permission matrix.
+
 
 ## ADR-007 — Use individual accounts and persistent PostgreSQL-backed sessions
 
@@ -217,6 +227,8 @@ Production must never use Express MemoryStore, an in-memory session store or pro
 - Production configuration must fail closed if the persistent session store is unavailable; it must not silently fall back to an in-memory store.
 - Whether MFA is required for Owner/Manager accounts remains a separate security-policy decision.
 
+**Task 005 implementation evidence and limitations (PR #7, merged):** The API uses Argon2id hashes, provisioned accounts, `express-session` with `connect-pg-simple` 10.0.0, HttpOnly/SameSite=Lax cookies (Secure in production), login session regeneration, logout/session destruction, a session-revocation helper, idle-cookie expiry and absolute session-age handling. CSRF checks the exact configured Origin and a session-bound token. The initial Owner bootstrap is an interactive CLI operation using a transaction/advisory lock and an audit record. Production configuration requires explicit idle/absolute timeout values, Secure cookies and an HTTPS application origin; development example values are not approved production policy. Login throttling currently uses a process-local `express-rate-limit` limiter. MFA, approved session lifetime values, concurrent-session policy and high-risk-action re-authentication remain unresolved. ADR-007's stated status is unchanged.
+
 
 ## ADR-008 — Send transactional email through a provider adapter and database outbox
 
@@ -245,6 +257,8 @@ Build a provider-neutral email adapter. Store messages in an email outbox in the
 - Transactional and marketing messages remain separate; marketing consent is stored independently.
 - Sender authentication, rate limits, SMTP/API access and delivery/bounce support must be verified.
 
+**Task 005 implementation status:** No email provider adapter, email outbox, delivery-attempt table, background worker, sender credentials or email integration was implemented or provisioned. This ADR remains **Proposed; provider details pending verification**.
+
 ## ADR-009 — Store files in private object storage, not in PostgreSQL
 
 **Status:** Proposed; provider pending selection
@@ -270,6 +284,8 @@ Store file bytes in a private object-storage bucket. Keep metadata, ownership an
 - Enforce allowed file types, file size, generated object keys and upload permissions.
 - Consider malware scanning before files are made available to other users.
 - Provider, storage region, retention, backup and lifecycle rules need confirmation.
+
+**Task 005 implementation status:** No object-storage adapter, storage bucket, file metadata table, upload/download workflow or storage provider was implemented or provisioned. This ADR remains **Proposed; provider pending selection**.
 
 ## ADR-010 — Prefer Render Postgres, subject to backup, recovery and cost verification
 
@@ -305,6 +321,8 @@ Prefer Render for the frontend/API and Render Postgres for the managed database,
 - Use separate staging and production configuration; migrations are controlled deployment steps.
 - No deployment or service provisioning is part of this architecture-correction task.
 
+**Task 005 implementation status:** No Render frontend, API, worker or production PostgreSQL service was provisioned, and no deployment occurred. Render Postgres remains a preferred candidate subject to the verification and approval already stated in this ADR; its status is unchanged.
+
 
 ## ADR-011 — Use an automated test pyramid with special focus on transaction invariants
 
@@ -330,6 +348,8 @@ Use frontend component tests, backend unit tests, PostgreSQL-backed API/integrat
 - Tests must run in CI before merging.
 - Test database migrations from a clean database.
 - Production deployment should be blocked by failing critical tests.
+
+**Task 005 implementation evidence (PR #7, merged):** The current CI workflow runs for pull requests targeting `main` and pushes to `main`. The implemented checks include Prettier, ESLint, TypeScript, Vitest, Supertest, React Testing Library, PostgreSQL-backed integration/security tests, clean migration and seed verification, rollback/reapplication, production-mode migration-up and rollback-guard checks, production builds and patch-whitespace verification. CI uses a disposable PostgreSQL 17 service. Playwright is not present in the package manifests or current workflow, and comprehensive user journeys, concurrent stock reservation/transfer invariants and financial-workflow tests remain future coverage. ADR-011 remains **Proposed**; implementation of this baseline does not approve the complete test strategy or gate policy.
 
 ## ADR-012 — Keep product registration manual and exclude the storefront
 
@@ -381,6 +401,8 @@ Keep order totals, payment events, refunds, expenses and cost snapshots separate
 - No payment gateway or automated bank reconciliation is assumed.
 - Finance reports must label estimates clearly and use verified source records.
 
+**Task 005 implementation status:** The migration seeds the payment-entry and payment-verification permission codes, but the physical schema contains no payment, refund, order, expense or cost tables and the API contains no financial workflow routes. The broader financial event/reporting model remains Proposed under ADR-013 and DMS-DEC-028; the permission seed does not implement that model.
+
 ## ADR-014 — Persist explicit receipt issuance records
 
 **Status:** Required architecture design.
@@ -404,6 +426,8 @@ Create an immutable receipt_issuances record whenever a receipt is issued. Store
 - Receipt issuance and email delivery are tracked independently.
 - Receipt records are not silently overwritten or deleted; corrections create a void/reissue event and replacement reference.
 - Receipt numbering/format and the exact business event that triggers each receipt type remain operational details to confirm.
+
+**Task 005 implementation status:** No `receipt_issuances` or `receipt_issuance_events` table, receipt-generation workflow or email-outbox linkage was implemented. ADR-014 remains an architecture design requirement, not a delivered receipt feature.
 
 ## ADR-015 — Use one fulfilment location per order in the first release
 
