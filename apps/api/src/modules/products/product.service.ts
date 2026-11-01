@@ -407,6 +407,7 @@ export async function updateCategory(
   input: CategoryUpdateInput,
 ): Promise<Category> {
   return inTransaction(async (client) => {
+    await client.query('SELECT pg_advisory_xact_lock(73518021)');
     const locked = await client.query<CategoryRow>(
       'SELECT id FROM product_categories WHERE id = $1 FOR UPDATE',
       [categoryId],
@@ -489,7 +490,7 @@ export async function createProduct(
     );
     const productId = inserted.rows[0]!.id;
     const variant = input.variant;
-    const isDefault = variant.name.toLowerCase() === 'default';
+    const isDefault = true;
     await client.query(
       `INSERT INTO product_variants(
          product_id, name, sku, unit_of_measure, selling_price_minor, cost_price_minor,
@@ -537,7 +538,8 @@ export async function updateProduct(
   return inTransaction(async (client) => {
     const before = await loadProduct(client, productId, true);
     const categoryId = input.categoryId === undefined ? before.categoryId : input.categoryId;
-    if (input.categoryId !== undefined) await requireActiveCategory(client, categoryId);
+    if (input.categoryId !== undefined && categoryId !== before.categoryId)
+      await requireActiveCategory(client, categoryId);
     await client.query(
       `UPDATE products
           SET name = COALESCE($2, name),
