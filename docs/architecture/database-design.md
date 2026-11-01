@@ -1,6 +1,6 @@
 # Dscentsation Management System — Database Design
 
-**Document status:** The eight-table physical Task 005 foundation is documented; the conceptual business schema remains proposed. This is not an approved final business schema or a production migration.
+**Document status:** The eight-table Task 005 foundation is the merged `main` baseline. The unmerged Task 007 branch candidate adds three product tables described below; this document is not an approved final business schema or a production migration.
 **Task:** 002 — Technical Architecture, updated for Task 005
 
 **Database:** PostgreSQL  
@@ -19,7 +19,17 @@ Task 005 was approved and merged into `main` through PR #7 (merge commit `652b5d
 7. `user_sessions`
 8. `audit_logs`
 
-No product, product-variant, customer, order, delivery, inventory-balance, stock-movement, transfer, payment, refund, expense, supplier, procurement, return, receipt-issuance, file-metadata or email-outbox table has been implemented. The entity groups and relationship model in the following conceptual sections describe the proposed future business schema; they must not be mistaken for migrated tables.
+No product, product-variant, customer, order, delivery, inventory-balance, stock-movement, transfer, payment, refund, expense, supplier, procurement, return, receipt-issuance, file-metadata or email-outbox table exists in the eight-table Task 005 `main` baseline. The unmerged Task 007 branch adds product-specific tables only; the remaining conceptual entities must not be mistaken for migrated tables.
+
+### Task 007 Product Management branch candidate — not merged or accepted
+
+The unmerged `task-007-product-management` branch adds migration `002_product_management.js` with three physical tables:
+
+- `product_categories`: optional self-referencing parent, name/description, active flag and timestamps. A PostgreSQL trigger rejects self-parenting and category cycles.
+- `products`: optional restrictive category FK, manually entered name/description/internal code, active/archived status, creator/updater references and timestamps.
+- `product_variants`: product FK, variant/size label, optional non-unique SKU, validated free-form unit label, BIGINT current selling/cost prices in kobo, NGN currency, active/default flags, creator/updater references and timestamps.
+
+The migration prevents hard deletion of categories, products and variants, prevents variant reparenting, and ensures a committed product retains at least one variant. Product creation inserts its initial variant in the same transaction. The branch introduces no stock tables, image/file storage or inventory valuation history. Six explicit product permissions are assigned to Owner only; Manager and Staff receive none. DMS-DEC-002 remains open. Only current cost price is stored; DMS-DEC-015 remains open and no costing or valuation policy is implemented.
 
 ### Implemented database approach
 
@@ -53,7 +63,7 @@ These are only the confirmed rules represented in the foundation seed. They are 
 
 The `user_sessions` table follows the `connect-pg-simple` adapter shape (`sid`, `sess`, `expire`) with additional user attribution and timestamps. It is not identical to the generic conceptual session columns shown in the proposed entity model below. The `audit_logs` table is protected by PostgreSQL triggers that reject UPDATE, DELETE and TRUNCATE operations.
 
-Only the eight tables above exist in the Task 005 migration. No production database was provisioned; all CI migration and integration testing uses disposable synthetic data.
+Only the eight foundation tables exist in Task 005 migration 001 on `main`. Task 007 migration 002 adds the three product tables below on its unmerged branch. No production database was provisioned; CI uses disposable synthetic data.
 
 ## 1. Design principles
 
@@ -431,4 +441,4 @@ Remaining design/configuration details:
 10. Render Postgres backup/recovery verification, restore-test evidence, expected recovery objectives and total cost approval.
 11. Confirm the physical paperwork/reference process used by Sheraton Staff at Warehouse; the permission boundary and stock movement rules for pickup remain as specified.
 
-**Schema status:** The eight-table physical Task 005 foundation is documented. The conceptual business schema remains proposed and requires separate business and architecture approval before implementation. This document is not an approved final business schema or a production migration.
+**Schema status:** The eight-table Task 005 foundation is the merged baseline. The three Task 007 product tables exist only on an unmerged implementation branch awaiting independent review. The remaining conceptual schema and outstanding business/architecture decisions remain unapproved.
