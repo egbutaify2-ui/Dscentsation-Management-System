@@ -1,7 +1,8 @@
 # Dscentsation Management System — Database Design
 
-**Document status:** Conceptual schema draft reconciled with the Task 005 physical foundation; pending project-manager review  
-**Task:** 002 — Technical Architecture, updated for Task 005  
+**Document status:** Conceptual schema draft reconciled with the Task 005 physical foundation; pending project-manager review
+**Task:** 002 — Technical Architecture, updated for Task 005
+
 **Database:** PostgreSQL  
 **Purpose:** Distinguish the physical eight-table foundation migration from the larger proposed business schema below. The conceptual entity groups are not an executable migration and do not indicate that a production database has been provisioned.
 
