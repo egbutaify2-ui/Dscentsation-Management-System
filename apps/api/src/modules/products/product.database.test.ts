@@ -6,7 +6,9 @@ import { fromMinorUnits, toMinorUnits } from './product.money.js';
 let actorId: string;
 
 beforeAll(async () => {
-  const ownerRole = await pool.query<{ id: string }>('SELECT id FROM roles WHERE code = $1', ['OWNER']);
+  const ownerRole = await pool.query<{ id: string }>('SELECT id FROM roles WHERE code = $1', [
+    'OWNER',
+  ]);
   if (!ownerRole.rows[0]) throw new Error('Owner role seed is missing.');
   const user = await pool.query<{ id: string }>(
     `INSERT INTO users(email_normalized, display_name, password_hash, role_id)
@@ -35,10 +37,10 @@ describe('Product Management database invariants', () => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query(
-        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2)',
-        [`Missing variant ${randomUUID()}`, actorId],
-      );
+      await client.query('INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2)', [
+        `Missing variant ${randomUUID()}`,
+        actorId,
+      ]);
       await expect(client.query('COMMIT')).rejects.toThrow(/at least one variant/i);
       await client.query('ROLLBACK');
     } finally {
@@ -90,10 +92,10 @@ describe('Product Management database invariants', () => {
       pool.query('DELETE FROM product_categories WHERE id = $1', [category.rows[0]!.id]),
     ).rejects.toThrow(/must be deactivated or archived/i);
 
-    const linked = await pool.query(
-      'SELECT id FROM products WHERE id = $1 AND category_id = $2',
-      [product.rows[0]!.id, category.rows[0]!.id],
-    );
+    const linked = await pool.query('SELECT id FROM products WHERE id = $1 AND category_id = $2', [
+      product.rows[0]!.id,
+      category.rows[0]!.id,
+    ]);
     expect(linked.rowCount).toBe(1);
   });
 
