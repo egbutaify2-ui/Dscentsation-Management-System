@@ -253,7 +253,7 @@ A status describes the state evidenced by the current source documents. It is no
 - **Related architecture document and section:** `README.md` — “Application architecture and technology status” and “Scope and boundaries”; `docs/architecture/overview.md` — §3.2 “Backend — Node.js and Express”; `docs/architecture/decisions.md` — ADR-003.
 - **Status:** Proposed
 
-### DMS-DEC-024 — Select database access and migration tooling
+### DMS-DEC-024 — Ratify database access and migration tooling
 
 - **Topic:** Formal ratification of the database access and migration tooling already adopted in Task 005.
 - **Outstanding question:** Should the existing explicit-SQL `pg` and `node-pg-migrate` implementation be accepted as the project's database access/migration convention, or should a reviewed alternative be selected before further schema work?
