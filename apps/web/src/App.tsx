@@ -1,10 +1,20 @@
+import { useEffect, useState } from 'react';
 import { AppShell } from './components/AppShell.js';
 import { useAuth } from './features/auth/AuthProvider.js';
 import { LoginPage } from './features/auth/LoginPage.js';
 import { DashboardPage } from './features/dashboard/DashboardPage.js';
+import { ProductManagementPage } from './features/products/ProductManagementPage.js';
+
+type Section = 'overview' | 'products';
 
 export function App() {
-  const { status, user, error, login, logout, refresh } = useAuth();
+  const { status, user, permissions, error, login, logout, refresh } = useAuth();
+  const [activeSection, setActiveSection] = useState<Section>('overview');
+  const canViewProducts = permissions.includes('products.view');
+
+  useEffect(() => {
+    if (!canViewProducts && activeSection === 'products') setActiveSection('overview');
+  }, [activeSection, canViewProducts]);
 
   if (status === 'loading') {
     return (
@@ -28,8 +38,18 @@ export function App() {
   }
   if (status !== 'authenticated' || !user) return <LoginPage onLogin={login} />;
   return (
-    <AppShell user={user} onLogout={logout}>
-      <DashboardPage user={user} />
+    <AppShell
+      user={user}
+      permissions={permissions}
+      activeSection={activeSection}
+      onNavigate={setActiveSection}
+      onLogout={logout}
+    >
+      {activeSection === 'products' && canViewProducts ? (
+        <ProductManagementPage />
+      ) : (
+        <DashboardPage user={user} />
+      )}
     </AppShell>
   );
 }

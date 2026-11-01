@@ -6,7 +6,7 @@
 **Scope:** Initial internal operations platform for Dscentsation's Nigerian operations  
 **Requirements and implementation sources:** Repository `README.md`, Task 005 merge commit `652b5d51d17ecb36e78871a99164c12238a8ac41`, application manifests, source, migration and CI workflow
 
-> This document distinguishes confirmed product/business rules, the Task 005 implementation that now exists in `main`, and target architecture that remains proposed or requires confirmation. Implementing a proposed choice does not by itself ratify that architecture decision. No production infrastructure or business-module workflow is implied.
+> This document distinguishes confirmed product/business rules, the Task 005 implementation in `main`, the unmerged Task 007 Product Management branch candidate, and target architecture that remains proposed or requires confirmation. Implementing a proposed choice does not by itself ratify that architecture decision. No production infrastructure or business-module workflow is implied.
 
 ## 1. Architecture goals
 

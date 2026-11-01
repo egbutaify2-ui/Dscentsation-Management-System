@@ -1,0 +1,394 @@
+import { randomUUID } from 'node:crypto';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { pool } from '../../db/pool.js';
+import { fromMinorUnits, toMinorUnits } from './product.money.js';
+
+let actorId: string;
+
+beforeAll(async () => {
+  const ownerRole = await pool.query<{ id: string }>('SELECT id FROM roles WHERE code = $1', [
+    'OWNER',
+  ]);
+  if (!ownerRole.rows[0]) throw new Error('Owner role seed is missing.');
+  const user = await pool.query<{ id: string }>(
+    `INSERT INTO users(email_normalized, display_name, password_hash, role_id)
+     VALUES ($1, 'Synthetic Product DB Actor', 'synthetic-test-hash', $2)
+     RETURNING id`,
+    [`task007.database.${randomUUID()}@example.invalid`, ownerRole.rows[0].id],
+  );
+  actorId = user.rows[0]!.id;
+});
+
+afterAll(async () => {
+  await pool.end();
+});
+
+describe('Product Management database invariants', () => {
+  it('converts decimal naira values to integer kobo without floating-point arithmetic', () => {
+    expect(toMinorUnits('1250')).toBe('125000');
+    expect(toMinorUnits('1250.5')).toBe('125050');
+    expect(toMinorUnits('0.01')).toBe('1');
+    expect(fromMinorUnits('9223372036854775807')).toBe('92233720368547758.07');
+    expect(() => toMinorUnits('1.005')).toThrow(/two decimal places/i);
+    expect(() => toMinorUnits('92233720368547758.08')).toThrow(/too large/i);
+  });
+
+  it('rejects a product transaction that does not create at least one variant', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2)', [
+        `Missing variant ${randomUUID()}`,
+        actorId,
+      ]);
+      await expect(client.query('COMMIT')).rejects.toThrow(/at least one variant/i);
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+  });
+
+  it('rejects a product whose only variant is not marked as the default', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const product = await client.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Non-default variant product ${randomUUID()}`, actorId],
+      );
+      await client.query(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           is_default, created_by, updated_by
+         ) VALUES ($1, 'Non-default', 'unit', 100, 50, false, $2, $2)`,
+        [product.rows[0]!.id, actorId],
+      );
+      await expect(client.query('COMMIT')).rejects.toThrow(/exactly one default variant/i);
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+  });
+
+  it('prevents a product from having two default variants', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const product = await client.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Two default variants product ${randomUUID()}`, actorId],
+      );
+      const productId = product.rows[0]!.id;
+      await client.query(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           is_default, created_by, updated_by
+         ) VALUES ($1, 'Default one', 'unit', 100, 50, true, $2, $2)`,
+        [productId, actorId],
+      );
+      await expect(
+        client.query(
+          `INSERT INTO product_variants(
+             product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+             is_default, created_by, updated_by
+           ) VALUES ($1, 'Default two', 'unit', 200, 75, true, $2, $2)`,
+          [productId, actorId],
+        ),
+      ).rejects.toThrow(/product_variants_one_default_idx|duplicate key/i);
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+  });
+
+  it('commits a product with exactly one default variant', async () => {
+    const client = await pool.connect();
+    let productId = '';
+    try {
+      await client.query('BEGIN');
+      const product = await client.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Exactly one default product ${randomUUID()}`, actorId],
+      );
+      productId = product.rows[0]!.id;
+      await client.query(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           is_default, created_by, updated_by
+         ) VALUES ($1, 'Default', 'unit', 100, 50, true, $2, $2)`,
+        [productId, actorId],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    const invariant = await pool.query<{ variants: string; defaults: string }>(
+      `SELECT count(*)::text AS variants,
+              count(*) FILTER (WHERE is_default)::text AS defaults
+         FROM product_variants
+        WHERE product_id = $1`,
+      [productId],
+    );
+    expect(invariant.rows[0]).toEqual({ variants: '1', defaults: '1' });
+  });
+
+  it('rejects variant reparenting and preserves both product relationships', async () => {
+    const client = await pool.connect();
+    let firstProductId = '';
+    let secondProductId = '';
+    let firstVariantId = '';
+    let secondVariantId = '';
+    try {
+      await client.query('BEGIN');
+      const firstProduct = await client.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Reparent source product ${randomUUID()}`, actorId],
+      );
+      firstProductId = firstProduct.rows[0]!.id;
+      const secondProduct = await client.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Reparent destination product ${randomUUID()}`, actorId],
+      );
+      secondProductId = secondProduct.rows[0]!.id;
+
+      const firstVariant = await client.query<{ id: string }>(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           is_default, created_by, updated_by
+         ) VALUES ($1, 'Source default', 'unit', 100, 50, true, $2, $2) RETURNING id`,
+        [firstProductId, actorId],
+      );
+      firstVariantId = firstVariant.rows[0]!.id;
+      const secondVariant = await client.query<{ id: string }>(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           is_default, created_by, updated_by
+         ) VALUES ($1, 'Destination default', 'unit', 200, 75, true, $2, $2) RETURNING id`,
+        [secondProductId, actorId],
+      );
+      secondVariantId = secondVariant.rows[0]!.id;
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    await expect(
+      pool.query('UPDATE product_variants SET product_id = $2 WHERE id = $1', [
+        firstVariantId,
+        secondProductId,
+      ]),
+    ).rejects.toMatchObject({
+      code: '23514',
+      constraint: 'product_variants_product_id_immutable',
+    });
+
+    const relationships = await pool.query<{
+      variant_id: string;
+      product_id: string;
+      joined_product_id: string;
+    }>(
+      `SELECT pv.id AS variant_id, pv.product_id, p.id AS joined_product_id
+         FROM product_variants pv
+         JOIN products p ON p.id = pv.product_id
+        WHERE pv.id = ANY($1::uuid[])`,
+      [[firstVariantId, secondVariantId]],
+    );
+    expect(relationships.rows).toHaveLength(2);
+    const byVariant = new Map(relationships.rows.map((row) => [row.variant_id, row]));
+    expect(byVariant.get(firstVariantId)).toMatchObject({
+      product_id: firstProductId,
+      joined_product_id: firstProductId,
+    });
+    expect(byVariant.get(secondVariantId)).toMatchObject({
+      product_id: secondProductId,
+      joined_product_id: secondProductId,
+    });
+  });
+
+  it('allows normal variant edits without changing its product relationship', async () => {
+    const client = await pool.connect();
+    let productId = '';
+    let variantId = '';
+    try {
+      await client.query('BEGIN');
+      const product = await client.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Editable variant product ${randomUUID()}`, actorId],
+      );
+      productId = product.rows[0]!.id;
+      const variant = await client.query<{ id: string }>(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           is_default, created_by, updated_by
+         ) VALUES ($1, 'Original name', 'original-unit', 100, 50, true, $2, $2) RETURNING id`,
+        [productId, actorId],
+      );
+      variantId = variant.rows[0]!.id;
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    await pool.query(
+      `UPDATE product_variants
+          SET name = $2,
+              sku = $3,
+              unit_of_measure = $4,
+              selling_price_minor = $5,
+              cost_price_minor = $6,
+              is_active = $7,
+              updated_by = $8,
+              updated_at = now()
+        WHERE id = $1`,
+      [variantId, 'Updated name', 'UPDATED-SKU', 'updated-unit', '12500', '7500', false, actorId],
+    );
+
+    const edited = await pool.query<{
+      product_id: string;
+      name: string;
+      sku: string;
+      unit_of_measure: string;
+      selling_price_minor: string;
+      cost_price_minor: string;
+      is_active: boolean;
+      is_default: boolean;
+    }>(
+      `SELECT product_id, name, sku, unit_of_measure, selling_price_minor::text,
+              cost_price_minor::text, is_active, is_default
+         FROM product_variants
+        WHERE id = $1`,
+      [variantId],
+    );
+    expect(edited.rows[0]).toEqual({
+      product_id: productId,
+      name: 'Updated name',
+      sku: 'UPDATED-SKU',
+      unit_of_measure: 'updated-unit',
+      selling_price_minor: '12500',
+      cost_price_minor: '7500',
+      is_active: false,
+      is_default: true,
+    });
+  });
+
+  it('prevents category cycles at the database boundary', async () => {
+    const root = await pool.query<{ id: string }>(
+      'INSERT INTO product_categories(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+      [`Cycle root ${randomUUID()}`, actorId],
+    );
+    const child = await pool.query<{ id: string }>(
+      'INSERT INTO product_categories(name, parent_id, created_by, updated_by) VALUES ($1, $2, $3, $3) RETURNING id',
+      [`Cycle child ${randomUUID()}`, root.rows[0]!.id, actorId],
+    );
+    await expect(
+      pool.query('UPDATE product_categories SET parent_id = $2 WHERE id = $1', [
+        root.rows[0]!.id,
+        child.rows[0]!.id,
+      ]),
+    ).rejects.toThrow(/cycle/i);
+  });
+
+  it('keeps product and variant records non-deletable and retains category references', async () => {
+    const client = await pool.connect();
+    let categoryId = '';
+    let productId = '';
+    let variantId = '';
+    try {
+      await client.query('BEGIN');
+      const category = await client.query<{ id: string }>(
+        'INSERT INTO product_categories(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Delete guard category ${randomUUID()}`, actorId],
+      );
+      categoryId = category.rows[0]!.id;
+      const product = await client.query<{ id: string }>(
+        'INSERT INTO products(name, category_id, created_by, updated_by) VALUES ($1, $2, $3, $3) RETURNING id',
+        [`Delete guard product ${randomUUID()}`, categoryId, actorId],
+      );
+      productId = product.rows[0]!.id;
+      const variant = await client.query<{ id: string }>(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           is_default, created_by, updated_by
+         ) VALUES ($1, 'Default', 'test-unit-label', 101, 50, true, $2, $2) RETURNING id`,
+        [productId, actorId],
+      );
+      variantId = variant.rows[0]!.id;
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    await expect(
+      pool.query('DELETE FROM product_variants WHERE id = $1', [variantId]),
+    ).rejects.toThrow(/must be deactivated or archived/i);
+    await expect(pool.query('DELETE FROM products WHERE id = $1', [productId])).rejects.toThrow(
+      /must be deactivated or archived/i,
+    );
+    await expect(
+      pool.query('DELETE FROM product_categories WHERE id = $1', [categoryId]),
+    ).rejects.toThrow(/must be deactivated or archived/i);
+
+    const linked = await pool.query('SELECT id FROM products WHERE id = $1 AND category_id = $2', [
+      productId,
+      categoryId,
+    ]);
+    expect(linked.rowCount).toBe(1);
+  });
+
+  it('uses BIGINT money columns and keeps currency in the initial NGN boundary', async () => {
+    const columns = await pool.query<{ column_name: string; data_type: string }>(
+      `SELECT column_name, data_type FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'product_variants'
+          AND column_name IN ('selling_price_minor', 'cost_price_minor')`,
+    );
+    expect(columns.rows).toEqual([
+      { column_name: 'cost_price_minor', data_type: 'bigint' },
+      { column_name: 'selling_price_minor', data_type: 'bigint' },
+    ]);
+    const client = await pool.connect();
+    let productId = '';
+    try {
+      await client.query('BEGIN');
+      const product = await client.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        [`Currency constraint product ${randomUUID()}`, actorId],
+      );
+      productId = product.rows[0]!.id;
+      await client.query(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           currency, is_default, created_by, updated_by
+         ) VALUES ($1, 'Default', 'unit', 10, 5, 'NGN', true, $2, $2)`,
+        [productId, actorId],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    await expect(
+      pool.query(
+        `INSERT INTO product_variants(
+           product_id, name, unit_of_measure, selling_price_minor, cost_price_minor,
+           currency, created_by, updated_by
+         ) VALUES ($1, 'Unsupported currency', 'unit', 10, 5, 'USD', $2, $2)`,
+        [productId, actorId],
+      ),
+    ).rejects.toThrow();
+  });
+});

@@ -3,8 +3,19 @@ import { runner } from 'node-pg-migrate';
 import { env } from '../config/env.js';
 
 const direction = process.argv[2];
+const countArgument = process.argv[3];
+const count =
+  countArgument === undefined
+    ? undefined
+    : Number.isSafeInteger(Number(countArgument)) && Number(countArgument) > 0
+      ? Number(countArgument)
+      : null;
+
 if (direction !== 'up' && direction !== 'down') {
-  throw new Error('Usage: pnpm db:migrate | pnpm db:rollback');
+  throw new Error('Usage: pnpm db:migrate | pnpm db:rollback [count]');
+}
+if (count === null) {
+  throw new Error('Migration count must be a positive safe integer.');
 }
 
 if (direction === 'down' && env.NODE_ENV === 'production') {
@@ -23,6 +34,7 @@ if (direction === 'down' && env.NODE_ENV === 'production') {
     dir: migrationsDirectory,
     migrationsTable: 'pgmigrations',
     direction,
+    ...(count === undefined ? {} : { count }),
     singleTransaction: true,
     verbose: false,
   });

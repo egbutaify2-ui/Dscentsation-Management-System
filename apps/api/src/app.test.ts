@@ -255,22 +255,36 @@ describe('DMS foundation API', () => {
       .expect(401);
   });
 
-  it('seeds only the three established roles and four confirmed permission codes', async () => {
+  it('preserves foundation permissions and assigns Product Management permissions only to Owner', async () => {
     const roles = await pool.query<{ code: string }>('SELECT code FROM roles ORDER BY code');
     const permissions = await pool.query<{ code: string }>(
       'SELECT code FROM permissions ORDER BY code',
     );
+    const productPermissions = [
+      'products.archive',
+      'products.categories.manage',
+      'products.create',
+      'products.update',
+      'products.variants.manage',
+      'products.view',
+    ];
     expect(roles.rows.map((row) => row.code)).toEqual(['MANAGER', 'OWNER', 'STAFF']);
     expect(permissions.rows.map((row) => row.code)).toEqual([
       'inventory.transfer.pickup_warehouse_to_assigned_sheraton',
       'inventory.transfer.receive_destination_assigned',
       'payments.record',
       'payments.verify',
+      ...productPermissions,
     ]);
     expect(staff.permissions).toContain('payments.record');
     expect(staff.permissions).not.toContain('payments.verify');
     expect(manager.permissions).toContain('payments.verify');
     expect(owner.permissions).toContain('payments.verify');
+    for (const permission of productPermissions) {
+      expect(owner.permissions).toContain(permission);
+      expect(manager.permissions).not.toContain(permission);
+      expect(staff.permissions).not.toContain(permission);
+    }
   });
 
   it('enforces global Owner/Manager and assigned-only Staff location access', async () => {

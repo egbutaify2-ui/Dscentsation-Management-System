@@ -11,14 +11,13 @@ export const pool = new Pool({
 });
 
 pool.on('error', (error) => {
-  // Do not log arbitrary driver messages; they may contain connection details.
   console.error('Unexpected idle PostgreSQL client error.', {
     name: error.name,
     code: 'code' in error && typeof error.code === 'string' ? error.code : undefined,
   });
 });
 
-const requiredFoundationTables = [
+const requiredApplicationTables = [
   'roles',
   'permissions',
   'role_permissions',
@@ -27,6 +26,9 @@ const requiredFoundationTables = [
   'user_location_access',
   'user_sessions',
   'audit_logs',
+  'product_categories',
+  'products',
+  'product_variants',
 ] as const;
 
 export async function assertDatabaseReady(): Promise<void> {
@@ -37,14 +39,14 @@ export async function assertDatabaseReady(): Promise<void> {
       FROM unnest($1::text[]) AS required(table_name)
       ORDER BY required.table_name
     `,
-    [requiredFoundationTables],
+    [requiredApplicationTables],
   );
 
   const missing = result.rows.filter((row) => !row.present).map((row) => row.table_name);
 
   if (missing.length > 0) {
     throw new Error(
-      `Required foundation tables are missing: ${missing.join(', ')}. ` +
+      `Required application tables are missing: ${missing.join(', ')}. ` +
         'Run "pnpm db:migrate" before starting the API.',
     );
   }

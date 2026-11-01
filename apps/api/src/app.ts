@@ -5,6 +5,7 @@ import { env } from './config/env.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { sessionMiddleware } from './middleware/session.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { productRoutes } from './modules/products/product.routes.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -25,6 +26,7 @@ export function createApp(): express.Express {
     response.json({ data: { status: 'ok' } });
   });
   app.use('/api/v1/auth', authRoutes);
+  app.use('/api/v1', productRoutes);
 
   app.use((_request, response) => {
     response.status(404).json({
@@ -43,7 +45,6 @@ export function createApp(): express.Express {
       response: express.Response,
       _next: express.NextFunction,
     ) => {
-      // Express identifies error middleware by its four-argument signature.
       void _next;
       console.error('DMS API request failed.', {
         requestId: request.requestId,

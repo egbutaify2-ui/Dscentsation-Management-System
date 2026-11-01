@@ -2,29 +2,40 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthenticatedUser } from '../features/auth/AuthProvider.js';
 
-const navigation = [
-  'Overview',
-  'Orders',
-  'Inventory',
-  'Customers',
-  'Suppliers',
-  'Finance',
-  'Reports',
-];
-const symbols = ['◫', '▤', '▥', '♙', '▧', '₦', '▦'];
+type Section = 'overview' | 'products';
+type NavigationItem = { label: string; section?: Section; symbol: string; enabled: boolean };
 
 export function AppShell({
   user,
+  permissions,
+  activeSection,
+  onNavigate,
   onLogout,
   children,
 }: {
   user: AuthenticatedUser;
+  permissions: string[];
+  activeSection: Section;
+  onNavigate: (section: Section) => void;
   onLogout: () => Promise<void>;
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const productVisible = permissions.includes('products.view');
+  const navigation: NavigationItem[] = [
+    { label: 'Overview', section: 'overview' as const, symbol: '◫', enabled: true },
+    ...(productVisible
+      ? [{ label: 'Products', section: 'products' as const, symbol: '◈', enabled: true }]
+      : []),
+    { label: 'Orders', symbol: '▤', enabled: false },
+    { label: 'Inventory', symbol: '▥', enabled: false },
+    { label: 'Customers', symbol: '♙', enabled: false },
+    { label: 'Suppliers', symbol: '▧', enabled: false },
+    { label: 'Finance', symbol: '₦', enabled: false },
+    { label: 'Reports', symbol: '▦', enabled: false },
+  ];
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -36,6 +47,13 @@ export function AppShell({
       setLoggingOut(false);
     }
   }
+
+  function navigate(section: Section) {
+    onNavigate(section);
+    setMenuOpen(false);
+  }
+
+  const activeLabel = activeSection === 'products' ? 'Products' : 'Overview';
 
   return (
     <div className="app-shell">
@@ -53,27 +71,33 @@ export function AppShell({
         </div>
         <div className="nav-label">WORKSPACE</div>
         <nav aria-label="Main navigation" className="main-navigation">
-          {navigation.map((item, index) => (
-            <button
-              key={item}
-              type="button"
-              className={`nav-item ${index === 0 ? 'nav-active' : 'nav-disabled'}`}
-              disabled={index !== 0}
-              aria-current={index === 0 ? 'page' : undefined}
-              title={index === 0 ? 'Overview' : 'Module not yet implemented'}
-            >
-              <span className="nav-symbol" aria-hidden="true">
-                {symbols[index]}
-              </span>
-              <span>{item}</span>
-              {index !== 0 && <span className="nav-soon">Soon</span>}
-            </button>
-          ))}
+          {navigation.map((item) => {
+            const active = item.enabled && item.section === activeSection;
+            return (
+              <button
+                key={item.label}
+                type="button"
+                className={`nav-item ${active ? 'nav-active' : ''} ${!item.enabled ? 'nav-disabled' : ''}`}
+                disabled={!item.enabled}
+                aria-current={active ? 'page' : undefined}
+                title={item.enabled ? item.label : 'Module not yet implemented'}
+                onClick={() => {
+                  if (item.enabled && item.section) navigate(item.section);
+                }}
+              >
+                <span className="nav-symbol" aria-hidden="true">
+                  {item.symbol}
+                </span>
+                <span>{item.label}</span>
+                {!item.enabled && <span className="nav-soon">Soon</span>}
+              </button>
+            );
+          })}
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-note">
             <span className="status-dot" />
-            Foundation environment
+            Internal workspace
           </div>
           <div className="sidebar-user">
             <div className="user-avatar" aria-hidden="true">
@@ -100,7 +124,7 @@ export function AppShell({
           <div className="breadcrumb">
             <span>Workspace</span>
             <span className="breadcrumb-divider">/</span>
-            <strong>Overview</strong>
+            <strong>{activeLabel}</strong>
           </div>
           <div className="topbar-right">
             <span className="topbar-role">{user.roleName}</span>
@@ -122,7 +146,7 @@ export function AppShell({
         <main>{children}</main>
         <footer className="app-footer">
           <span>Dscentsation Management System</span>
-          <span>Internal workspace · Foundation release</span>
+          <span>Internal workspace · Product Management release</span>
         </footer>
       </div>
     </div>

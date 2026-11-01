@@ -39,7 +39,10 @@ BEGIN
 
   SELECT array_agg(code ORDER BY code)
     INTO actual_permissions
-    FROM permissions;
+    FROM permissions
+   WHERE code IN ('payments.record', 'payments.verify',
+     'inventory.transfer.receive_destination_assigned',
+     'inventory.transfer.pickup_warehouse_to_assigned_sheraton');
 
   IF actual_permissions IS DISTINCT FROM ARRAY[
     'inventory.transfer.pickup_warehouse_to_assigned_sheraton',
@@ -69,7 +72,7 @@ INSERT INTO expected_role_permissions(role_code, permission_code) VALUES
 
 DO $$
 BEGIN
-  IF (SELECT count(*) FROM role_permissions) <> 7 THEN
+  IF (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.code NOT LIKE 'products.%') <> 7 THEN
     RAISE EXCEPTION 'Expected seven role-permission assignments, found %',
       (SELECT count(*) FROM role_permissions);
   END IF;
@@ -79,6 +82,7 @@ BEGIN
       FROM role_permissions rp
       JOIN roles r ON r.id = rp.role_id
       JOIN permissions p ON p.id = rp.permission_id
+     WHERE p.code NOT LIKE 'products.%'
     EXCEPT
     SELECT role_code, permission_code FROM expected_role_permissions
   ) OR EXISTS (
@@ -88,6 +92,7 @@ BEGIN
       FROM role_permissions rp
       JOIN roles r ON r.id = rp.role_id
       JOIN permissions p ON p.id = rp.permission_id
+     WHERE p.code NOT LIKE 'products.%'
   ) THEN
     RAISE EXCEPTION 'Role-permission assignments do not match the confirmed matrix';
   END IF;
@@ -133,8 +138,8 @@ ON CONFLICT DO NOTHING;
 DO $$
 BEGIN
   IF (SELECT count(*) FROM roles) <> 3
-     OR (SELECT count(*) FROM permissions) <> 4
-     OR (SELECT count(*) FROM role_permissions) <> 7 THEN
+     OR (SELECT count(*) FROM permissions) <> 10
+     OR (SELECT count(*) FROM role_permissions) <> 13 THEN
     RAISE EXCEPTION 'Conflict-safe seed replay changed the number of seed records';
   END IF;
 
@@ -143,6 +148,7 @@ BEGIN
       FROM role_permissions rp
       JOIN roles r ON r.id = rp.role_id
       JOIN permissions p ON p.id = rp.permission_id
+     WHERE p.code NOT LIKE 'products.%'
     EXCEPT
     SELECT role_code, permission_code FROM expected_role_permissions
   ) OR EXISTS (
@@ -152,6 +158,7 @@ BEGIN
       FROM role_permissions rp
       JOIN roles r ON r.id = rp.role_id
       JOIN permissions p ON p.id = rp.permission_id
+     WHERE p.code NOT LIKE 'products.%'
   ) THEN
     RAISE EXCEPTION 'Conflict-safe seed replay changed the role-permission matrix';
   END IF;
