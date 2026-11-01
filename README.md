@@ -2,7 +2,7 @@
 
 A centralised internal business management platform for Dscentsation's Nigerian operations. The planned system will bring orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
 
-> **Project status:** Task 005 and Task 006 architecture reconciliation are merged into `main`. Task 007 Product Management is implemented on `task-007-product-management` as an unmerged draft-review candidate and is not yet accepted. The full business schema, complete permission matrix, DMS-DEC-002, DMS-DEC-015, production infrastructure and deployment remain pending. The checklist below distinguishes merged work from branch-only implementation.
+> **Project status:** Tasks 005 and 006 architecture reconciliation are merged into `main`. Task 007 Product Management was independently reviewed and merged through PR #9 (merge commit `521d94c3242cea55d23770b799b6b025a50d2104`). The first Product Management module is implemented; remaining business modules, the complete permission matrix, DMS-DEC-002, DMS-DEC-015, production infrastructure and deployment remain pending. The checklist below distinguishes completed work from remaining scope.
 
 ## Contents
 
@@ -354,11 +354,11 @@ Task 005 established the initial application foundation in `main`. The table bel
 | Area | Implemented Task 005 foundation | Remaining boundary |
 |---|---|---|
 | Workspace | pnpm 12.16.1 workspace/monorepo; Node.js 26.13.0; separate `apps/web` and `apps/api` applications. | The code structure is consistent with a modular-monolith proposal; formal architecture ratification remains tracked in DMS-DEC-021. |
-| Web frontend | React 19.3.0, TypeScript 6.0.3 and Vite 8.3.5; sign-in, authenticated shell and dashboard. Task 007 branch adds a permission-aware Product Management experience. | Task 007 awaits independent review; other operational screens are not implemented. TypeScript/Vite formal ratification remains open. |
-| API | Node.js 26.13.0, Express 5.3.0 and TypeScript 6.0.3; Task 007 branch adds authenticated Product Management routes under `/api/v1`. | Product API awaits independent review; Inventory, Customer, Order and Finance routes remain unimplemented. The API is not a public customer/ecommerce API. |
-| Database | PostgreSQL via `pg` 8.23.1, explicit parameterised SQL, `node-pg-migrate` 9.0.0 and no ORM. Task 007 branch adds `product_categories`, `products` and `product_variants` after the eight-table foundation. | Product schema awaits independent review; other business schema is not implemented. CI uses disposable PostgreSQL; no production database has been provisioned. |
+| Web frontend | React 19.3.0, TypeScript 6.0.3 and Vite 8.3.5; sign-in, authenticated shell, dashboard and the merged permission-aware Product Management experience. | Other operational screens are not implemented. TypeScript/Vite formal ratification remains open. |
+| API | Node.js 26.13.0, Express 5.3.0 and TypeScript 6.0.3; authenticated Product Management routes under `/api/v1` are merged into `main`. | Inventory, Customer, Order and Finance routes remain unimplemented. The API is not a public customer/ecommerce API. |
+| Database | PostgreSQL via `pg` 8.23.1, explicit parameterised SQL, `node-pg-migrate` 9.0.0 and no ORM. The merged Task 007 migration adds `product_categories`, `products` and `product_variants` after the eight-table foundation. | Other business schema is not implemented. CI uses disposable PostgreSQL; no production database has been provisioned. |
 | Authentication | Argon2id hashes, provisioned accounts, PostgreSQL-backed sessions, HttpOnly/SameSite cookies, login rotation, logout/revocation, expiry handling, exact-Origin/session-bound CSRF protection, login throttling and an interactive Owner bootstrap CLI. | MFA, approved production idle/absolute session values, high-risk-action re-authentication and a distributed rate limiter remain unresolved or unimplemented. |
-| Roles, permissions and audit | Task 007 branch adds six explicit `products.*` permissions for Owner only and before/after audit events for product, category and variant actions; existing append-only audit protections remain. | DMS-DEC-002 remains open; Owner-only is scoped to this first module, not the complete role-permission matrix. |
+| Roles, permissions and audit | Six explicit `products.*` permissions are assigned to Owner only, and product, category and variant actions write before/after audit events; existing append-only audit protections remain. | DMS-DEC-002 remains open; Owner-only is scoped to this first module, not the complete role-permission matrix. |
 | Verification | Prettier, ESLint, TypeScript checks, Vitest, Supertest, React Testing Library, PostgreSQL-backed API integration tests, migration/seed/rollback/reapplication checks and production builds in GitHub Actions. | Comprehensive Playwright journeys and business-specific stock-concurrency, inventory-transfer and financial-workflow coverage remain future work. |
 | Infrastructure and integrations | No Task 005 production infrastructure or external integration was provisioned. | Render hosting/database, background workers, email delivery, file storage, production secrets, backups and deployment remain subject to separate verification and approval. |
 
@@ -541,11 +541,11 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 **Task 005 status:** Approved and merged. Merge commit: `652b5d51d17ecb36e78871a99164c12238a8ac41`. The application foundation is now part of `main`; this does not represent approval of the full target architecture or implementation of the business application.
 
-**Current implementation boundary:** `main` contains the eight-table foundation and authenticated application shell. The unmerged Task 007 branch adds a first Product Management module (three tables, Owner-only permissions, API, audit events, frontend and tests) pending independent review. Inventory, Customer, Order, Finance and Supplier modules remain incomplete.
+**Current implementation boundary:** `main` contains the eight-table foundation, authenticated application shell and the merged Task 007 Product Management module (three tables, Owner-only permissions, API, audit events, frontend and tests). Inventory, Customer, Order, Finance and Supplier modules remain incomplete.
 
 **Not yet implemented or approved:** Real Warehouse/Sheraton location records and Staff assignments; operational business modules; production database/service provisioning; production credentials; background workers; company email and file-storage integrations; production deployment; MFA; approved production session lifetimes and high-risk-action re-authentication; distributed rate limiting; and overall architecture/deployment approval. The technical implementation choices tracked by DMS-DEC-021–024 and DMS-DEC-027 are documented as adopted in the codebase where applicable but retain their existing review statuses.
 
-**Current development task:** Task 007 — Product Management — is implemented on `task-007-product-management` and awaits independent review. Do not start Task 008 until Task 007 has been reviewed and merged.
+**Current development task:** Task 007 — Product Management — is complete and merged through PR #9. Task 008 is next and has not been started.
 
 ## Working agreement
 
