@@ -103,8 +103,8 @@ jobs:
           cat /tmp/dms-production-rollback.log
           grep -F "Production database rollback is disabled" /tmp/dms-production-rollback.log
           remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants')")"
-          if [ "$remaining" != "8" ]; then
-            echo "Production rollback guard did not preserve the disposable foundation schema (found $remaining tables)."
+          if [ "$remaining" != "11" ]; then
+            echo "Production rollback guard did not preserve all application tables (found $remaining)."
             exit 1
           fi
           echo "Production rollback was rejected before migrations ran; all eleven application tables remain."
