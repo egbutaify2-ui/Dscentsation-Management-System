@@ -1,0 +1,65 @@
+name: Bootstrap Task 005 files and pnpm lockfile
+
+on:
+  push:
+    branches:
+      - task-005-application-foundation
+
+permissions:
+  contents: write
+
+jobs:
+  materialise:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@v5
+        with:
+          ref: task-005-application-foundation
+          persist-credentials: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 26.13.0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+          run_install: false
+
+      - name: Materialise application source files
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest = Path('.task005-payload.json')
+          files = json.loads(manifest.read_text(encoding='utf-8'))
+          for name, content in files.items():
+              path = Path(name)
+              path.parent.mkdir(parents=True, exist_ok=True)
+              with path.open('w', encoding='utf-8', newline='\\n') as handle:
+                  handle.write(content)
+          manifest.unlink()
+          Path('.github/workflows/bootstrap-task005.yml').unlink()
+          print(f"Materialised {len(files)} files.")
+          PY
+
+      - name: Resolve workspace dependencies and write the root lockfile
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Format source and configuration
+        run: pnpm format
+
+      - name: Check whitespace
+        run: git diff --check
+
+      - name: Commit source tree and pnpm lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+users.noreply.github.com"
+          git add -A
+          git commit -m "feat: build the DMS application foundation"
+          git push origin task-005-application-foundation
