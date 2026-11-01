@@ -1,8 +1,8 @@
 # DMS Task 009 — Inventory Implementation Readiness & Decision Pack
 
-**Document status:** Task 009 documentation deliverable; pending independent project-manager/business-owner review  
-**Implementation status:** Inventory feature implementation has not started  
-**Evidence baseline:** adb0258d463d6337d99f76ef1bb7d7abf5749b21  
+**Document status:** Task 009 documentation deliverable; pending independent project-manager/business-owner review
+**Implementation status:** Inventory feature implementation has not started
+**Evidence baseline:** adb0258d463d6337d99f76ef1bb7d7abf5749b21
 **Scope:** Readiness assessment and decision worksheet only. This document does not approve, implement or provision inventory functionality.
 
 ## 1. Purpose and current project position
@@ -569,6 +569,6 @@ The assessment was checked against the required base commit:
 - [Product Management routes](../../apps/api/src/modules/products/product.routes.ts)
 - [GitHub Actions CI](../../.github/workflows/ci.yml)
 
-**Task 009 status:** Readiness and decision worksheet prepared for independent review.  
-**Inventory implementation status:** Not started.  
+**Task 009 status:** Readiness and decision worksheet prepared for independent review.
+**Inventory implementation status:** Not started.
 **Decision-register status:** Unchanged; DMS-DEC-001, 002, 007, 008, 009, 010 and 015 remain Pending confirmation.
