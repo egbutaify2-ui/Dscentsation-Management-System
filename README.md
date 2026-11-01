@@ -4,7 +4,7 @@ A centralised internal business management platform for Dscentsation's Nigerian 
 
 > **Project status:** Tasks 005 and 006 architecture reconciliation, Task 007 Product Management (PR #9), and Task 008 Employee Account Administration (PR #10, merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`) are merged into `main`. Employee account administration is implemented with Owner-only permissions, secure Manager/Staff invitations, initial password setup, account suspension/reactivation, session revocation and audit events. Email delivery (DMS-DEC-017), location assignments (DMS-DEC-001), the full permission matrix (DMS-DEC-002), password recovery, session history, comprehensive business-event audit coverage, production infrastructure and deployment remain pending.
 >
-> **Current task:** DMS Task 009 — Inventory Implementation Readiness & Decision Pack — is under review in open draft PR #11. Task 009 has not yet been approved or merged; inventory feature implementation has not started.
+> **Current project position:** DMS Task 009 — Inventory Implementation Readiness & Decision Pack — is complete and merged through PR #11 (merge commit `f301eb238b982ead836e049b15348154c02c72b0`). Inventory feature implementation has not started; the seven inventory business decisions remain pending.
 
 ## Contents
 
@@ -352,7 +352,7 @@ Inventory accuracy is business-critical. The implementation must follow these ru
 
 ## Inventory implementation readiness
 
-DMS Task 009 is the current documentation/readiness task for multi-location inventory. It records the verified implementation baseline, confirmed business rules, unresolved decisions, dependencies and recommended sequence. It does not introduce inventory feature code, migrations, screens, stock balances or real stock records. Inventory implementation has not started and remains blocked pending the approvals in the [Inventory Implementation Readiness & Decision Pack](docs/operations/inventory-implementation-readiness.md).
+The DMS Task 009 readiness pack is complete and merged through PR #11. It records the verified implementation baseline, confirmed business rules, unresolved decisions, dependencies and recommended sequence. It did not introduce inventory feature code, migrations, screens, stock balances or real stock records. Inventory implementation has not started and remains blocked pending the approvals in the [Inventory Implementation Readiness & Decision Pack](docs/operations/inventory-implementation-readiness.md).
 
 ## Application architecture and technology status
 
@@ -553,7 +553,7 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 **Not yet implemented or approved:** Real Warehouse/Sheraton location records and Staff assignments (DMS-DEC-001); automated company email delivery (DMS-DEC-017; Task 008 returns a one-time URL for secure manual delivery using the official company email identity); the full role/permission matrix (DMS-DEC-002); password recovery; session-history and searchable audit-history screens; comprehensive business-event audit coverage; operational business modules; production database/service provisioning; production credentials; background workers; file-storage integrations; production deployment; MFA; approved production session lifetimes and high-risk-action re-authentication; distributed rate limiting; and overall architecture/deployment approval. The technical implementation choices tracked by DMS-DEC-021–024 and DMS-DEC-027 are documented as adopted in the codebase where applicable but retain their existing review statuses.
 
-**Completed development tasks:** Task 007 — Product Management — is merged through PR #9. Task 008 — Employee Account Administration — is independently reviewed and merged through PR #10 (merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`). **Current task:** Task 009 — Inventory Implementation Readiness & Decision Pack — is under review in open draft PR #11. The readiness pack is not yet approved or merged, and inventory feature implementation has not started.
+**Completed development tasks:** Task 007 — Product Management — is merged through PR #9. Task 008 — Employee Account Administration — is independently reviewed and merged through PR #10 (merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`). Task 009 — Inventory Implementation Readiness & Decision Pack — is reviewed and merged through PR #11 (merge commit `f301eb238b982ead836e049b15348154c02c72b0`). The readiness pack is complete; the seven inventory business decisions remain pending, and inventory feature implementation has not started. **Next work:** complete the business decision worksheet and approve the applicable prerequisites before issuing the first inventory implementation task.
 
 ## Working agreement
 
