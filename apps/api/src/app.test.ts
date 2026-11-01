@@ -56,9 +56,7 @@ async function createTestUser(
 
 function sessionCookieFromHeader(header: string | string[] | undefined): string | undefined {
   const values = header === undefined ? [] : Array.isArray(header) ? header : [header];
-  return values
-    .find((cookie) => cookie.startsWith(`${env.cookieName}=`))
-    ?.split(';', 1)[0];
+  return values.find((cookie) => cookie.startsWith(`${env.cookieName}=`))?.split(';', 1)[0];
 }
 
 async function signIn(agent: ReturnType<typeof request.agent>, email: string): Promise<void> {
