@@ -11,26 +11,43 @@ export const pool = new Pool({
 });
 
 pool.on('error', (error) => {
+  // Do not log arbitrary driver messages; they may contain connection details.
   console.error('Unexpected idle PostgreSQL client error.', {
     name: error.name,
-    message: error.message,
+    code: 'code' in error && typeof error.code === 'string' ? error.code : undefined,
   });
 });
 
-export async function assertDatabaseReady(): Promise<void> {
-  const result = await pool.query<{
-    roles_ready: boolean;
-    session_store_ready: boolean;
-    audit_ready: boolean;
-  }>(`
-    SELECT
-      to_regclass('public.roles') IS NOT NULL AS roles_ready,
-      to_regclass('public.user_sessions') IS NOT NULL AS session_store_ready,
-      to_regclass('public.audit_logs') IS NOT NULL AS audit_ready
-  `);
+const requiredFoundationTables = [
+  'roles',
+  'permissions',
+  'role_permissions',
+  'users',
+  'locations',
+  'user_location_access',
+  'user_sessions',
+  'audit_logs',
+] as const;
 
-  const state = result.rows[0];
-  if (!state?.roles_ready || !state.session_store_ready || !state.audit_ready) {
-    throw new Error('Foundation migration missing. Run "pnpm db:migrate" before starting the API.');
+export async function assertDatabaseReady(): Promise<void> {
+  const result = await pool.query<{ table_name: string; exists: boolean }>(
+    `
+      SELECT required.table_name,
+             to_regclass(format('public.%I', required.table_name)) IS NOT NULL AS exists
+      FROM unnest($1::text[]) AS required(table_name)
+      ORDER BY required.table_name
+    `,
+    [requiredFoundationTables],
+  );
+
+  const missing = result.rows
+    .filter((row) => !row.exists)
+    .map((row) => row.table_name);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Required foundation tables are missing: ${missing.join(', ')}. ` +
+        'Run "pnpm db:migrate" before starting the API.',
+    );
   }
 }
