@@ -115,84 +115,106 @@ Use PostgreSQL as the authoritative relational database. Use migrations in versi
 - Historical line items: snapshot the product description/SKU and transaction price at the time of sale.
 - Financial and stock corrections: append a reversal/adjustment event; do not silently overwrite history.
 
-## ADR-005 — Track inventory by variant and location, with a movement ledger
+## ADR-005 — Track inventory by variant and location, with in-transit ledger and configurable reservations
 
-**Status:** Proposed
+**Status:** Confirmed business rules; policy values remain configurable.
 
 **Context**
 
-The business holds stock at multiple physical locations. A single product may have sizes/variants. Orders reserve stock before dispatch; transfers have a sending and receiving stage. Inventory accuracy is business-critical.
+The business holds stock at multiple physical locations. Orders have one fulfilment location in the first release. Confirmed orders reserve stock immediately, including when unpaid. Transfers require dispatch at the source and explicit receipt confirmation by Staff at the destination. Reservation expiry must be configurable.
 
 **Decision**
 
-Use a unique current balance per (`location_id`, `product_variant_id`), and maintain an append-only stock movement ledger. Track active order reservations explicitly. Use transfer header/item records for inter-location movements.
+Track physical on-hand/reserved balances per (location_id, product_variant_id), maintain an append-only stock movement ledger, and store active reservations with expires_at and the reservation-policy version used. Track stock in transit separately from physical location balances using a transfer-item-scoped stock_in_transit_balances record and linked stock-movement events.
+
+A transfer dispatch transaction decreases source on-hand and increases in-transit quantity. A Staff user assigned to the destination location must confirm receipt; the receipt transaction decreases in-transit and increases destination on-hand. Partial receipts leave the remainder in transit. Discrepancies require attributed resolution.
+
+On order confirmation, reserve the required quantity immediately from the order's single selected fulfilment location, whether the order is unpaid, partially paid or paid. A persisted reservation_policies record controls whether expiry is enabled, its duration and its eligibility scope. Each new reservation snapshots its expiry timestamp and policy version.
 
 **Why**
 
 - Product-level totals alone cannot show where stock is held.
-- A movement ledger explains how each balance changed and supports audit/reconciliation.
-- Reservations prevent the same stock being promised to multiple confirmed orders.
-- Explicit transfer dispatch and receipt prevents destination stock appearing before the goods arrive.
-- Transactional updates and row locks protect concurrent order confirmation.
+- Separating in-transit stock prevents dispatched goods from remaining available at the source or appearing prematurely at the destination.
+- Destination Staff confirmation makes the receiving location accountable for physical receipt.
+- Immediate reservation prevents confirmed orders from competing for the same available stock, independent of payment timing.
+- Configurable expiry lets the business control how long stock remains committed.
+- Ledger events, row locks and idempotency prevent double deductions or releases.
 
 **Consequences**
 
-- Available stock is calculated as on-hand minus reserved.
-- Reserve, release, dispatch, transfer, receipt and adjustment operations must be atomic.
-- Idempotency keys are required for retryable commands.
-- The business must approve stock reservation timing, partial fulfilment, transfer approvals and the base unit/precision.
+- Available stock at a location is on-hand minus reserved; in-transit stock is excluded.
+- Transfer dispatch/receipt and reservation creation/release/expiry are atomic, auditable and idempotent.
+- Expiry processing locks and rechecks the order/reservation. It releases only active, due and policy-eligible reservations, reduces reserved quantity (not on-hand), records the expiry reason and places the order on fulfilment hold/reconfirmation. It does not silently cancel the order.
+- Dispatch, cancellation and expiry races resolve through transactional state checks; a reservation can be consumed or expired, never both.
+- A policy change applies to new reservations; changing existing expiry times requires an explicit authorised/audited action.
+- Initial reservation duration, expiry-eligible payment/order states, grace period and warning rules remain configurable values to set.
+- A first-release order cannot be fulfilled from multiple stock locations; all item reservations use its one fulfilment location.
 
-## ADR-006 — Enforce role-based and location-based permissions in the backend
 
-**Status:** Proposed
+## ADR-006 — Enforce confirmed role, location and payment permissions in the backend
+
+**Status:** Confirmed business rules; detailed permissions for other modules remain to be defined.
 
 **Context**
 
-The system has three known roles: Owner, Manager and Staff. Some users may only work with assigned physical locations. Sensitive actions include financial access, expense approvals, refunds, user management and stock adjustments.
+DMS has Owner, Manager and Staff roles. Stock-location access and payment verification require explicit limits. Sensitive actions must be enforced at the API/domain layer, not by UI visibility.
 
 **Decision**
 
-Use explicit permission records mapped to Owner, Manager and Staff roles. Add user-to-location access records to support location restrictions. Enforce permissions in backend middleware and domain services with deny-by-default behaviour.
+Use explicit permissions mapped to the three roles and enforce them with deny-by-default backend checks:
+
+- **Owner:** full business access and access to all stock locations; may record and verify payments.
+- **Manager:** management access and access to all stock locations; may record and verify payments.
+- **Staff:** may access and act on stock locations assigned to that Staff account only; may record payment entries but may not verify them.
+- **Transfer receipt:** a Staff account assigned to the destination location must confirm that transfer's receipt.
+
+A Manager's global stock-location access does not depend on user_location_access assignment rows. Staff access is granted/revoked through explicit user-location rows. Location restrictions apply to stock reads and all location-scoped stock/order/transfer operations, not only writes.
 
 **Why**
 
 - Hiding UI controls is not a security boundary.
-- A permission registry makes the final role matrix auditable and adjustable.
-- Location restrictions are an additional scope rule, not an alternative role.
-- Backend enforcement protects direct API requests as well as normal UI actions.
+- Backend checks protect direct API requests as well as normal UI interactions.
+- Separate payment recording from verification adds a second-person control over payment confirmation.
+- Destination Staff confirmation makes the receiving location accountable for stock physically arriving.
 
 **Consequences**
 
-- Exact role permissions, approval limits and cross-location visibility remain pending business approval.
-- Owner access to all locations is the proposed default.
-- Staff and Manager access can be constrained by explicit assignments.
-- Any change to a user's role or location grants should create an audit record.
+- Every protected endpoint/domain service checks role and, where relevant, location assignment.
+- A Staff payment entry remains pending/unverified until a Manager or Owner verifies it.
+- Unverified entries are excluded from verified-receipts reporting.
+- Changes to roles, location assignments and payment verification create audit events.
+- Detailed view/edit/export/refund/expense/user-administration permissions remain a separate matrix; they cannot override the confirmed constraints above.
 
-## ADR-007 — Prefer individual accounts and revocable server-side sessions
 
-**Status:** Proposed
+## ADR-007 — Use individual accounts and persistent PostgreSQL-backed sessions
+
+**Status:** PostgreSQL session persistence is required; adapter/library choice is an implementation detail.
 
 **Context**
 
-DMS contains personal customer details, operational records and financial information. A small team still needs individual accountability and remote access.
+DMS contains personal customer details, operational records and financial information. A small team still needs individual accountability and reliable session behaviour across API restarts and multiple instances.
 
 **Decision**
 
-Use individual invited/provisioned accounts. Hash passwords with Argon2id. Prefer opaque server-side sessions delivered through secure, `HttpOnly`, `SameSite` cookies; store session state server-side and support session revocation. Require HTTPS in hosted environments and CSRF protection for cookie-authenticated mutations.
+Use individual invited/provisioned accounts and Argon2id password hashes. Use opaque server-side sessions delivered through secure, HttpOnly, SameSite cookies. Persist session records in PostgreSQL through a maintained PostgreSQL-backed Express session store and a migration-managed session table with expiry indexing/cleanup.
+
+Production must never use Express MemoryStore, an in-memory session store or process-local session state. All API instances share the same PostgreSQL session store. Rotate session identifiers at authentication/privilege changes and revoke sessions on logout, password reset, account suspension and security incidents.
 
 **Why**
 
 - Shared logins prevent reliable attribution.
-- Server-side sessions can be invalidated centrally when an account is disabled or a session is compromised.
-- Avoids storing long-lived bearer tokens in browser local storage.
-- A password-reset flow can use short-lived, single-use, hashed reset tokens.
+- PostgreSQL persistence means sessions survive process restarts and are shared across API instances.
+- A central store supports revocation and expiry cleanup.
+- Opaque cookies avoid exposing session data to frontend JavaScript.
 
 **Consequences**
 
-- Public self-registration is not part of the initial design.
-- Login throttling, secure cookies, CSRF controls, password reset, session expiry and logout invalidation must be tested.
-- Email-based account recovery depends on verifying the company/transactional email service; it must not expose privileged account creation.
-- Whether MFA is required for Owner/Manager accounts is a security policy question to confirm before launch.
+- No public self-registration is part of the initial design.
+- Session storage schema and cleanup are managed by migrations/operations.
+- Login throttling, CSRF controls, secure cookies, password reset, session expiry and revocation must be tested.
+- Production configuration must fail closed if the persistent session store is unavailable; it must not silently fall back to an in-memory store.
+- Whether MFA is required for Owner/Manager accounts remains a separate security-policy decision.
+
 
 ## ADR-008 — Send transactional email through a provider adapter and database outbox
 
@@ -247,32 +269,40 @@ Store file bytes in a private object-storage bucket. Keep metadata, ownership an
 - Consider malware scanning before files are made available to other users.
 - Provider, storage region, retention, backup and lifecycle rules need confirmation.
 
-## ADR-010 — Use Render as the proposed application hosting platform
+## ADR-010 — Prefer Render Postgres, subject to backup, recovery and cost verification
 
-**Status:** Proposed deployment direction; no services have been created
+**Status:** Preferred by the project manager; provisioning is conditional on verification.
 
 **Context**
 
-The README identifies Render as the proposed application host. The system requires a React frontend, Express API, PostgreSQL and potentially a worker.
+The README identifies Render as the proposed application host. The system requires a React frontend, Express API, PostgreSQL and potentially background workers. The project manager prefers Render Postgres, provided its operational safeguards and cost are acceptable.
 
 **Decision**
 
-Target a Render-hosted frontend and Express API, with a managed PostgreSQL database reachable through private networking. A Render Postgres instance is a candidate to verify. Use a separate worker service only when email/background processing is introduced. Keep file storage in the selected private object-storage provider.
+Prefer Render for the frontend/API and Render Postgres for the managed database, reachable through private networking. Do not provision the production database until backup, recovery and cost checks have been completed and documented. Use a shared PostgreSQL-backed session store; production in-memory sessions are prohibited.
 
 **Why**
 
-- Matches the hosting direction already documented.
-- Keeps the first deployment topology small.
-- Separates web/API process concerns while preserving one database transaction boundary.
-- Allows environment-specific configuration and secret management.
+- Aligns with the existing Render hosting direction and keeps the initial topology compact.
+- A managed database reduces day-to-day database administration compared with self-hosting.
+- Private connectivity and central persistence support the API and session store.
+
+**Required verification before provisioning**
+
+- Backup frequency, retention and backup availability for the selected plan.
+- Point-in-time recovery support, limits and the actual restore procedure.
+- A restore test (or documented pre-production restoration exercise) and evidence that data can be recovered.
+- Recovery objectives appropriate to the business (RPO/RTO to be agreed).
+- Region, private networking, connection limits, storage/compute capacity and operational constraints.
+- Total recurring cost at expected workload, including database compute/storage, backup or recovery-related charges where applicable, frontend/API/worker services and required plan tiers.
 
 **Consequences**
 
-- The exact database product, region, plan, backups, restore support, service sizing, custom domains and cost must be checked before provisioning.
-- Use separate staging and production configurations.
-- Run migrations as a controlled deployment step, not concurrently at every application startup.
-- Production rollout remains gated by review and acceptance testing.
-- No deployment is part of Task 002.
+- Render Postgres is the preferred candidate, not a provisioned production service until the checks are accepted.
+- Record verification findings and project-manager approval before production data is introduced.
+- Use separate staging and production configuration; migrations are controlled deployment steps.
+- No deployment or service provisioning is part of this architecture-correction task.
+
 
 ## ADR-011 — Use an automated test pyramid with special focus on transaction invariants
 
@@ -325,48 +355,108 @@ DMS owns its internal product records. Staff create and maintain products in the
 
 ## ADR-013 — Record sales, payments, expenses and refunds as distinct concepts
 
-**Status:** Proposed, aligned to confirmed reporting requirements
+**Status:** Proposed financial model; payment recording and verification permissions confirmed.
 
 **Context**
 
-The README requires reports to distinguish sales, actual payments received, product costs, expenses and estimated profit. Orders may be unpaid or partially paid; refunds and corrections need history.
+DMS must distinguish sales, actual payments received, product costs, expenses and estimated profit. Orders may be unpaid or partially paid; refunds and corrections need history.
 
 **Decision**
 
-Keep order totals, payment events, refunds, expenses and cost snapshots separate. Derive outstanding balances and payment state from verified events or update a transactional summary with strict reconciliation rules.
+Keep order totals, payment events, refunds, expenses and cost snapshots separate. Staff may record a payment entry, but only a Manager or the Owner may verify it. Only verified payment events count toward verified cash-received reports and paid-balance calculations. Derive outstanding balances and payment state from verified events or update a transactional summary with strict reconciliation rules.
 
 **Why**
 
 - Order value is not the same as cash received.
 - A partial payment cannot be represented accurately by a single boolean.
+- Separating entry from verification provides a second-person control.
 - Refunds and corrections must not erase the original receipt.
 - Estimated profit must not be presented as audited accounts.
 
 **Consequences**
 
-- Payment verification, payment methods and refund approval limits require business rules.
+- Payment entry and payment verification are separate permissions and audit events.
 - No payment gateway or automated bank reconciliation is assumed.
 - Finance reports must label estimates clearly and use verified source records.
 
+## ADR-014 — Persist explicit receipt issuance records
+
+**Status:** Required architecture design.
+
+**Context**
+
+The business requires unique receipt references, purchase receipts and paid receipts, as well as a communication history. A generated receipt is a business artifact; an email send attempt is a separate delivery event.
+
+**Decision**
+
+Create an immutable receipt_issuances record whenever a receipt is issued. Store a unique receipt reference, order/payment association, receipt type, issuer, issuance timestamp, currency/amount and a frozen transaction snapshot. Record void/reissue actions as append-only receipt issuance events. Link email-outbox/delivery attempts to the receipt issuance.
+
+**Why**
+
+- The business needs evidence of exactly which receipt was issued, when and by whom.
+- Historical receipts must remain reproducible if product, customer or order details later change.
+- Email failure must not erase or invalidate a correctly issued receipt.
+
+**Consequences**
+
+- Receipt issuance and email delivery are tracked independently.
+- Receipt records are not silently overwritten or deleted; corrections create a void/reissue event and replacement reference.
+- Receipt numbering/format and the exact business event that triggers each receipt type remain operational details to confirm.
+
+## ADR-015 — Use one fulfilment location per order in the first release
+
+**Status:** Confirmed first-release business rule.
+
+**Context**
+
+DMS supports multiple stock locations, but order fulfilment must remain operationally simple and traceable in the first release.
+
+**Decision**
+
+Each order has one required fulfilment_location_id. All items/reservations for that order are sourced from that location. Cross-location split fulfilment for a single order is not supported in the first release.
+
+If stock is insufficient at the selected location, the system must not silently source stock from another location. Staff must correct the order, select another single location before confirmation where authorised, or arrange a stock transfer before fulfilment.
+
+**Why**
+
+- A single source location makes stock reservation, picking, dispatch, returns and audit history more predictable.
+- It avoids hidden cross-location allocations and prevents fulfilment ambiguity.
+
+**Consequences**
+
+- orders.fulfilment_location_id is non-null.
+- Reservations for all order items use that location.
+- Multi-location/split fulfilment requires a separately approved future change.
+
+
 ## 3. Decisions requiring project-manager confirmation
 
-The technical proposal cannot finalise these business rules on its own:
+The following project-manager decisions are confirmed and are no longer pending:
 
-| Topic | Proposed default | Confirmation needed |
-|---|---|---|
-| Role matrix | Owner full access; Managers operational and approved management actions; Staff task-scoped access | Exact view/create/edit/approve/export permissions by module |
-| Location scope | Owner sees all; Staff may be location-scoped; Manager scope configurable | Actual assignments and cross-location rules |
-| Stock reservation | Reserve when order is confirmed | Whether order confirmation requires payment/deposit and how long reservations may remain open |
-| Partial fulfilment | Model supports it, but workflow can be deferred | Whether one order may ship from multiple locations or in multiple deliveries |
-| Transfers | Dispatch at source; increase destination only on confirmed receipt | Whether transfer creation, dispatch and receipt require separate approvals |
-| Payments | Staff can record reported payment; authorised role verifies | Accepted methods, evidence and verification permissions |
-| Refunds | Separate request, approval and processing | Role/amount approval limits and return-inspection dependency |
-| Product variants | Stock each sellable variant | Whether all product records have variants and the unit/precision used |
-| Company email | Provider-neutral SMTP/API adapter | Provider, sender mailbox, authentication and sending permissions |
-| Database hosting | Managed PostgreSQL; Render Postgres candidate | Provider, region, plan, backup and recovery expectations |
-| File storage | Private Supabase Storage or equivalent | Provider, region, permitted file types, size and retention |
-| Privacy/retention | Least data necessary; access by role | Retention periods, deletion/correction policy and applicable compliance review |
-| First-release procurement | Data model includes suppliers, POs and goods receipts | Whether all procurement functions ship in initial release or a later phase |
+| Confirmed area | Rule |
+|---|---|
+| Transfer receipt | Staff assigned to the destination location must confirm receipt. |
+| Payment permissions | Staff can record payments; only Managers and Owner can verify payments. |
+| Location access | Managers have access to all stock locations; Staff are restricted to assigned locations; Owner has global access. |
+| Database hosting preference | Render Postgres is preferred, subject to backup, recovery and cost verification before provisioning. |
+| Order fulfilment | One fulfilment location per order in the first release; no cross-location split fulfilment. |
+| Reservation timing | Reserve stock immediately on order confirmation, whether paid or unpaid. |
+| Reservation expiry | Expiry must be configurable and persisted; each reservation snapshots its applied policy/expiry. |
+
+Remaining details requiring confirmation:
+
+1. Actual stock locations, codes and Staff-to-location assignments.
+2. Initial reservation duration and expiry eligibility scope (unpaid-only or all undispatched confirmed orders).
+3. Grace period, pre-expiry warning/notification and whether an authorised user may extend an existing reservation.
+4. Transfer exception/escalation when destination Staff are unavailable, and the review/approval process for shortages or damage.
+5. Detailed permissions for refunds, expense approvals, exports and user administration.
+6. Accepted payment methods and what evidence is required before verification.
+7. Receipt numbering/format and which business events issue an order receipt versus a payment receipt.
+8. Company email provider, sender authentication and supported SMTP/API method.
+9. File-storage provider/region, allowed types, size limits and retention.
+10. Render Postgres backup/recovery findings, restore-test evidence, recovery objectives and total cost approval.
+11. Record-retention, correction/deletion and privacy policy.
+
 
 ## 4. Explicit non-decisions
 
