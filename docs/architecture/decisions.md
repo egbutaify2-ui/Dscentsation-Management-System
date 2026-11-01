@@ -467,7 +467,7 @@ Add a dedicated `destination_staff_pickup` transfer mode and a narrow backend ac
 
 - The backend must enforce both the role capability and row-specific source/destination/assignment checks; frontend route hiding is not sufficient.
 - The Warehouse balance lookup is permitted only as an internal validation step for the particular transfer items and must not be returned to the caller.
-- The transfer header/item plus pickup/receipt event tables are the audit source for partial actions; movement events reconcile Warehouse, in-transit and Sheraton quantities.
+- Every successful pickup and receipt submission creates its own immutable event row with its own actor, timestamp and item quantities; partial actions never overwrite earlier event rows. Append-only stock movements provide the corresponding quantity-ledger evidence. The transfer header's `dispatched_by`/`dispatched_at` and `received_by`/`received_at` columns, where retained, are denormalised summaries only (first source-release action and final receipt-completing event respectively), not authoritative evidence for partial-operation history.
 - Managers and Owner retain their existing global location access and normal transfer permissions; this decision adds a Staff pickup capability without removing or reducing those permissions.
 - The configured Warehouse/Sheraton location records and Staff assignments must be established before enabling the action.
 
@@ -479,7 +479,7 @@ The following project-manager decisions are confirmed and are no longer pending:
 |---|---|
 | Transfer receipt | Staff assigned to the destination location must confirm receipt. |
 | Payment permissions | Staff can record payments; only Managers and Owner can verify payments. |
-| Location access | Managers have access to all stock locations; Staff are restricted to assigned locations; Owner has global access. |
+| Location access | Managers and Owner have access to all stock locations. Staff are restricted to assigned locations except for the dedicated Warehouse-to-assigned-Sheraton pickup action in ADR-016; that action grants no general Warehouse inventory access. |
 | Database hosting preference | Render Postgres is preferred, subject to backup, recovery and cost verification before provisioning. |
 | Order fulfilment | One fulfilment location per order in the first release; no cross-location split fulfilment. |
 | Reservation timing | Reserve stock immediately on order confirmation, whether paid or unpaid. |
