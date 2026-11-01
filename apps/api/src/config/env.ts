@@ -31,6 +31,7 @@ const schema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   APP_ORIGIN: z.string().url().default('http://localhost:5173'),
+  INVITATION_EXPIRY_HOURS: z.coerce.number().int().min(1).max(168).default(24),
 });
 
 const parsed = schema.parse(process.env);
@@ -51,4 +52,5 @@ export const env = {
   sessionIdleTimeoutMs: (parsed.SESSION_IDLE_TIMEOUT_MINUTES ?? 30) * 60 * 1000,
   sessionAbsoluteTimeoutMs: (parsed.SESSION_ABSOLUTE_TIMEOUT_HOURS ?? 12) * 60 * 60 * 1000,
   cookieName: parsed.COOKIE_SECURE ? '__Host-dms.sid' : 'dms.sid',
+  INVITATION_EXPIRY_HOURS: parsed.INVITATION_EXPIRY_HOURS,
 };

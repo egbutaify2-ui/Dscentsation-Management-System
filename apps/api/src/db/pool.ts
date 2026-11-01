@@ -29,6 +29,7 @@ const requiredApplicationTables = [
   'product_categories',
   'products',
   'product_variants',
+  'user_invitations',
 ] as const;
 
 export async function assertDatabaseReady(): Promise<void> {

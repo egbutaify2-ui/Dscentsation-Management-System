@@ -6,6 +6,7 @@ import { csrfProtection } from './middleware/csrf.js';
 import { sessionMiddleware } from './middleware/session.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { productRoutes } from './modules/products/product.routes.js';
+import { userAdminRoutes } from './modules/users/user-admin.routes.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -26,6 +27,7 @@ export function createApp(): express.Express {
     response.json({ data: { status: 'ok' } });
   });
   app.use('/api/v1/auth', authRoutes);
+  app.use('/api/v1/users', userAdminRoutes);
   app.use('/api/v1', productRoutes);
 
   app.use((_request, response) => {
