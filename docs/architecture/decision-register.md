@@ -307,7 +307,7 @@ A status describes the state evidenced by the current source documents. It is no
 
 ## 4. Confirmed decisions and fixed architecture boundaries intentionally excluded
 
-The following matters are not outstanding questions in Task 004. They are recorded here only so that the register does not cause them to be re-opened. Their existing source documents remain authoritative.
+The following pre-existing confirmed rules and separately labelled Task 010 planning directions are summarised here for traceability. A row expressly labelled as Task 010 planning direction remains subject to formal confirmation under DMS-DEC-001/002; its presence in this table does not make it a Confirmed business decision. The source documents remain authoritative for pre-existing confirmed rules.
 
 | Area / decision status | Current documented decision or planning direction | Reference |
 |---|---|---|
