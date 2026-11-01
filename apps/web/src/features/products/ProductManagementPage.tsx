@@ -1,3 +1,4 @@
+import './ProductManagementPage.css';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ApiError, api, getCsrfToken } from '../../lib/api/client.js';
 
