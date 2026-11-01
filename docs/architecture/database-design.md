@@ -1,10 +1,10 @@
 # Dscentsation Management System — Database Design
 
-**Document status:** The eight-table Task 005 foundation and three-table Task 007 Product Management module are merged into `main`. The Task 008 Employee Account Administration draft branch candidate adds one invitation table and user-status/Owner-protection constraints; this document is not an approved final business schema or a production database record.
+**Document status:** The eight-table Task 005 foundation, three-table Task 007 Product Management module and Task 008 Employee Account Administration are merged into `main` (PR #10, merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`). This document is not an approved final business schema or a production database record.
 **Task:** 002 — Technical Architecture, updated for Task 005
 
 **Database:** PostgreSQL  
-**Purpose:** Distinguish the physical Task 005 foundation, merged Task 007 product schema and Task 008 employee-account branch candidate from the larger proposed business schema below. The conceptual entity groups are not executable migrations and do not indicate that a production database has been provisioned.
+**Purpose:** Distinguish the physical Task 005 foundation and the merged Task 007/008 schemas from the larger proposed business schema below. The conceptual entity groups are not executable migrations and do not indicate that a production database has been provisioned.
 
 ## Task 005 implemented foundation — physical schema
 
@@ -19,7 +19,7 @@ Task 005 was approved and merged into `main` through PR #7 (merge commit `652b5d
 7. `user_sessions`
 8. `audit_logs`
 
-Migration 001 contains only the eight Task 005 foundation tables. Merged migration 002 adds product categories, products and product variants. Task 008 migration 003 adds `user_invitations` on its draft branch. Customer, order, delivery, inventory-balance, stock-movement, transfer, payment, refund, expense, supplier, procurement, return, receipt-issuance, file-metadata and email-outbox tables remain unimplemented.
+Migration 001 contains only the eight Task 005 foundation tables. Merged migration 002 adds product categories, products and product variants. Merged Task 008 migration 003 adds `user_invitations`. Customer, order, delivery, inventory-balance, stock-movement, transfer, payment, refund, expense, supplier, procurement, return, receipt-issuance, file-metadata and email-outbox tables remain unimplemented.
 
 ### Task 007 Product Management — merged through PR #9
 
@@ -31,7 +31,7 @@ Migration `002_product_management.js` adds three physical tables:
 
 The migration prevents hard deletion of categories, products and variants, prevents variant reparenting, and ensures a committed product retains at least one variant. Product creation inserts its initial variant in the same transaction. It introduces no stock tables, image/file storage or inventory valuation history. Six explicit product permissions are assigned to Owner only; Manager and Staff receive none. DMS-DEC-002 remains open. Only current cost price is stored; DMS-DEC-015 remains open and no costing or valuation policy is implemented.
 
-### Task 008 Employee Account Administration — draft branch candidate
+### Task 008 Employee Account Administration — merged through PR #10
 
 Migration `003_employee_account_administration.js` adds the following physical and constraint changes:
 
@@ -47,7 +47,7 @@ The technical invitation expiry default is 24 hours and can be configured with `
 
 - PostgreSQL is the database technology used by the application foundation.
 - The API uses `pg` 8.23.1 and explicit SQL with parameterised query values. No ORM is used in Task 005.
-- `node-pg-migrate` 9.0.0 manages versioned migrations. Schema changes are migration-controlled; on the Task 008 branch the API readiness check includes the eight foundation tables, three product tables and the `user_invitations` table. The API does not run migrations automatically at startup.
+- `node-pg-migrate` 9.0.0 manages versioned migrations. Schema changes are migration-controlled; the API readiness check includes the eight foundation tables, three product tables and the `user_invitations` table. The API does not run migrations automatically at startup.
 - Transactions are used for implemented multi-step operations, including initial Owner creation (advisory lock, user insert and audit insert) and successful login metadata/audit writes. This is not evidence that future order, inventory or financial transaction workflows exist.
 - The API integration suite and migration verification run against a disposable PostgreSQL 17 service in GitHub Actions. This is not a production database or provisioning record.
 
@@ -75,7 +75,7 @@ These are only the confirmed rules represented in the foundation seed. They are 
 
 The `user_sessions` table follows the `connect-pg-simple` adapter shape (`sid`, `sess`, `expire`) with additional user attribution and timestamps. It is not identical to the generic conceptual session columns shown in the proposed entity model below. The `audit_logs` table is protected by PostgreSQL triggers that reject UPDATE, DELETE and TRUNCATE operations.
 
-Migration 001 remains the eight-table Task 005 foundation. Migration 002 is merged and adds the three Product Management tables. Task 008 migration 003 is present on the draft branch and adds `user_invitations` plus the invited status and last-active-Owner guard. No production database was provisioned; CI uses disposable synthetic data.
+Migration 001 remains the eight-table Task 005 foundation. Merged migration 002 adds the three Product Management tables. Merged Task 008 migration 003 adds `user_invitations`, the invited status and last-active-Owner guard. No production database was provisioned; CI uses disposable synthetic data.
 
 ## 1. Design principles
 
@@ -453,4 +453,4 @@ Remaining design/configuration details:
 10. Render Postgres backup/recovery verification, restore-test evidence, expected recovery objectives and total cost approval.
 11. Confirm the physical paperwork/reference process used by Sheraton Staff at Warehouse; the permission boundary and stock movement rules for pickup remain as specified.
 
-**Schema status:** The eight-table Task 005 foundation is the merged baseline. The three Task 007 product tables exist only on an unmerged implementation branch awaiting independent review. The remaining conceptual schema and outstanding business/architecture decisions remain unapproved.
+**Schema status:** The Task 005 eight-table foundation, three Task 007 Product Management tables and Task 008 `user_invitations` table are merged into `main`. The remaining conceptual schema and outstanding business/architecture decisions remain unapproved.
