@@ -63,6 +63,21 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Diagnose Customer module formatting
+        run: |
+          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 --write \
+            apps/api/src/modules/customers/customer.database.test.ts \
+            apps/api/src/modules/customers/customer.errors.ts \
+            apps/api/src/modules/customers/customer.routes.test.ts \
+            apps/api/src/modules/customers/customer.service.ts \
+            apps/api/src/modules/customers/customer.validation.ts
+          git diff --unified=2 -- \
+            apps/api/src/modules/customers/customer.database.test.ts \
+            apps/api/src/modules/customers/customer.errors.ts \
+            apps/api/src/modules/customers/customer.routes.test.ts \
+            apps/api/src/modules/customers/customer.service.ts \
+            apps/api/src/modules/customers/customer.validation.ts
+
       - name: Check formatting
         run: pnpm format:check
 
