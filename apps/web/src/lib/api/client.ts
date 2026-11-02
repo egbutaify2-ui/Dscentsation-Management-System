@@ -56,7 +56,13 @@ export async function getCsrfToken(): Promise<string> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  getPage: <T, Meta>(path: string) => requestEnvelope<T, Meta>(path),
+  getPage: async <T, Meta>(path: string): Promise<{ data: T; meta: Meta }> => {
+    const response = await requestEnvelope<T, Meta>(path);
+    if (response.meta === undefined) {
+      throw new Error('The server did not return pagination metadata.');
+    }
+    return { data: response.data, meta: response.meta };
+  },
   post: <T>(path: string, body: unknown, csrfToken: string) =>
     request<T>(path, {
       method: 'POST',
