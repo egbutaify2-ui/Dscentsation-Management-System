@@ -1,10 +1,12 @@
 # Dscentsation Management System (DMS)
 
-A centralised internal business management platform for Dscentsation's Nigerian operations. The planned system will bring orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
+An internal business management platform being actively built for Dscentsation's Nigerian operations. DMS brings orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
 
-> **Project status:** Tasks 005 and 006 architecture reconciliation, Task 007 Product Management (PR #9), and Task 008 Employee Account Administration (PR #10, merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`) are merged into `main`. Employee account administration is implemented with Owner-only permissions, secure Manager/Staff invitations, initial password setup, account suspension/reactivation, session revocation and audit events. Email delivery (DMS-DEC-017), location assignments (DMS-DEC-001), the full permission matrix (DMS-DEC-002), password recovery, session history, comprehensive business-event audit coverage, production infrastructure and deployment remain pending.
+> **Project status — active development:** DMS is in its build phase. The team is implementing working modules in parallel, not just documenting plans. Active implementation work includes Customer Management (PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14)), Supplier Directory (PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16)), Expense Categories and Draft Expenses (PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17)), and the independent components of Order Capture (Task 022).
 >
-> **Current project position:** DMS Task 009 — Inventory Implementation Readiness & Decision Pack — is complete and merged through PR #11 (merge commit `f301eb238b982ead836e049b15348154c02c72b0`). Inventory feature implementation has not started; the seven inventory business decisions remain pending.
+> **Build direction:** New tasks are implementation tasks: build features, fix bugs, integrate modules, improve the UI and add the tests needed to ship them. Investigation-only and audit-only task streams are not the default. When a dependency is pending, agents should build the independent parts instead of leaving the whole task idle.
+>
+> **Current main baseline:** `07bf296d2ce32d1cb91854f91b492540bdc5a954`. The merged application foundation, Product Management and Employee Account Administration are available in `main`. The active module PRs are still in progress and are not represented as completed functionality.
 
 ## Contents
 
@@ -404,9 +406,9 @@ The implementation details and evidence are reconciled in [the architecture over
 
 ## Development roadmap and progress
 
-This checklist is the project's shared progress record. It is intended to help future coding agents and contributors understand what has been decided, what is complete and what comes next.
+This checklist is the project's shared delivery record. It helps coding agents and contributors see what has shipped, what is being built and what comes next.
 
-**A checkbox is marked complete only after the work has been implemented (where applicable), reviewed and supported by evidence.** Planning a feature does not count as implementing it.
+**A checkbox is marked complete only after the functionality has been implemented and the relevant checks have passed.** Planning or documenting a feature does not count as implementing it.
 
 ### Phase 0 — Discovery and project setup
 
@@ -559,29 +561,34 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 ### Current project position
 
-**Completed:** Business discovery, core requirements, product scope decisions, public repository creation, initial project documentation, Task 002 architecture work for the dedicated Ajose Warehouse-to-Sheraton Store physical pickup and destination receipt workflow (ADR-016) merged in PRs #3 and #4, and the Task 005 application foundation approved and merged into `main` through PR #7. The Task 005 CI run passed on the exact reviewed head using disposable PostgreSQL and synthetic test records.
+**Implemented in `main`:** The application foundation, authentication and employee account administration, Product Management, and the documentation reconciliation from Task 010. The latest recorded `main` baseline is `07bf296d2ce32d1cb91854f91b492540bdc5a954`.
 
-**Task 005 status:** Approved and merged. Merge commit: `652b5d51d17ecb36e78871a99164c12238a8ac41`. The application foundation is now part of `main`; this does not represent approval of the full target architecture or implementation of the business application.
+**Active implementation work:**
 
-**Current implementation boundary:** `main` contains the Task 005 eight-table foundation, the merged Task 007 Product Management module (three tables, Owner-only permissions, API, audit events, frontend and tests), and Task 008 Employee Account Administration (invitation table and lifecycle constraints, Owner-only permissions, API, frontend, audit events and tests). Inventory, Customer, Order, Finance and Supplier modules remain incomplete.
+- **Task 011 — Customer Management:** PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14). Customer backend foundation and its database migration are being brought into the application.
+- **Task 020 — Supplier Directory:** PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16). Supplier directory backend foundation is being implemented.
+- **Task 021 — Expense Categories & Draft Expenses:** PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17). Expense categories and draft expense recording are being implemented.
+- **Task 022 — Order Capture:** independent order-capture components are authorised to be built in parallel. Customer integration and the order database migration are connected when the customer module and coordinated migration sequence are available.
 
-**Not yet implemented or approved:** Real Ajose Warehouse/Sheraton Store location records, unique codes, addresses/identifying details and secure employee-to-location assignments (DMS-DEC-001); formal approval of the Task 010 shared-visibility, location-scoped-editing, cross-location approval and Owner-only financial-overview direction plus the complete role/module matrix (DMS-DEC-002); automated company email delivery (DMS-DEC-017; Task 008 returns a one-time URL for secure manual delivery using the official company email identity); the full role/permission matrix (DMS-DEC-002); password recovery; session-history and searchable audit-history screens; comprehensive business-event audit coverage; operational business modules; production database/service provisioning; production credentials; background workers; file-storage integrations; production deployment; MFA; approved production session lifetimes and high-risk-action re-authentication; distributed rate limiting; and overall architecture/deployment approval. The technical implementation choices tracked by DMS-DEC-021–024 and DMS-DEC-027 are documented as adopted in the codebase where applicable but retain their existing review statuses.
+These PRs are works in progress; do not treat their features as already shipped in `main`.
 
-**Completed development tasks:** Task 007 — Product Management — is merged through PR #9. Task 008 — Employee Account Administration — is independently reviewed and merged through PR #10 (merge commit `a582a55b81d253fa84feb29a81932ec7843a2d97`). Task 009 — Inventory Implementation Readiness & Decision Pack — is reviewed and merged through PR #11 (merge commit `f301eb238b982ead836e049b15348154c02c72b0`). The readiness pack is complete; the seven inventory business decisions remain pending, and inventory feature implementation has not started. **Current documentation task:** Task 010 — Location Access, Cross-Location Approval & Financial Visibility — is being reconciled in a draft pull request for independent review. Task 010 does not approve inventory implementation or introduce inventory functionality. **Next work:** complete formal business approval evidence for the applicable decisions and independently review Task 010 before issuing any inventory implementation task.
+**Remaining build areas:** Inventory balances and movements, order fulfilment, incoming customer payments, receipts and notifications, procurement workflows, returns/refunds, reporting, and production deployment still need implementation. Build them in practical increments, reusing the modules already being delivered. Keep business decisions that genuinely affect money, stock ownership or permissions explicit, but do not turn those dependencies into reasons to stop unrelated coding.
+
 
 ## Working agreement
 
-The project is managed in small, reviewable tasks:
+**We are coding and developing now. The priority is to ship working DMS functionality.**
 
-1. The project manager defines one clearly scoped task and its acceptance criteria.
-2. A coding agent inspects the repository and implements that task.
-3. The agent reports files changed, important decisions, test commands/results, Git status and relevant diffs.
-4. The implementation is reviewed against the requirements. Unsupported claims are not accepted.
-5. Corrections are made before the task is approved.
-6. Only verified work is marked complete in this README.
-7. The next task is issued after review.
+1. The project manager issues scoped implementation tasks with clear outcomes.
+2. Coding agents build features, fix bugs, integrate modules, improve the interface and add the tests needed for delivery.
+3. Agents work in parallel where practical. If one integration dependency is pending, build the independent components instead of waiting idle.
+4. Keep implementation updates short and useful: report what was built, what works, relevant test results and any genuine blocker.
+5. Make necessary engineering decisions close to the code. Do not replace implementation work with another investigation or architecture document unless the project manager specifically asks for it.
+6. The project manager checks progress at meaningful milestones and focuses feedback on issues that materially affect functionality, data integrity, security or business operations. Avoid repetitive audit cycles and unnecessary approval ceremonies.
+7. Update this README as functionality ships. Do not mark incomplete or merely planned functionality as complete.
 
-Agents must read this README before making changes. If implementation reveals a requirement conflict or a necessary design decision, they must report it rather than silently changing the agreed scope.
+Agents should read this README and follow the established repository conventions before making changes. Preserve confirmed business rules and existing data. When a real business decision or technical dependency blocks one part of a feature, isolate that part and continue with the work that can safely be built.
+
 
 ---
 
