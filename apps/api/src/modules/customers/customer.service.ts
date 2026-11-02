@@ -16,15 +16,15 @@ export interface CustomerActor {
 }
 
 export interface CustomerWriteInput {
-  fullName?: string;
-  phone?: string | null;
-  email?: string | null;
-  notes?: string | null;
+  fullName?: string | undefined;
+  phone?: string | null | undefined;
+  email?: string | null | undefined;
+  notes?: string | null | undefined;
 }
 
 export interface CustomerListFilters {
-  query?: string;
-  status?: 'active' | 'archived' | 'all';
+  query?: string | undefined;
+  status?: 'active' | 'archived' | 'all' | undefined;
   page: number;
   pageSize: number;
 }
@@ -117,7 +117,8 @@ async function loadCustomer(
 }
 
 function auditFieldNames(input: CustomerWriteInput): string[] {
-  return Object.keys(input).sort();
+  const allowedFields = ['fullName', 'phone', 'email', 'notes'] as const;
+  return allowedFields.filter((field) => input[field] !== undefined);
 }
 
 export async function listCustomers(
