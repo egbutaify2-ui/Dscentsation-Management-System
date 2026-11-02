@@ -201,6 +201,20 @@ describe('Customer Management API', () => {
       .expect(403);
   });
 
+  it('rejects invalid profile fields and pagination inputs', async () => {
+    await post(ownerAgent, '/api/v1/customers', { fullName: '   ' }).expect(400);
+    await post(ownerAgent, '/api/v1/customers', {
+      fullName: 'Invalid Email',
+      email: 'not-an-email',
+    }).expect(400);
+    await post(ownerAgent, '/api/v1/customers', {
+      fullName: 'Oversized Phone',
+      phone: '1'.repeat(41),
+    }).expect(400);
+    await ownerAgent.get('/api/v1/customers?page=0').expect(400);
+    await ownerAgent.get('/api/v1/customers?status=deleted').expect(400);
+  });
+
   it('retrieves a customer and returns a consistent not-found response', async () => {
     const customer = await createCustomer(`Task011 Get ${suffix.slice(0, 8)}`);
     const response = await ownerAgent.get(`/api/v1/customers/${customer.id}`).expect(200);
