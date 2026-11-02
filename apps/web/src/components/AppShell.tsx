@@ -172,7 +172,7 @@ export function AppShell({
         <main>{children}</main>
         <footer className="app-footer">
           <span>Dscentsation Management System</span>
-          <span>Internal workspace · Account and Product Management</span>
+          <span>Internal workspace · Business operations</span>
         </footer>
       </div>
     </div>
