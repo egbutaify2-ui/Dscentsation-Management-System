@@ -149,6 +149,16 @@ describe('OrderManagementPage', () => {
     expect(screen.getByText('Received')).toBeTruthy();
   });
 
+  it('hides create and amendment actions without their specific permissions', async () => {
+    render(<OrderManagementPage permissions={['orders.view']} locations={locations} />);
+    await screen.findByText('Synthetic Customer');
+    expect(screen.queryByRole('button', { name: 'Create order' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    expect(await screen.findByRole('heading', { name: 'ORD-555555555555' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Amend order' })).toBeNull();
+  });
+
   it('submits search and filters to the API and supports pagination', async () => {
     vi.mocked(api.getPage).mockImplementation((path) => {
       const meta = path.includes('page=2')
