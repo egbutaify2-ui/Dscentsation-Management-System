@@ -104,6 +104,36 @@ describe('AppShell permission-aware navigation', () => {
     expect(onNavigate).toHaveBeenCalledWith('suppliers');
   });
 
+  it('shows Expenses when the session grants expense or expense-category view permission', () => {
+    const onNavigate = vi.fn();
+    const { rerender } = render(
+      <AppShell
+        user={user}
+        permissions={[]}
+        activeSection="overview"
+        onNavigate={onNavigate}
+        onLogout={async () => undefined}
+      >
+        <p>Overview content</p>
+      </AppShell>,
+    );
+    expect(screen.queryByRole('button', { name: 'Expenses' })).toBeNull();
+
+    rerender(
+      <AppShell
+        user={user}
+        permissions={['expense_categories.view']}
+        activeSection="overview"
+        onNavigate={onNavigate}
+        onLogout={async () => undefined}
+      >
+        <p>Overview content</p>
+      </AppShell>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Expenses' }));
+    expect(onNavigate).toHaveBeenCalledWith('expenses');
+  });
+
   it('keeps unfinished business modules disabled', () => {
     render(
       <AppShell

@@ -272,6 +272,13 @@ describe('DMS foundation API', () => {
       'products.variants.manage',
       'products.view',
     ];
+    const expensePermissions = [
+      'expense_categories.manage',
+      'expense_categories.view',
+      'expenses.create',
+      'expenses.update',
+      'expenses.view',
+    ];
     const supplierPermissions = [
       'suppliers.create',
       'suppliers.manage_status',
@@ -284,6 +291,11 @@ describe('DMS foundation API', () => {
       'customers.create',
       'customers.update',
       'customers.view',
+      'expense_categories.manage',
+      'expense_categories.view',
+      'expenses.create',
+      'expenses.update',
+      'expenses.view',
       'inventory.transfer.pickup_warehouse_to_assigned_sheraton',
       'inventory.transfer.receive_destination_assigned',
       'payments.record',
@@ -305,6 +317,11 @@ describe('DMS foundation API', () => {
     expect(owner.permissions).toContain('payments.verify');
     for (const permission of productPermissions) {
       expect(owner.permissions).toContain(permission);
+      expect(manager.permissions).not.toContain(permission);
+      expect(staff.permissions).not.toContain(permission);
+    }
+    for (const permission of expensePermissions) {
+      expect(owner.permissions).not.toContain(permission);
       expect(manager.permissions).not.toContain(permission);
       expect(staff.permissions).not.toContain(permission);
     }

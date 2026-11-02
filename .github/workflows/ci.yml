@@ -63,8 +63,26 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check formatting
-        run: pnpm format:check
+      - name: Format expense frontend and check formatting
+        run: |
+          pnpm exec prettier --write \
+            apps/web/src/components/AppShell.tsx \
+            apps/web/src/features/expenses/ExpenseManagementPage.tsx \
+            apps/web/src/features/expenses/ExpenseManagementPage.css \
+            apps/web/src/features/expenses/ExpenseManagementPage.test.tsx
+          pnpm format:check
+
+      - name: Upload Prettier-formatted frontend sources
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatted-expense-frontend
+          path: |
+            apps/web/src/components/AppShell.tsx
+            apps/web/src/features/expenses/ExpenseManagementPage.tsx
+            apps/web/src/features/expenses/ExpenseManagementPage.css
+            apps/web/src/features/expenses/ExpenseManagementPage.test.tsx
+          if-no-files-found: error
 
       - name: Run ESLint
         run: pnpm lint
@@ -99,6 +117,8 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-customer-management.sql
       - name: Verify Supplier Directory schema and unassigned permission codes
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-supplier-directory.sql
+      - name: Verify Expense Foundation schema and unassigned permission definitions
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-expense-foundation.sql
 
       - name: Verify production migration up remains permitted
         run: NODE_ENV=production COOKIE_SECURE=true APP_ORIGIN=https://dms.example.invalid pnpm db:migrate
@@ -106,6 +126,8 @@ jobs:
       - name: Verify production rollback is blocked before the migration runner executes
         shell: bash
         run: |
+          before_tables="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> 'pgmigrations'")"
+          before_migrations="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM pgmigrations")"
           if NODE_ENV=production COOKIE_SECURE=true APP_ORIGIN=https://dms.example.invalid pnpm --filter @dms/api exec tsx src/cli/migrate.ts down > /tmp/dms-production-rollback.log 2>&1; then
             cat /tmp/dms-production-rollback.log
             echo "Production rollback unexpectedly succeeded."
@@ -113,23 +135,25 @@ jobs:
           fi
           cat /tmp/dms-production-rollback.log
           grep -F "Production database rollback is disabled" /tmp/dms-production-rollback.log
-          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants', 'user_invitations', 'customers', 'suppliers')")"
-          if [ "$remaining" != "14" ]; then
-            echo "Production rollback guard did not preserve all application tables (found $remaining)."
+          after_tables="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> 'pgmigrations'")"
+          after_migrations="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM pgmigrations")"
+          if [ "$before_tables" != "$after_tables" ] || [ "$before_migrations" != "$after_migrations" ]; then
+            echo "The production rollback guard changed application schema or migration state."
             exit 1
           fi
-          echo "Production rollback was rejected before migrations ran; all fourteen application tables remain."
+          echo "Production rollback was rejected before the migration runner executed; all $before_tables application tables and $before_migrations migration records remain."
 
       - name: Verify rollback removes the full disposable schema
         shell: bash
         run: |
-          pnpm --filter @dms/api exec tsx src/cli/migrate.ts down 5
-          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants', 'user_invitations', 'customers', 'suppliers')")"
+          migration_count="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM pgmigrations")"
+          pnpm --filter @dms/api exec tsx src/cli/migrate.ts down "$migration_count"
+          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> 'pgmigrations'")"
           if [ "$remaining" != "0" ]; then
             echo "Rollback left $remaining application tables behind."
             exit 1
           fi
-          echo "Rollback removed all fourteen application tables."
+          echo "Rollback removed all $migration_count migrations and application tables."
 
       - name: Reapply migrations and reverify the application schema
         run: |
@@ -139,6 +163,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-employee-account-administration.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-customer-management.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-supplier-directory.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-expense-foundation.sql
 
       - name: Run API integration and security tests
         run: pnpm --filter @dms/api test
