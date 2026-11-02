@@ -64,11 +64,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check formatting
-        shell: bash
-        run: |
-          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 apps/api/src/modules/suppliers/supplier.routes.test.ts > /tmp/supplier.routes.test.formatted
-          diff -u apps/api/src/modules/suppliers/supplier.routes.test.ts /tmp/supplier.routes.test.formatted || true
-          pnpm format:check
+        run: pnpm format:check
 
       - name: Run ESLint
         run: pnpm lint

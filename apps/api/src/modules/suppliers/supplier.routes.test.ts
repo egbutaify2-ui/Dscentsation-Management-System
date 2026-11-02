@@ -503,10 +503,7 @@ describe('Supplier Directory API', () => {
       expect(failedDeactivate.status).toBe(500);
       expect(failedDeactivate.body.error.code).toBe('INTERNAL_SERVER_ERROR');
 
-      const failedActivate = await post(
-        fullAgent,
-        '/api/v1/suppliers/' + inactiveId + '/activate',
-      );
+      const failedActivate = await post(fullAgent, '/api/v1/suppliers/' + inactiveId + '/activate');
       expect(failedActivate.status).toBe(500);
       expect(failedActivate.body.error.code).toBe('INTERNAL_SERVER_ERROR');
     } finally {
@@ -518,10 +515,9 @@ describe('Supplier Directory API', () => {
       id: string;
       display_name: string;
       status: string;
-    }>(
-      'SELECT id, display_name, status FROM suppliers WHERE id = ANY($1::uuid[]) ORDER BY id',
-      [[activeId, inactiveId].sort()],
-    );
+    }>('SELECT id, display_name, status FROM suppliers WHERE id = ANY($1::uuid[]) ORDER BY id', [
+      [activeId, inactiveId].sort(),
+    ]);
     expect(persisted.rows).toHaveLength(2);
     const activeRecord = persisted.rows.find((row) => row.id === activeId);
     const inactiveRecord = persisted.rows.find((row) => row.id === inactiveId);
