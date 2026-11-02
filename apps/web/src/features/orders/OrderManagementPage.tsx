@@ -183,6 +183,10 @@ function parseVariantKey(value: string): { productId: string; variantId: string 
   return productId && variantId ? { productId, variantId } : null;
 }
 
+function safeQuantity(value: number): bigint {
+  return Number.isSafeInteger(value) && value > 0 ? BigInt(value) : 0n;
+}
+
 function validateOrderForm(form: OrderFormState): string | null {
   if (!form.customerId) return 'Choose a customer.';
   if (!form.sourceChannel) return 'Choose an order source channel.';
@@ -417,7 +421,7 @@ export function OrderManagementPage({
   function previewTotals(): { subtotal: bigint; total: bigint } {
     const subtotal = form.items.reduce((sum, item) => {
       const variant = selectedVariant(item.productId, item.variantId);
-      return sum + BigInt(item.quantity) * nairaToMinor(variant?.sellingPrice ?? '0');
+      return sum + safeQuantity(item.quantity) * nairaToMinor(variant?.sellingPrice ?? '0');
     }, 0n);
     return { subtotal, total: subtotal };
   }
@@ -853,7 +857,7 @@ export function OrderManagementPage({
                         </label>
                         <div className="order-line-total">
                           <small>{formatMoney(unitMinor)} each</small>
-                          <strong>{formatMoney((BigInt(item.quantity || 0) * BigInt(unitMinor)).toString())}</strong>
+                          <strong>{formatMoney((safeQuantity(item.quantity) * BigInt(unitMinor)).toString())}</strong>
                         </div>
                         <button className="text-button remove-line" type="button" onClick={() => removeItem(index)}>
                           Remove
