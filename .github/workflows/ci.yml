@@ -94,6 +94,8 @@ jobs:
 
       - name: Verify Employee Account Administration schema and Owner-only permission seeds
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-employee-account-administration.sql
+
+      - name: Verify Customer Management schema and unassigned permission codes
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-customer-management.sql
 
       - name: Verify production migration up remains permitted
