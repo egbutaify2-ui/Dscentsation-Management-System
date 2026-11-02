@@ -12,7 +12,12 @@ describe('Customer Management database invariants', () => {
     const user = await pool.query<{ id: string }>(
       `INSERT INTO users(email_normalized, display_name, password_hash, role_id)
        VALUES ($1, $2, $3, $4) RETURNING id`,
-      [`task011.database.${suffix}@example.invalid`, 'Synthetic customer database actor', 'synthetic-hash', role.rows[0].id],
+      [
+        `task011.database.${suffix}@example.invalid`,
+        'Synthetic customer database actor',
+        'synthetic-hash',
+        role.rows[0].id,
+      ],
     );
     actorId = user.rows[0]!.id;
   });
@@ -57,7 +62,13 @@ describe('Customer Management database invariants', () => {
       `INSERT INTO customers(full_name, phone, email, created_by, updated_by)
        VALUES ($1, $3, $4, $5, $5), ($2, $3, $4, $5, $5)
        RETURNING id`,
-      [`Synthetic Contact A ${suffix}`, `Synthetic Contact B ${suffix}`, sharedPhone, sharedEmail, actorId],
+      [
+        `Synthetic Contact A ${suffix}`,
+        `Synthetic Contact B ${suffix}`,
+        sharedPhone,
+        sharedEmail,
+        actorId,
+      ],
     );
     expect(records.rows).toHaveLength(2);
     expect(records.rows[0]!.id).not.toBe(records.rows[1]!.id);
@@ -90,9 +101,10 @@ describe('Customer Management database invariants', () => {
     await expect(pool.query('DELETE FROM customers WHERE id = $1', [customerId])).rejects.toThrow(
       /archived, not deleted/i,
     );
-    expect(
-      await pool.query('SELECT 1 FROM customers WHERE id = $1', [customerId]),
-    ).toHaveProperty('rowCount', 1);
+    expect(await pool.query('SELECT 1 FROM customers WHERE id = $1', [customerId])).toHaveProperty(
+      'rowCount',
+      1,
+    );
   });
 
   it('enforces actor references for both creation and update attribution', async () => {
