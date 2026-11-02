@@ -1,13 +1,13 @@
 # DMS Task 009 — Inventory Implementation Readiness & Decision Pack
 
-**Document status:** Task 009 documentation deliverable; pending independent project-manager/business-owner review
-**Implementation status:** Inventory feature implementation has not started
+**Document status:** Task 009 readiness deliverable, updated by Task 010 planning-direction reconciliation; independent review of Task 010 remains pending
+**Implementation status:** Inventory feature implementation has not started; Task 010 does not authorise it
 **Evidence baseline:** adb0258d463d6337d99f76ef1bb7d7abf5749b21
 **Scope:** Readiness assessment and decision worksheet only. This document does not approve, implement or provision inventory functionality.
 
 ## 1. Purpose and current project position
 
-This pack establishes the verified repository baseline and the decisions required before Dscentsation begins its next major phase: multi-location inventory and stock management. It separates executable database/code evidence from conceptual architecture entities and confirmed business rules.
+This pack establishes the verified repository baseline and the decisions required before Dscentsation begins multi-location inventory and stock management. The Task 010 update reconciles the supplied Ajose Warehouse/Sheraton Store operating model, shared operational visibility, location-scoped direct editing, cross-location approval and Owner-only financial overview with the architecture. It separates executable database/code evidence from planning direction, formal approval evidence and conceptual architecture entities.
 
 The assessment is based on the required starting commit, which is also the observed main HEAD at inspection time. Tasks 007 (Product Management, PR #9) and 008 (Employee Account Administration, PR #10) are merged. The Task 008 merge commit is a582a55b81d253fa84feb29a81932ec7843a2d97. The required baseline includes the post-merge documentation reconciliation.
 
@@ -29,7 +29,7 @@ The complete migration directory at the evidence baseline contains exactly three
 
 There are twelve physical application tables after the three migrations. No migration creates inventory balances, stock movements, reservations, reservation policies, transfer headers/items, pickup/receipt events, in-transit balances, stock counts or reconciliation records.
 
-The existing **locations** table stores a location code, name, optional address/contact fields, active state and timestamps. The existing **user_location_access** table stores a user/location assignment and the user who granted it. **Neither table is seeded with real physical locations or Staff assignments.** The foundation migration explicitly avoids inventing or seeding locations.
+The existing **locations** table stores a location code, name, optional address/contact fields, active state and timestamps. The existing **user_location_access** table stores a user/location assignment and the user who granted it. **Neither table is seeded with real physical locations or employee assignments.** Task 010 planning direction identifies Ajose Warehouse (main warehouse/stock holding) and Sheraton Store (customer-facing walk-in retail), but no codes, addresses, UUIDs, real location records or account-to-location mappings are introduced. The foundation migration explicitly avoids inventing or seeding locations.
 
 The existing **audit_logs** table has database triggers rejecting UPDATE, DELETE and TRUNCATE. It is an audit foundation, not a stock movement ledger. The existence of the location and audit tables does not mean that inventory operations are implemented.
 
@@ -37,14 +37,14 @@ The existing **audit_logs** table has database triggers rejecting UPDATE, DELETE
 
 The executable code already provides the following reusable foundations:
 
-- **canAccessStockLocation** grants Owner and Manager global location access and checks an active **user_location_access** assignment for Staff.
+- **canAccessStockLocation** at the inspected baseline grants Owner and the generic Manager role global location access and checks an active **user_location_access** assignment for Staff. This is existing Task 005 implementation evidence, not the revised target authorisation model supplied for Task 010.
 - **requireStockLocationAccess** is available as backend middleware for a location-scoped API action.
-- **canUseWarehouseSheratonPickup** is a narrow authorisation helper. It checks the Staff role, the dedicated pickup permission, the configured Warehouse source, a configured Sheraton destination and the Staff member's assignment to that destination. Its source comment states that canonical location IDs must come from trusted configuration and that the foundation does not invent or seed physical locations.
+- **canUseWarehouseSheratonPickup** is a narrow authorisation helper at the inspected baseline. It checks the Staff role, the dedicated pickup permission, the configured Warehouse source, a configured Sheraton destination and the Staff member's assignment to that destination. The Task 010 target model requires an explicitly authorised Store Manager using the existing Manager role to be eligible when the destination assignment and action permission pass; the current Staff-role-only helper therefore requires later reviewed implementation reconciliation. Its source comment states that canonical location IDs must come from trusted configuration and that the foundation does not invent or seed physical locations.
 - **requirePermission** enforces seeded permission codes on the backend.
 
-These are access-control primitives, not location administration or stock-transfer functionality. There is no API route to create/edit/deactivate locations or grant/revoke employee location assignments. The API application currently mounts authentication, user administration and Product Management routes; it does not mount an inventory or location-administration module. The web feature tree has authentication, dashboard, products and users features; it has no inventory or locations feature.
+These are access-control primitives, not location administration or stock-transfer functionality. They do not implement shared operational read visibility, assignment-scoped direct changes for the Manager role, cross-location approval requests or the Owner-only financial overview. There is no API route to create/edit/deactivate locations or grant/revoke employee location assignments. The API application currently mounts authentication, user administration and Product Management routes; it does not mount an inventory or location-administration module. The web feature tree has authentication, dashboard, products and users features; it has no inventory or locations feature.
 
-The foundation migration seeds four permission codes: **payments.record**, **payments.verify**, **inventory.transfer.receive_destination_assigned** and **inventory.transfer.pickup_warehouse_to_assigned_sheraton**. The two inventory codes are capability seeds only; no corresponding transfer/receipt workflow exists. Staff receives the two narrow inventory action permissions. The Manager/Owner global location access rule is implemented in the access helper, not by assigning every location to those roles.
+The foundation migration seeds four permission codes: **payments.record**, **payments.verify**, **inventory.transfer.receive_destination_assigned** and **inventory.transfer.pickup_warehouse_to_assigned_sheraton**. The two inventory codes are capability seeds only; no corresponding transfer/receipt workflow exists. The current foundation assigns the two narrow inventory action permissions to Staff. No new role code or permission seed is introduced by Task 010. The target model requires explicit action permission and destination assignment checks that also permit the assigned Store Manager using the existing Manager role; the existing helper/seed arrangement must be reconciled in a later reviewed implementation task.
 
 Task 007 adds six **products.*** permissions to Owner only. Task 008 adds **users.view** and **users.manage** to Owner only. Those product/user permissions do not settle the complete module permission matrix: DMS-DEC-002 remains pending.
 
@@ -124,21 +124,22 @@ The following requirements are confirmed and must be preserved. They are not reo
 - Expiry does not cancel an order and does not reduce physical on-hand. It releases eligible reserved quantity and places the order on fulfilment hold/reconfirmation as specified by ADR-005.
 - Reservation creation, extension, release, expiry and dispatch consumption must be transactional and must not double-consume or double-release the same reservation.
 
-### 3.4 Warehouse-to-Sheraton pickup — preserve ADR-016 exactly
+### 3.4 Warehouse-to-Sheraton pickup and receipt — preserve the amended ADR-016 controls
 
-Warehouse and Sheraton are separate physical locations. The confirmed exception is a narrow transfer action for a Staff member assigned to the destination Sheraton location. It is not a general Warehouse role or access grant.
+Ajose Warehouse and Sheraton Store are separate physical locations with separate balances. The Task 010 planning direction permits shared read-only operational visibility of both locations; it does not grant cross-location direct editing. A non-Owner's direct stock-changing actions remain assigned-location scoped, except for the narrowly defined pickup/receipt actions below.
 
-- Sheraton-assigned Staff may perform only the dedicated Warehouse-to-their-assigned-Sheraton pickup action.
-- The Staff member must not receive general Warehouse access, Warehouse balance browsing, Warehouse adjustments or unrelated Warehouse transfer-management access.
-- The backend checks Warehouse availability internally for the specific transfer items and submitted quantities. The exact Warehouse balance must not be returned or exposed to Sheraton Staff. An insufficient-stock response must not disclose the exact balance.
+- An operational user assigned to Sheraton and holding the explicit pickup action permission may create/open a transfer only from Ajose Warehouse to that assigned Sheraton Store. The existing Manager role is eligible when the active destination assignment and explicit action permission pass; eligibility must not depend exclusively on the literal Staff role.
+- The assigned Store Manager and other authorised operational users may view Warehouse quantities/availability through the shared operational read surfaces. Shared visibility does not grant general Warehouse receiving, adjustment or unrelated transfer write permissions.
+- The pickup command validates the exact source/destination, destination assignment, explicit permission, transfer state and submitted quantities against current Warehouse available stock inside the transaction. It must not partially post a failed event.
 - Pickup atomically reduces Warehouse on-hand and increases the transfer-item-specific in-transit quantity by the same amount.
-- Destination receipt is a separate operation performed by Staff assigned to the destination. Receipt atomically reduces in-transit and increases that destination's on-hand balance.
+- Destination receipt is separate and is performed by an authenticated user assigned to Sheraton with the explicit destination-receipt permission. The existing Manager role is eligible when those checks pass. Receipt atomically reduces in-transit and increases Sheraton on-hand.
+- Standard transfers, dedicated pickup and destination receipt keep their separate workflows and do not enter the additional cross-location stock-change approval queue.
 - Partial pickup and partial receipt are supported. Unpicked requested quantities remain open; unreceived quantities remain in transit.
-- Pickup and receipt events preserve their individual authenticated actors and timestamps. The same person may perform both actions, but the events and attribution remain separate.
+- Pickup and receipt events preserve individual authenticated actors and timestamps. The same person may perform both actions, but the events and attribution remain separate.
 - Idempotency prevents retries from creating duplicate pickup/receipt events or stock movements. Reusing an idempotency key with a different payload is rejected.
 - Discrepancies preserve quantity, reason, reporter and time. Unresolved discrepancies remain visible and must not be hidden by silent balance changes or transfer cancellation.
 - Picked quantity cannot be automatically expired, silently restored to Warehouse or erased by cancellation. A return must be a separately recorded reverse transfer; any other outcome requires an authorised, recorded discrepancy resolution.
-- The exact physical paperwork/reference accompanying collection is not confirmed; DMS-DEC-010 must answer that without weakening any ADR-016 control.
+- The exact physical paperwork/reference accompanying collection is not confirmed; DMS-DEC-010 must answer that without weakening the transfer controls.
 
 ## 4. Inventory domain entities and relationships
 
@@ -183,66 +184,75 @@ Opening stock is not present in the repository. It must be introduced only throu
 
 ## 5. Outstanding business decisions and decision worksheet
 
-All seven decisions below remain **Pending confirmation** in the existing decision register. Task 009 does not change those statuses. Each answer must be completed by the project manager/business owner with an approval source and date; a suggested option or existing schema description is not approval.
+All seven decisions below remain **Pending confirmation** in the existing decision register. The Task 010 planning direction does not change those statuses and is not formal business-owner approval evidence. Each decision must be completed with an approval source and date; a planning statement, suggested option or existing schema description is not approval.
 
-### DMS-DEC-001 — Canonical physical stock locations and Staff assignments
+### DMS-DEC-001 — Canonical physical stock locations and role-based assignments
 
 **Current status:** Pending confirmation
 
-**Already confirmed:** DMS supports multiple physical locations. Warehouse and Sheraton are distinct physical stock locations with separate balances. ADR-016 requires a configured Warehouse source, a Sheraton destination and destination Staff assignments. Owner and Manager have global stock-location access; Staff access is assignment-scoped, subject to the dedicated ADR-016 action.
+**Business direction supplied for Task 010 (not formal business-owner approval evidence):** The two initial operating stock locations are Ajose Warehouse (main warehouse and stock holding location) and Sheraton Store (customer-facing walk-in retail store), each with an independent physical balance. The Owner has authority across both. The existing Manager role is used for the Sheraton Store Manager and is assigned to Sheraton. Three Warehouse Staff accounts are assigned to Ajose Warehouse. All authorised operational users are intended to have read-only operational visibility of both locations. Non-Owner direct stock-changing operations are scoped to the assigned location, with other-location requests routed through DMS-DEC-002 approval rules. No employee names, email addresses, account IDs or credentials belong in this public repository.
 
-**Still unanswered:** The complete list of physical stock/fulfilment locations; approved names and unique codes; which records are the canonical Warehouse and Sheraton location(s); address/identifying description and operating purpose; active state; which Staff accounts are assigned to each location; and who may grant, change or revoke assignments.
+**Still unanswered:** Approved unique location codes; addresses or other identifying details needed to disambiguate the physical sites; canonical location record IDs; actual secure employee-account-to-location mappings; who is authorised to establish, grant, change, temporarily vary and revoke assignments; and the formal approval evidence for this operating model. No code, address, UUID or employee mapping has been invented.
 
-**Why it affects implementation:** Location IDs anchor balances, receiving, transfers, order fulfilment and every Staff location-access check. Incorrect codes or assignments can direct stock to the wrong balance or expose a location to the wrong person. ADR-016 cannot be enabled safely until the canonical source/destination and assignments are known.
+**Why it affects implementation:** Location IDs anchor balances, receiving, transfers, order fulfilment and every location-access check. Incorrect codes or assignments can direct stock to the wrong balance or expose a location to the wrong user. The dedicated pickup/receipt actions cannot be enabled safely until the canonical endpoints and assigned destination accounts are established.
 
 **Exact information / approval required:**
 
-1. Provide each initial location's approved business name, unique code, purpose/type, address or identifying description, active state and operational notes.
-2. Identify the single canonical Warehouse record used as the ADR-016 source and every approved Sheraton destination record.
-3. Identify which existing employee accounts are assigned to each location using a controlled internal reference; do not place personal employee details in this public repository.
-4. Identify the role/person authorised to grant, change and revoke an assignment, and the required reason/audit evidence.
-5. Confirm how temporary assignment changes and staff transfers between locations are authorised and recorded.
+1. Approve unique codes and any required address/identifying details for Ajose Warehouse and Sheraton Store.
+2. Identify the canonical Ajose Warehouse source record and Sheraton Store destination record.
+3. Establish the actual employee-account-to-location mappings privately through an authorised secure process; do not copy personal details into this repository.
+4. Approve the role/person authorised to grant, change, temporarily vary and revoke each assignment, including required reasons and audit evidence.
+5. Record the formal business-owner approval source, date and reference for the supplied location/assignment model.
 
 **Governing sources:** README — Business context, Inventory rules and Phase 0; Architecture Overview §§4.2, 4.2.1 and 5; Database Design §§2.1–2.2; ADR-005, ADR-006 and ADR-016; Decision Register DMS-DEC-001.
 
 **Project manager / business owner response (complete before approval):**
 
-- Approved location register: **[To be completed]**
-- Canonical Warehouse record and code: **[To be completed]**
-- Canonical Sheraton destination record(s) and code(s): **[To be completed]**
-- Staff-to-location assignments (controlled employee references): **[To be completed]**
-- Assignment authority and change/revocation process: **[To be completed]**
-- Approval by / role: **[To be completed]**
+- Approved location names and purposes: **Ajose Warehouse — main warehouse/stock holding; Sheraton Store — customer-facing walk-in retail** (planning direction supplied; formal approval evidence pending)
+- Approved unique location codes: **[To be completed]**
+- Canonical Warehouse/Sheraton records and IDs: **[To be completed]**
+- Secure employee-account-to-location mappings: **[To be configured privately; no personal details in this repository]**
+- Assignment authority and grant/change/revocation process: **[To be completed]**
+- Formal approval by / role: **[To be completed]**
 - Approval date and evidence/reference: **[To be completed]**
 
-### DMS-DEC-002 — Detailed role and permission matrix
+### DMS-DEC-002 — Detailed role, location and financial-visibility permission matrix
 
 **Current status:** Pending confirmation
 
-**Already confirmed:** Owner and Manager have global stock-location access. Staff are restricted to assigned locations. The ADR-016 pickup permission does not grant general Warehouse access. Destination receipt is restricted to Staff assigned to the destination. Staff may record payment entries; only Owner/Manager may verify them. The executable foundation currently grants the two inventory action permission codes to Staff, but no stock workflows exist.
+**Business direction supplied for Task 010 (not formal business-owner approval evidence):**
 
-**Still unanswered:** The complete Owner/Manager/Staff permission matrix for viewing, creating, editing, receiving, adjusting, counting, transferring, dispatching, reconciling, approving, exporting and administering inventory and locations. The present permission seeds do not settle this matrix.
+- **Shared operational visibility:** Authorised operational users use the same operational dashboards and can view both Ajose Warehouse and Sheraton Store dashboards, stock quantities and availability, plus shared information needed for day-to-day stock management.
+- **Location-specific direct editing:** Ajose Warehouse Staff directly perform normal authorised stock-changing operations at Ajose Warehouse. The Sheraton Store Manager using the existing Manager role directly performs normal authorised stock-changing operations at Sheraton Store. The Owner can operate at both locations without restriction. The generic Manager role does not automatically grant unrestricted cross-location stock editing.
+- **Cross-location stock-change approval:** A non-Owner stock-changing request affecting the other location must remain Pending Approval without changing the live balance. A Sheraton Store Manager request affecting Ajose Warehouse is approved by any one authorised Ajose Warehouse Staff account. An Ajose Warehouse Staff request affecting Sheraton Store is approved by the Sheraton Store Manager. The requester cannot approve their own request. The Owner may approve, reject or override another user's pending request; the Owner's own direct operations require no second approver. Operations evaluated under this rule include manual stock adjustments/corrections, receiving that changes the target location's balance, stock-count reconciliation, other non-transfer stock quantity changes. Non-Owner reservation or dispatch operations that change stock at a location other than the actor's assigned location are also subject to this approval rule, including when they form part of an order workflow. The only separate workflow exceptions are standard stock transfers, the dedicated Ajose Warehouse-to-Sheraton Store physical pickup, and destination receipt for those transfer workflows. These transfer workflows remain governed by their separate lifecycles and are excluded from this additional approval queue.
+- **Approval integrity:** Retain requester, target location, proposed operation, reason and submission timestamp; approver, decision, decision timestamp and outcome; revalidate permissions/current stock when approving; post the operation and movement transactionally; rejected requests do not change stock; and attribute every action, including Owner overrides.
+- **Owner-only financial overview:** Only the Owner may access the consolidated overview across both locations: total money in, total money out, revenue, expenses and profit/loss. Enforce this in backend authorisation and protected API responses, not just frontend display. Manager and Staff must not receive those aggregate values.
 
-**Why it affects implementation:** Every API route and service command must have a clear least-privilege rule. UI visibility is not an access-control boundary. In particular, a generic inventory permission must not accidentally grant Sheraton Staff general Warehouse access.
+**Still unanswered:** Formal approval evidence for the supplied rules; the complete role-by-module permission matrix; permissions for individual payments, expenses, refunds and other financial records; customer/product/order/document/export/user/location administration permissions; other approval flows and any monetary limits (without changing DMS-DEC-003); and the detailed action/field permissions for all operational modules. The Owner-only summary rule does not settle broader individual financial-record permissions.
+
+**Why it affects implementation:** Every API route and service command needs a clear least-privilege rule. Shared read visibility must not imply permission to change stock. A generic inventory permission must not accidentally permit an unassigned stock change, bypass approval, expose Owner-only aggregates or remove existing payment controls.
 
 **Exact information / approval required:**
 
-1. Approve role-by-module permissions for location administration, inventory viewing, receiving, adjustments, counts, standard transfers, ADR-016 pickup, destination receipt, discrepancy reporting/resolution, order reservation/dispatch and inventory reporting.
-2. For each role, specify view/create/edit/deactivate/submit/approve/resolve/export actions where relevant, including field-level and location restrictions.
-3. Confirm whether an action needs a second approver, whether the actor may approve their own action, and how unavailability is escalated. Coordinate approval limits with DMS-DEC-003 where applicable.
-4. Confirm whether access is global, assigned-location-only or limited to a specific resource/action.
-5. Explicitly preserve all current ADR-005, ADR-006 and ADR-016 boundaries.
+1. Formally approve shared two-location operational visibility and the location-specific direct-edit model.
+2. Formally approve the two destination-location approval routes and Owner direct/approval/override authority, including requester self-approval prohibition and the separate transfer/pickup/receipt exception.
+3. Approve the required approval-record/audit behaviour and stock-state revalidation at decision time. Detailed schema design remains for a later reviewed task.
+4. Formally approve Owner-only access to the consolidated financial overview and its exact aggregate scope.
+5. Approve the full Owner/Manager/Staff permission matrix for customers, products, orders, cancellation, dispatch, receiving, adjustments, counts, standard transfers, pickup, receipt, discrepancies, payments, individual financial records, expenses, refunds, suppliers/procurement, reports, documents, exports, user administration, location administration and system settings.
+6. Specify any other role-specific approval, field-level restriction or export rule. Coordinate monetary thresholds only through DMS-DEC-003; Task 010 does not change those limits.
 
-**Governing sources:** README — Users and permissions, Inventory rules and Security; Architecture Overview §5; Database Design §§2.1 and 7; ADR-006 and ADR-016; Decision Register DMS-DEC-002.
+**Governing sources:** README — Users and permissions, Inventory rules and Security; Architecture Overview §5; Database Design §§2.1, 2.5 and 6–8; ADR-006 and ADR-016; Decision Register DMS-DEC-002.
 
 **Project manager / business owner response:**
 
-- Approved Owner permissions: **[To be completed]**
-- Approved Manager permissions: **[To be completed]**
-- Approved Staff permissions: **[To be completed]**
-- Location-scoping and exception rules: **[To be completed]**
-- Approval / segregation-of-duties rules: **[To be completed]**
-- Approval by / role: **[To be completed]**
+- Shared operational visibility: **[Planning direction supplied; formal approval pending]**
+- Direct-edit scope by role and location: **[Planning direction supplied; formal approval pending]**
+- Cross-location approval authority and exceptions: **[Planning direction supplied; formal approval pending]**
+- Approval audit and transaction requirements: **[Planning direction supplied; formal approval pending]**
+- Owner-only consolidated financial overview: **[Planning direction supplied; formal approval pending]**
+- Complete role/module permission matrix: **[To be completed]**
+- Permissions for individual financial records, refunds, expenses and exports: **[To be completed]**
+- Formal approval by / role: **[To be completed]**
 - Approval date and evidence/reference: **[To be completed]**
 
 ### DMS-DEC-007 — Initial reservation duration and expiry eligibility
@@ -311,16 +321,18 @@ All seven decisions below remain **Pending confirmation** in the existing decisi
 
 **Current status:** Pending confirmation
 
-**Already confirmed:** Destination-assigned Staff confirms physical receipt. Partial receipt is supported; unreceived quantity remains in transit. A discrepancy has a quantity, reason, reporter and subsequent authorised resolution. Unresolved quantities remain visible. Under ADR-016, picked quantities cannot be silently cancelled, expired or restored to Warehouse; they must be received, separately returned or formally resolved.
+**Existing confirmed transfer rules:** For standard transfers, destination-assigned Staff confirms physical receipt. Partial receipt is supported; unreceived quantity remains in transit. A discrepancy has a quantity, reason, reporter and subsequent authorised resolution. Unresolved quantities remain visible. Under ADR-016, picked quantities cannot be silently cancelled, expired or restored to Warehouse; they must be received, separately returned or formally resolved.
 
-**Still unanswered:** How transfer processing is escalated when destination Staff are unavailable; whether a substitute can be used and how they become assigned; required shortage/damage/loss/wrong-item evidence; permissible resolution outcomes; approver role/threshold; and ageing/escalation expectations.
+**Task 010 planning direction, pending formal confirmation under DMS-DEC-001/002:** For the dedicated Ajose Warehouse-to-Sheraton Store workflow, the assigned Store Manager using the existing Manager role is also eligible when the active Sheraton assignment and explicit destination-receipt permission pass.
+
+**Still unanswered:** How transfer processing is escalated when no authorised destination-assigned actor is available; whether any substitute can be used and how they receive an active destination assignment and explicit action permission; required shortage/damage/loss/wrong-item evidence; permissible resolution outcomes; approver role/threshold; and ageing/escalation expectations.
 
 **Why it affects implementation:** A transfer can leave stock in transit for an extended period. Without approved exceptions, the system may expose a bypass around destination assignment or encourage unsupported write-offs that conceal missing stock.
 
 **Exact information / approval required:**
 
-1. Define who monitors/escalates a transfer when no currently assigned destination Staff member is available and the expected escalation timing.
-2. If a substitute is permitted, define how the substitute is formally assigned to the destination before receipt. Do not assume an unassigned Staff member or Manager may bypass the confirmed destination-Staff receipt rule.
+1. Define who monitors/escalates a transfer when no currently authorised destination-assigned actor is available and the expected escalation timing.
+2. If a substitute is permitted, define how the substitute is formally assigned to the destination and granted the explicit action permission before receipt. Preserve the dedicated Ajose Warehouse-to-Sheraton Store eligibility of the assigned Store Manager under the existing Manager role; an unassigned Staff or Manager account must not bypass the destination-assignment rule.
 3. For shortage, damage, loss and wrong-item cases, specify required quantity evidence, reason, photos/documents if any, reporter and review record.
 4. List the permitted resolution outcomes and the exact stock/in-transit event for each (for example, receipt of remaining physical quantity, separately recorded return transfer, quarantine, write-off or another explicitly approved outcome).
 5. Specify who approves each resolution, any quantity/value thresholds, segregation-of-duties rules and what happens when an approver is unavailable.
@@ -344,7 +356,7 @@ All seven decisions below remain **Pending confirmation** in the existing decisi
 
 **Current status:** Pending confirmation
 
-**Already confirmed:** ADR-016's dedicated Warehouse-to-assigned-Sheraton pickup mode, backend availability check, no-Warehouse-balance-disclosure rule, atomic source-to-in-transit movement, partial pickup, actor/time attribution and idempotency are fixed. The physical paperwork/reference process is explicitly left open.
+**Already confirmed:** ADR-016's dedicated Warehouse-to-assigned-Sheraton pickup mode, transactional stock-availability revalidation, shared read-only visibility of Warehouse quantities and availability through authorised operational read surfaces, atomic source-to-in-transit movement, partial pickup, actor/time attribution and idempotency are fixed. An insufficient-stock submission rejects the entire pickup event without changing the Warehouse balance, in-transit quantity, pickup event or stock movement. A failed pickup response need not duplicate balance values already available through those read surfaces. The physical paperwork/reference process is explicitly left open.
 
 **Still unanswered:** Whether a Staff member must present or record a transfer reference, printed slip, dispatch note, signed handover, Warehouse confirmation, identity check or other evidence; who creates/checks it; and whether DMS must retain a file or only a reference.
 
@@ -407,17 +419,19 @@ Do not fill any blank with an assumption. Do not paste real employee personal de
 
 ## 6. Security, access-control and audit requirements
 
-The following requirements must be carried into the eventual design and implementation.
+The following requirements must be carried into the eventual design and implementation. The location/approval rules in §6.1 record Task 010 planning direction pending formal confirmation under DMS-DEC-001/002; they do not authorise code changes.
 
 ### 6.1 Backend authorisation and location scope
 
 - Every protected operation is authenticated and authorised by the backend. Hiding a control in the frontend is not sufficient.
 - Enforce the approved role permission and the location/resource scope for every command and read.
-- Owner and Manager retain the confirmed global stock-location access.
-- Staff may use ordinary stock functions only for locations to which they are actively assigned.
-- Sheraton Staff must not receive a Warehouse assignment or general Warehouse read, adjustment or transfer access.
-- The ADR-016 pickup exception remains a dedicated action for a transfer from the configured Warehouse to the actor's assigned Sheraton destination. The backend validates the actor, role, permission, source, destination and assignment. It checks exact Warehouse availability internally and does not expose the balance.
-- Destination receipt remains a separate action performed by Staff assigned to that destination.
+- Authorised operational users have shared read-only visibility of the Ajose Warehouse and Sheraton Store operational dashboards, stock quantities and availability. This read access is not an assignment and does not grant write permission.
+- Non-Owner direct stock-changing operations are limited to the account's assigned location: the Sheraton Store Manager using the existing Manager role is assigned to Sheraton; Warehouse Staff accounts are assigned to Ajose Warehouse. The Owner may operate directly at either location.
+- A non-Owner request to change stock at the other location enters Pending Approval and changes no live balance while pending. A Sheraton Store Manager request affecting Ajose Warehouse requires one authorised Ajose Warehouse Staff approver; an Ajose Warehouse Staff request affecting Sheraton Store requires the Sheraton Store Manager. A requester cannot approve their own request. The Owner may approve, reject or override another user's request; Owner direct operations require no second approver.
+- The approval record retains the requester, target location, proposed operation, reason and submission timestamp plus the approver, decision, decision timestamp and outcome. Approval revalidates current permission and stock state and posts the operation/movement transactionally; rejection changes no stock. Every action is auditable.
+- Standard transfers, dedicated Warehouse-to-Sheraton pickup and destination receipt retain their separate workflows and are not routed through the additional cross-location approval queue.
+- The assigned Sheraton Store Manager using the existing Manager role may use the dedicated pickup and destination-receipt actions when the active destination assignment and explicit action permission are satisfied. A literal Staff-role-only check must not block this action. No general Warehouse write permission is granted.
+- The consolidated financial overview (total money in/out, revenue, expenses and profit/loss across both locations) is Owner-only and must be protected by backend authorisation/API responses. This does not settle permissions for individual financial records.
 
 ### 6.2 Actor attribution, timestamps and audit
 
@@ -454,7 +468,7 @@ The implementation plan must explicitly test and protect the following failure m
 | Policy changes while reservations are active | Store the applied policy version and expiry on each reservation. New policy versions do not retroactively alter existing reservations. |
 | Two source dispatches/pickups or destination receipts are retried | Transfer/item locks, unique idempotency keys and transactional event/movement writes prevent duplicate stock changes. |
 | Partial transfer pickup/receipt or cancellation | Reconcile requested, dispatched, received, cancelled, in-transit and formally resolved quantities. Picked quantity cannot be erased by cancellation. |
-| Sheraton Staff tries to read or use unrelated Warehouse stock | Authorise the exact Warehouse-to-assigned-Sheraton transfer action. Perform only item-specific internal availability checks; do not return exact Warehouse balances. |
+| Non-Owner requests an unrelated direct Warehouse stock change | Shared read-only Warehouse visibility remains available to authorised operational users. An unrelated cross-location stock change must use the destination-location approval process; dedicated pickup authority does not grant general Warehouse write access. |
 | Destination Staff is unavailable or an item is disputed | Leave unreceived quantity visible in transit until a formally approved receipt, return or discrepancy resolution. Do not silently force receipt or write off. |
 | Stock count overlaps with normal movements | Define a count cutoff/snapshot and locking/reconciliation strategy before implementation so legitimate movements are not overwritten by a stale count. Every reconciliation delta must be attributable. |
 | Audit insertion or downstream write fails | Roll back the entire stock transaction; a balance change without its movement/audit evidence must not commit. |
@@ -468,11 +482,11 @@ This sequence is a dependency assessment, not a commitment to deliver every modu
 
 ### Stage 0 — Business and technical decision closure
 
-Complete and independently review DMS-DEC-001, 002, 007, 008, 009, 010 and 015. Resolve related approval, order, supplier, file-storage and database/tooling dependencies where they affect a selected stage. Confirm the opening-stock verification/cutover procedure and the approved quantity/unit precision before creating live balances. No inventory feature code should begin on assumptions.
+Complete and independently review DMS-DEC-001, 002, 007, 008, 009, 010 and 015. For DMS-DEC-001/002, convert the Task 010 planning direction into formal, evidence-backed approval and close the remaining codes, account-mapping, assignment-authority and broader permission-matrix gaps. Resolve related approval, order, supplier, file-storage and database/tooling dependencies where they affect a selected stage. Confirm the opening-stock verification/cutover procedure and the approved quantity/unit precision before creating live balances. No inventory feature code should begin on assumptions.
 
 ### Stage 1 — Stock location register and location-access administration
 
-Build on the existing locations and user_location_access tables only after DMS-DEC-001 and DMS-DEC-002 are approved. Implement location administration, assignment grant/change/revocation and audit history with backend enforcement. Verify Owner/Manager global access, assigned-Staff scope and the absence of a Warehouse assignment for Sheraton Staff. Do not seed invented locations or users.
+Build on the existing locations and user_location_access tables only after DMS-DEC-001 and DMS-DEC-002 are approved. Implement location administration and private assignment grant/change/revocation with audit history and backend enforcement. Support shared read-only visibility of both locations separately from direct stock-changing permission. Verify Owner authority across both locations, assigned-location editing for the Store Manager and Warehouse Staff, destination-location approval for other-location stock changes, and the assigned-Manager pickup/receipt action permissions. Do not seed invented codes, IDs, locations or users.
 
 ### Stage 2 — Inventory balance foundation and opening-stock handling
 
@@ -492,7 +506,7 @@ Implement source/destination selection, transfer items, source dispatch, transfe
 
 ### Stage 6 — Dedicated Warehouse-to-Sheraton pickup and destination receipt
 
-Implement only after Stages 1, 2 and the transfer foundations are approved and DMS-DEC-009/010 have answers. Preserve ADR-016 verbatim in behaviour: exact configured Warehouse source, actor's assigned Sheraton destination, item-specific backend-only Warehouse availability check, no Warehouse balance disclosure, atomic Warehouse-to-in-transit pickup, separate destination receipt, partial events, individual actor/time attribution and idempotency. If the paperwork decision requires uploaded documents, resolve DMS-DEC-018 private storage controls before building that upload path.
+Implement only after Stages 1, 2 and the transfer foundations are approved and DMS-DEC-009/010 have answers. Preserve the amended ADR-016 behaviour: exact Ajose Warehouse source, actor's assigned Sheraton Store destination, explicit action permission plus destination assignment (including the existing Manager role where authorised), atomic Warehouse-to-in-transit pickup, separate destination receipt, partial events, individual actor/time attribution, in-transit accounting, idempotency and discrepancy protection. Shared operational read surfaces may show Warehouse quantities/availability; pickup authority does not grant general Warehouse write access. If the paperwork decision requires uploaded documents, resolve DMS-DEC-018 private storage controls before building that upload path.
 
 ### Stage 7 — Order reservation and dispatch integration
 
@@ -510,8 +524,8 @@ Implement cost history and valuation only if DMS-DEC-015 approves the basis, or 
 
 The following items prevent an evidence-based start of the corresponding inventory implementation work:
 
-1. **DMS-DEC-001 — locations and assignments:** approved location codes, canonical Warehouse/Sheraton records, employee assignments and assignment authority are unknown.
-2. **DMS-DEC-002 — permissions:** the full Owner/Manager/Staff matrix for inventory and location actions is not approved.
+1. **DMS-DEC-001 — locations and assignments:** Ajose Warehouse and Sheraton Store names/purposes are supplied as planning direction, but approved unique codes, canonical record IDs, private account-to-location mappings, assignment authority and formal approval evidence remain outstanding.
+2. **DMS-DEC-002 — permissions:** the supplied shared-visibility, location-scoped-editing, cross-location approval, assigned-Manager pickup/receipt and Owner-only financial-overview direction still requires formal approval; the full Owner/Manager/Staff matrix and individual financial-record permissions remain outstanding.
 3. **DMS-DEC-007 — reservation policy:** initial expiry enablement, duration and eligible order/payment states are not approved.
 4. **DMS-DEC-008 — reservation exceptions:** grace period, warning rules, extension and manual-release authorities are not approved.
 5. **DMS-DEC-009 — transfer exceptions:** unavailable destination Staff, discrepancy evidence, permitted resolutions and approvals are not defined.

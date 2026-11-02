@@ -132,13 +132,13 @@ Use PostgreSQL as the authoritative relational database. Use migrations in versi
 
 **Context**
 
-The business holds stock at multiple physical locations. Orders have one fulfilment location in the first release. Confirmed orders reserve stock immediately, including when unpaid. Transfers require dispatch at the source and explicit receipt confirmation by Staff at the destination. Reservation expiry must be configurable.
+The business holds stock at multiple physical locations. Orders have one fulfilment location in the first release. Confirmed orders reserve stock immediately, including when unpaid. Standard transfers require dispatch at the source and explicit receipt confirmation by Staff assigned to the destination. For the separate dedicated Ajose Warehouse-to-Sheraton Store pickup/receipt workflow, Task 010 records planning direction (pending formal confirmation under DMS-DEC-001/002) that the assigned Store Manager using the existing Manager role is also eligible when the active Sheraton assignment and explicit destination action permission pass (ADR-016). Reservation expiry must be configurable.
 
 **Decision**
 
 Track physical on-hand/reserved balances per (location_id, product_variant_id), maintain an append-only stock movement ledger, and store active reservations with expires_at and the reservation-policy version used. Track stock in transit separately from physical location balances using a transfer-item-scoped stock_in_transit_balances record and linked stock-movement events.
 
-A transfer dispatch transaction decreases source on-hand and increases in-transit quantity. A Staff user assigned to the destination location must confirm receipt; the receipt transaction decreases in-transit and increases destination on-hand. Partial receipts leave the remainder in transit. Discrepancies require attributed resolution.
+A transfer dispatch transaction decreases source on-hand and increases in-transit quantity. For standard transfers, a Staff user assigned to the destination location must confirm receipt; the receipt transaction decreases in-transit and increases destination on-hand. For the dedicated Ajose Warehouse-to-Sheraton Store workflow, Task 010 records planning direction (pending formal confirmation under DMS-DEC-001/002) that the assigned Store Manager using the existing Manager role may confirm receipt when the active Sheraton assignment and explicit destination-receipt permission pass (ADR-016). Partial receipts leave the remainder in transit. Discrepancies require attributed resolution.
 
 On order confirmation, reserve the required quantity immediately from the order's single selected fulfilment location, whether the order is unpaid, partially paid or paid. A persisted, versioned reservation_policies record controls whether expiry is enabled, its duration and its eligibility scope. Every policy edit creates a new immutable version for future reservations. Each reservation stores a foreign key to the policy version used, its expiry timestamp and that policy version; the expiry worker evaluates eligibility against the referenced version, so configuration changes do not retroactively alter existing reservations.
 
@@ -164,42 +164,51 @@ On order confirmation, reserve the required quantity immediately from the order'
 
 ## ADR-006 — Enforce confirmed role, location and payment permissions in the backend
 
-**Status:** Confirmed business rules; detailed permissions for other modules remain to be defined.
+**Status:** Existing backend-enforcement and payment controls remain confirmed. The revised location visibility/editing, cross-location approval and financial-overview direction recorded by Task 010 remains pending formal confirmation under DMS-DEC-001 and DMS-DEC-002.
 
 **Context**
 
-DMS has Owner, Manager and Staff roles. Stock-location access and payment verification require explicit limits. Sensitive actions must be enforced at the API/domain layer, not by UI visibility.
+DMS has the existing Owner, Manager and Staff roles. The operating model distinguishes shared operational visibility from permission to change stock. The Owner has authority across both initial locations. The existing Manager role is used for the Sheraton Store Manager; it must not automatically confer unrestricted cross-location stock editing. The business also requires an auditable approval path when a non-Owner requests a stock-changing operation at the other location. Sensitive actions must be enforced at the API/domain layer, not by UI visibility.
 
 **Decision**
 
-Use explicit permissions mapped to the three roles and enforce them with deny-by-default backend checks:
+Use the existing three role codes and explicit permissions mapped to those roles. Do not add a role code or infer broad authority from the generic Manager label. Enforce all protected actions with deny-by-default backend checks:
 
-- **Owner:** full business access and access to all stock locations; may record and verify payments.
-- **Manager:** management access and access to all stock locations; may record and verify payments.
-- **Staff:** may access and act on stock locations assigned to that Staff account only, except for the specific Warehouse-to-assigned-Sheraton pickup action defined in ADR-016. That exception does not provide general Warehouse balance, adjustment or operational access; Staff may record payment entries but may not verify them.
-- **Transfer receipt:** a Staff account assigned to the destination location must confirm that transfer's receipt.
-
-A Manager's global stock-location access does not depend on user_location_access assignment rows. Staff access is granted/revoked through explicit user-location rows. Location restrictions apply to stock reads and all location-scoped stock/order/transfer operations, not only writes. The only exception is the narrowly scoped destination-addressed Warehouse pickup action in ADR-016; it is an action permission conditional on the transfer's exact Warehouse source, assigned Sheraton destination and Staff assignment, not a Warehouse location grant.
+- **Owner:** full authority across both locations; may view and directly operate at either location without a second approver. The Owner may approve, reject or override another user's pending cross-location request. The Owner alone may access the consolidated financial overview across both locations: total money in, total money out, revenue, expenses and profit/loss.
+- **Manager (Sheraton Store Manager assignment):** may view the operational dashboards and stock quantities/availability of both locations. Direct stock-changing operations are limited to the Manager's assigned location, Sheraton Store. The Manager may use the dedicated Warehouse-to-assigned-Sheraton pickup and destination-receipt actions only where the authenticated account has the Sheraton destination assignment and the explicit action permission. The Manager role alone does not grant direct Warehouse stock-edit permission.
+- **Staff (Ajose Warehouse assignment):** may view the operational dashboards and stock quantities/availability of both locations. Direct stock-changing operations are limited to the Staff member's assigned location, Ajose Warehouse. Staff may record payment entries but may not verify them.
+- **Shared operational visibility:** authorised operational users may view both Ajose Warehouse and Sheraton Store dashboards, stock quantities, availability and shared operational information needed for day-to-day stock management. This is read-only cross-location visibility for a user who is not assigned to that location; it does not grant direct stock-changing permission there.
+- **Assigned-location operation:** a non-Owner may perform normal authorised stock-changing operations directly at the location to which the account is assigned, subject to its explicit action permission and other business rules.
+- **Cross-location stock-change request:** when a non-Owner requests a stock-changing operation against the other location, the operation enters **Pending Approval** and must not change a live stock balance before approval. The approval route is:
+  - A Sheraton Store Manager request affecting Ajose Warehouse requires approval from **one** authorised Ajose Warehouse Staff account.
+  - An Ajose Warehouse Staff request affecting Sheraton Store requires approval from the Sheraton Store Manager.
+  - The requester cannot approve their own request. The Owner may approve, reject or override another user's pending request.
+  - The Owner performs their own stock-changing operations directly and does not need a second approver.
+- **Approval integrity:** retain the requester, target location, proposed operation, reason and submission timestamp; retain the approver, decision, decision timestamp and outcome. On approval, revalidate current permissions and stock state, then commit the approved operation and resulting stock movement transactionally. Rejection changes no stock. Every request, decision, execution and Owner override remains attributable and auditable.
+- **Separate transfer workflows:** Operations evaluated under this rule include manual stock adjustments/corrections, receiving that changes the target location's balance, stock-count reconciliation, other non-transfer stock operations that change quantities. Non-Owner reservation or dispatch operations that change stock at a location other than the actor's assigned location are also subject to this approval rule, including when they form part of an order workflow. The only separate workflow exceptions are standard stock transfers, the dedicated Ajose Warehouse-to-Sheraton Store physical pickup, and destination receipt for those transfer workflows. These transfer workflows remain governed by their separate transfer lifecycle and do not enter the additional cross-location stock-change approval queue. Their source dispatch, in-transit accounting, destination receipt and discrepancy controls remain as defined in ADR-005 and ADR-016.
+- **Payment permissions:** Staff may record payment entries; only Manager and Owner may verify them. Unverified entries remain excluded from verified-receipts reporting.
+- **Financial overview:** the consolidated overview is Owner-only and must be enforced by backend authorisation and protected API responses. Shared operational dashboards must not expose these owner-only aggregates to Manager or Staff. This does not settle who may view or manage individual expense, payment, refund or other financial records.
 
 **Why**
 
-- Hiding UI controls is not a security boundary.
-- Backend checks protect direct API requests as well as normal UI interactions.
-- Separate payment recording from verification adds a second-person control over payment confirmation.
-- Destination Staff confirmation makes the receiving location accountable for stock physically arriving.
-- The controlled Sheraton pickup exception allows the person physically collecting goods to record the event while preserving the Warehouse inventory security boundary.
+- Shared operational visibility supports coordinated stock decisions without creating unrestricted write access.
+- Location-scoped direct changes preserve clear accountability for each physical stock location.
+- A pending cross-location request gives the destination location a review opportunity before its balance changes.
+- An Owner can exercise full authority without an artificial second-approver dependency, while every direct action and override remains attributable.
+- Backend enforcement protects direct API calls as well as normal UI interactions.
+- Separating the Owner-only financial summary from operational visibility prevents accidental exposure through shared dashboards.
 
 **Consequences**
 
-- Every protected endpoint/domain service checks role and, where relevant, location assignment.
-- Sheraton Staff receive only the dedicated pickup action for transfers from the configured Warehouse to a Sheraton location assigned to them; they do not receive Warehouse inventory-read, adjustment or general transfer permissions.
-- A Staff payment entry remains pending/unverified until a Manager or Owner verifies it.
-- Unverified entries are excluded from verified-receipts reporting.
-- Changes to roles, location assignments and payment verification create audit events.
-- Detailed view/edit/export/refund/expense/user-administration permissions remain a separate matrix; they cannot override the confirmed constraints above.
+- Every protected endpoint/domain command must check the authenticated actor, explicit action permission and relevant assigned-location scope on the backend.
+- A user's read access to both operational dashboards must be separate from the permission to create a stock movement at either location.
+- The Manager role must not be treated as a global stock-edit grant. Store Manager direct edits are location-scoped to the approved Sheraton assignment.
+- Cross-location approval requests must have no stock effect while pending; approval-time revalidation and transactional posting are mandatory. A requester cannot approve their own request.
+- Standard transfers, physical pickup and destination receipt use their own lifecycle and do not acquire an extra cross-location approval step.
+- Owner-only financial aggregates must not be returned by an API response available to Manager or Staff. The broader permission matrix for individual records and other modules remains open.
+- Changes to assignments, permissions, requests, approvals, stock movements and Owner overrides must be auditable.
 
-**Task 005 implementation evidence (PR #7, merged):** The migration seeds Owner, Manager and Staff; the four codes `payments.record`, `payments.verify`, `inventory.transfer.receive_destination_assigned` and `inventory.transfer.pickup_warehouse_to_assigned_sheraton`; and seven assignments (Owner: two, Manager: two, Staff: three). The foundation also contains permission and location-access helpers. No stock-transfer, payment or other business workflow route has been implemented, and this seed subset is not the complete business permission matrix.
-
+**Task 005 implementation evidence and reconciliation boundary:** The existing Task 005 helper currently grants Owner and the generic Manager role global stock-location access, and the current destination pickup helper is Staff-role-specific. Those are implementation facts at the inspected baseline, not the revised target behaviour. Task 010 changes documentation only. A later separately scoped and reviewed implementation task must reconcile the helpers and permission checks with this ADR without adding role codes or general Warehouse write access. The current permission seeds do not implement the approval workflow, the shared-read model or the Owner-only financial overview.
 
 ## ADR-007 — Use individual accounts and persistent PostgreSQL-backed sessions
 
@@ -458,67 +467,71 @@ If stock is insufficient at the selected location, the system must not silently 
 - Multi-location/split fulfilment requires a separately approved future change.
 
 
-## ADR-016 — Allow destination-scoped Sheraton Staff pickup from Warehouse without granting Warehouse access
+## ADR-016 — Preserve dedicated Warehouse-to-Sheraton pickup controls under shared stock visibility
 
-**Status:** Confirmed business workflow and permission boundary.
+**Status:** Existing transfer-accounting and audit safeguards remain fixed. Shared stock visibility and eligibility of an assigned Store Manager for destination actions are Task 010 planning direction pending formal confirmation under DMS-DEC-001 and DMS-DEC-002.
 
 **Context**
 
-Sheraton Stock and Warehouse Stock are separate physical inventory balances. Sheraton Staff sometimes travel to Warehouse, physically collect products and take them back to Sheraton. Existing Staff access is restricted to assigned locations. The person recording pickup must not gain general access to Warehouse balances, adjustments or unrelated Warehouse operations.
+Ajose Warehouse and Sheraton Store are separate physical stock locations with independent balances. Authorised operational users are intended to have shared read-only visibility of both locations' dashboards, stock quantities and availability. That shared visibility does not give a non-Owner direct stock-changing permission at an unassigned location. The dedicated Warehouse-to-Sheraton pickup and destination-receipt workflow must continue to validate the exact transfer, destination assignment and explicit action permission, and must not grant general Warehouse write access.
 
 **Decision**
 
-Add a dedicated `destination_staff_pickup` transfer mode and a narrow backend action for Sheraton-assigned Staff:
+Retain a dedicated `destination_staff_pickup` transfer mode and narrow backend action for an operational user assigned to the destination Sheraton Store:
 
-- A Staff member may create a pickup transfer only with source = the configured Warehouse location and destination = one Sheraton location actively assigned to that Staff member.
-- A Staff member may open/read only a pickup transfer with that exact Warehouse-to-assigned-Sheraton source/destination pair and a pickup-eligible state. The staff view is limited to that transfer's products and requested/picked quantities.
-- The Staff member records the actual quantity physically collected for each transfer item. The backend validates the transfer and user assignment from PostgreSQL, then checks Warehouse available stock inside the pickup transaction.
-- The command must not expose the Warehouse's exact balance or provide Warehouse balance browsing, adjustment, general transfer management, or unrelated Warehouse operations. Insufficient stock returns a generic validation error without revealing Warehouse quantities.
-- Pickup reduces Warehouse on-hand and increases the transfer-item in-transit balance by the same quantity in one transaction. Paired stock ledger events, an immutable pickup event, the acting Staff user and timestamp are recorded.
-- A Staff member assigned to Sheraton confirms the quantity physically received there. Receipt reduces in-transit and increases Sheraton on-hand atomically. The same person may perform both actions; pickup and receipt remain separate events with separate actor/time attribution.
+- A pickup actor must have an active assignment to the destination Sheraton Store and the explicit pickup action permission. The existing Manager role is eligible where those checks pass; eligibility must not be hard-coded to the literal `STAFF` role. An assigned Staff account with the explicit permission may also qualify. No role code is added or changed.
+- The actor may create or open a pickup transfer only with source = the configured Ajose Warehouse and destination = the Sheraton Store assigned to that actor. The actor records the actual quantity physically collected against each transfer item.
+- Shared read-only operational views may show Warehouse and Sheraton stock quantities and availability to authorised operational users, including the assigned Sheraton Store Manager. That shared visibility is not a general Warehouse write grant. The pickup action itself remains limited to its exact Warehouse-to-assigned-Sheraton transfer and cannot be used for unrelated Warehouse stock changes or transfer management.
+- The backend validates the authenticated actor, active destination assignment, explicit action permission, exact source/destination pair, transfer state, item quantities and current Warehouse available stock. It must derive assignments and transfer endpoints from trusted database records, not client-supplied IDs or role claims.
+- The pickup command locks the relevant transfer, items and Warehouse balance rows. In one transaction it reduces Warehouse on-hand and increases the transfer-item-specific in-transit quantity by the same amount, appends the paired Warehouse-out and in-transit-in movement events, records an immutable pickup event, actor and timestamp, and updates the cumulative picked quantity/status.
+- The pickup command need not return a second copy of the Warehouse balance. The shared operational read surface is governed by the shared-visibility rule above. An insufficient-stock result must not partially post the submitted event; it must not bypass the transactional revalidation of the current stock state.
+- A user assigned to the destination Sheraton Store and holding the explicit destination-receipt permission may confirm the quantity physically received. The existing Manager role is eligible where those checks pass; the workflow must not require a literal `STAFF` role if that would block the assigned Store Manager. Receipt reduces in-transit and increases Sheraton on-hand atomically. The same person may perform pickup and receipt; each remains a separate event with separate actor/time attribution.
 - Partial pickups and receipts are supported. Unpicked requested quantities remain open; unreceived quantities remain in transit.
-- Insufficient Warehouse stock rejects the submitted pickup event without partial writes. A smaller actual quantity may be submitted as a separate partial pickup. The system never returns the overall Warehouse balance to the Sheraton Staff interface.
-- Discrepancies require a recorded quantity, reason, reporter and subsequent authorised resolution. No balance is silently adjusted to hide a mismatch.
+- Discrepancies require a recorded quantity, reason, reporter, time and subsequent authorised resolution. No balance is silently adjusted to hide a mismatch.
 - A transfer with no pickup may be cancelled without stock movements. After partial pickup, only the unpicked remainder may be cancelled; picked quantities remain in transit and must still be received, returned through a separately recorded reverse transfer, or formally resolved. It cannot be marked fully cancelled while picked quantity remains unreceived/unresolved.
 - Transfers that remain in transit stay visible in ageing/open-transfer reporting; picked stock is not automatically expired or released.
 - Pickup and receipt requests use idempotency keys. Same-key/same-payload retries return the original outcome; same-key/different-payload reuse is rejected.
+- Standard stock transfers, this dedicated physical pickup and destination receipt remain separate transfer workflows; none is routed through the additional cross-location stock-change approval queue.
 
 **Why**
 
-- The person physically collecting stock can record what was collected at the point of handover.
-- Warehouse stock is reduced at the real point of collection, while Sheraton stock increases only when the receiving location confirms delivery.
-- The dedicated command solves the operational need without weakening the default Staff location boundary or exposing unrelated Warehouse records.
-- Event-level actors and immutable movements support accountability, reconciliation and duplicate prevention.
+- Operational users can coordinate using the same read-only view of both locations without giving every user direct write access to both.
+- The person physically collecting goods can record the actual pickup while the source and in-transit balances remain transactionally correct.
+- Destination assignment and explicit action permission ensure that pickup and receipt actions are available to the assigned Store Manager without broadening their Warehouse editing rights.
+- Event-level actors, immutable movements and idempotency support accountability, reconciliation and duplicate prevention.
 
 **Consequences**
 
-- The backend must enforce both the role capability and row-specific source/destination/assignment checks; frontend route hiding is not sufficient.
-- The Warehouse balance lookup is permitted only as an internal validation step for the particular transfer items and must not be returned to the caller.
+- Backend checks must combine explicit action permissions with the actor's active destination assignment and exact transfer source/destination; frontend route visibility is not an access-control boundary.
+- The destination Store Manager may be authorised for the assigned-Sheraton pickup and receipt actions under the existing Manager role, provided the assignment and explicit permission are present. A check that depends exclusively on role code `STAFF` is insufficient for this direction.
+- Shared read-only visibility of Warehouse balances is separate from pickup authority. The pickup permission does not authorise Warehouse adjustments, receiving, arbitrary transfers or other direct Warehouse writes.
 - Every successful pickup and receipt submission creates its own immutable event row with its own actor, timestamp and item quantities; partial actions never overwrite earlier event rows. Append-only stock movements provide the corresponding quantity-ledger evidence. The transfer header's `dispatched_by`/`dispatched_at` and `received_by`/`received_at` columns, where retained, are denormalised summaries only (first source-release action and final receipt-completing event respectively), not authoritative evidence for partial-operation history.
-- Managers and Owner retain their existing global location access and normal transfer permissions; this decision adds a Staff pickup capability without removing or reducing those permissions.
-- The configured Warehouse/Sheraton location records and Staff assignments must be established before enabling the action.
+- The configured Ajose Warehouse/Sheraton Store location records and private account assignments must be established before enabling the action.
+
+
 
 ## 3. Decisions requiring project-manager confirmation
 
-The following project-manager decisions are confirmed and are no longer pending:
+The following pre-existing project-manager decisions remain confirmed and are not changed by Task 010:
 
 | Confirmed area | Rule |
 |---|---|
-| Transfer receipt | Staff assigned to the destination location must confirm receipt. |
+| Transfer receipt | For standard transfers, Staff assigned to the destination location confirm physical receipt. |
 | Payment permissions | Staff can record payments; only Managers and Owner can verify payments. |
-| Location access | Managers and Owner have access to all stock locations. Staff are restricted to assigned locations except for the dedicated Warehouse-to-assigned-Sheraton pickup action in ADR-016; that action grants no general Warehouse inventory access. |
 | Database hosting preference | Render Postgres is preferred, subject to backup, recovery and cost verification before provisioning. |
 | Order fulfilment | One fulfilment location per order in the first release; no cross-location split fulfilment. |
 | Reservation timing | Reserve stock immediately on order confirmation, whether paid or unpaid. |
 | Reservation expiry | Expiry must be configurable and persisted; each reservation snapshots its applied policy/expiry. |
-| Sheraton pickup | Sheraton-assigned Staff may use only the dedicated pickup action for a transfer from Warehouse to their assigned Sheraton location; this is not general Warehouse access. |
+| Sheraton pickup | A user assigned to the Sheraton destination and holding the explicit pickup permission may use only the dedicated Warehouse-to-assigned-Sheraton pickup action; this does not grant general Warehouse write access. |
+
+The following Task 010 direction is recorded separately from those pre-existing confirmed decisions and is not formal business-owner approval evidence: shared read-only operational visibility of both locations; direct stock-changing operations limited to the actor's assigned location for non-Owners; cross-location stock-change requests routed for destination-location approval (with the Owner able to act directly and review another user's request); Owner-only consolidated financial overview; and assigned-Store-Manager eligibility for the dedicated Sheraton pickup/receipt actions when the assignment and explicit permission checks pass. DMS-DEC-001 and DMS-DEC-002 remain Pending confirmation. No approver, date or evidence reference has been supplied.
 
 Remaining details requiring confirmation:
 
-1. Confirm the canonical Warehouse and Sheraton location records/codes and the Staff-to-Sheraton assignments used by ADR-016.
+1. Confirm the canonical Warehouse and Sheraton location records/codes and the destination-account-to-Sheraton assignments used by ADR-016.
 2. Initial reservation duration and expiry eligibility scope (unpaid-only or all undispatched confirmed orders).
 3. Grace period, pre-expiry warning/notification and whether an authorised user may extend an existing reservation.
-4. Transfer exception/escalation when destination Staff are unavailable, and the review/approval process for shortages or damage.
+4. Transfer exception/escalation when no authorised destination-assigned actor is available, and the review/approval process for shortages or damage.
 5. Detailed permissions for refunds, expense approvals, exports and user administration.
 6. Accepted payment methods and what evidence is required before verification.
 7. Receipt numbering/format and which business events issue an order receipt versus a payment receipt.
