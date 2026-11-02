@@ -5,10 +5,7 @@ import { appendAuditEvent } from '../audit/audit.service.js';
 import { CustomerError, forbidden, notFound } from './customer.errors.js';
 
 export type CustomerPermission =
-  | 'customers.view'
-  | 'customers.create'
-  | 'customers.update'
-  | 'customers.archive';
+  'customers.view' | 'customers.create' | 'customers.update' | 'customers.archive';
 
 export interface CustomerActor {
   id: string;
