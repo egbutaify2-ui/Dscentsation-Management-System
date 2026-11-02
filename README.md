@@ -2,11 +2,11 @@
 
 An internal business management platform being actively built for Dscentsation's Nigerian operations. DMS brings orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
 
-> **Project status — active development:** DMS is in its build phase. The team is implementing working modules in parallel, not just documenting plans. Active implementation work includes Customer Management (PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14)), Supplier Directory (PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16)), Expense Categories and Draft Expenses (PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17)), and the independent components of Order Capture (Task 022).
+> **Project status — active development:** DMS is in its build phase. The team is implementing working modules in parallel, not just documenting plans. Customer Management (Task 011, PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14)) has now been merged into `main`. Active implementation work continues on Supplier Directory (PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16)), Expense Categories and Draft Expenses (PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17)), and Order Capture (Task 022).
 >
 > **Build direction:** New tasks are implementation tasks: build features, fix bugs, integrate modules, improve the UI and add the tests needed to ship them. Investigation-only and audit-only task streams are not the default. When a dependency is pending, agents should build the independent parts instead of leaving the whole task idle.
 >
-> **Current main baseline:** `07bf296d2ce32d1cb91854f91b492540bdc5a954`. The merged application foundation, Product Management and Employee Account Administration are available in `main`. The active module PRs are still in progress and are not represented as completed functionality.
+> **Current main baseline:** `57e83e37655604b34ff5813d7fe7aebf05daf579`. The application foundation, Product Management, Employee Account Administration and Customer Management are available in `main`. Supplier Directory, Expense Management and Order Capture remain in active development.
 
 ## Contents
 
@@ -563,9 +563,12 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 **Implemented in `main`:** The application foundation, authentication and employee account administration, Product Management, and the documentation reconciliation from Task 010. The latest recorded `main` baseline is `07bf296d2ce32d1cb91854f91b492540bdc5a954`.
 
+**Recently shipped:**
+
+- **Task 011 — Customer Management:** merged through PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14). Migration 004, customer API/service and customer database/API tests are now in `main`.
+
 **Active implementation work:**
 
-- **Task 011 — Customer Management:** PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14). Customer backend foundation and its database migration are being brought into the application.
 - **Task 020 — Supplier Directory:** PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16). Supplier directory backend foundation is being implemented.
 - **Task 021 — Expense Categories & Draft Expenses:** PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17). Expense categories and draft expense recording are being implemented.
 - **Task 022 — Order Capture:** independent order-capture components are authorised to be built in parallel. Customer integration and the order database migration are connected when the customer module and coordinated migration sequence are available.
