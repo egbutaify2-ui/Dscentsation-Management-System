@@ -118,6 +118,7 @@ export function SupplierManagementPage({ permissions }: { permissions: string[] 
   }
 
   async function openSupplier(supplier: Supplier) {
+    setSelectedSupplier(supplier);
     setDetailLoading(true);
     setDetailError(null);
     setError(null);
@@ -245,9 +246,19 @@ export function SupplierManagementPage({ permissions }: { permissions: string[] 
       </div>
 
       {error && (
-        <p className="supplier-alert error" role="alert">
-          {error}
-        </p>
+        <div className="supplier-error-row">
+          <p className="supplier-alert error" role="alert">
+            {error}
+          </p>
+          <button
+            type="button"
+            className="supplier-retry-button"
+            onClick={() => void loadSuppliers(search, statusFilter, meta.page)}
+            disabled={loading}
+          >
+            Retry
+          </button>
+        </div>
       )}
       {notice && (
         <p className="supplier-alert success" role="status">
@@ -273,9 +284,19 @@ export function SupplierManagementPage({ permissions }: { permissions: string[] 
           </div>
 
           {detailError && (
-            <p className="supplier-alert error" role="alert">
-              {detailError}
-            </p>
+            <div className="supplier-error-row">
+              <p className="supplier-alert error" role="alert">
+                {detailError}
+              </p>
+              <button
+                type="button"
+                className="supplier-retry-button"
+                onClick={() => void openSupplier(selectedSupplier)}
+                disabled={detailLoading}
+              >
+                Retry
+              </button>
+            </div>
           )}
           {detailLoading ? (
             <div className="supplier-state" role="status">Loading supplier details…</div>
@@ -532,6 +553,11 @@ export function SupplierManagementPage({ permissions }: { permissions: string[] 
                 </div>
               )}
 
+              {error && (
+                <p className="supplier-alert error" role="alert">
+                  {error}
+                </p>
+              )}
               <div className="supplier-modal-actions">
                 <button
                   className="secondary-button"
@@ -576,6 +602,11 @@ export function SupplierManagementPage({ permissions }: { permissions: string[] 
               Deactivate <strong>{pendingDeactivation.displayName}</strong> ({pendingDeactivation.supplierCode})?
               The supplier record will be retained and can be reactivated later.
             </p>
+            {error && (
+              <p className="supplier-alert error" role="alert">
+                {error}
+              </p>
+            )}
             <div className="supplier-modal-actions">
               <button
                 type="button"
@@ -593,7 +624,7 @@ export function SupplierManagementPage({ permissions }: { permissions: string[] 
                   void changeSupplierStatus(pendingDeactivation, 'inactive')
                 }
               >
-                {saving ? 'Deactivating…' : 'Deactivate supplier'}
+                {saving ? 'Deactivating…' : 'Confirm deactivation'}
               </button>
             </div>
           </section>

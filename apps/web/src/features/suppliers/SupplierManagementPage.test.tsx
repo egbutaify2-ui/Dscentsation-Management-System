@@ -64,10 +64,6 @@ describe('SupplierManagementPage', () => {
     mocks.post.mockResolvedValue(sampleSupplier);
     mocks.patch.mockResolvedValue({ ...sampleSupplier, displayName: 'Renamed Supplier' });
     mocks.postEmpty.mockResolvedValue(undefined);
-    vi.stubGlobal(
-      'confirm',
-      vi.fn(() => true),
-    );
   });
 
   it('loads the supplier directory with real backend pagination metadata', async () => {
@@ -162,7 +158,7 @@ describe('SupplierManagementPage', () => {
 
     expect(screen.getByRole('dialog', { name: 'Deactivate supplier?' })).toBeTruthy();
     expect(mocks.postEmpty).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Deactivate supplier' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm deactivation' }));
 
     await waitFor(() =>
       expect(mocks.postEmpty).toHaveBeenCalledWith(
@@ -211,7 +207,7 @@ describe('SupplierManagementPage', () => {
       .mockRejectedValueOnce(new Error('Supplier directory unavailable.'))
       .mockResolvedValueOnce({ data: [sampleSupplier], meta: pageMeta });
     render(<SupplierManagementPage permissions={fullPermissions} />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Supplier directory unavailable.');
+    expect((await screen.findByRole('alert')).textContent).toContain('Supplier directory unavailable.');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('Synthetic Fragrance Supplies Ltd')).toBeTruthy();
   });

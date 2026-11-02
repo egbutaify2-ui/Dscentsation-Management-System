@@ -413,3 +413,33 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+.supplier-error-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+.supplier-error-row .supplier-alert {
+  flex: 1;
+  margin: 0;
+}
+.supplier-retry-button {
+  flex-shrink: 0;
+  padding: 7px 10px;
+  border: 1px solid #e2e8e2;
+  border-radius: 7px;
+  background: #fff;
+  color: #45624b;
+  font-size: 10px;
+  font-weight: 800;
+}
+.supplier-retry-button:hover:not(:disabled) {
+  background: #f4f7f3;
+}
+@media (max-width: 520px) {
+  .supplier-error-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
