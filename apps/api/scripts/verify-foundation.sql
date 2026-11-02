@@ -139,7 +139,7 @@ ON CONFLICT DO NOTHING;
 DO $$
 BEGIN
   IF (SELECT count(*) FROM roles) <> 3
-     OR (SELECT count(*) FROM permissions) <> 12
+     OR (SELECT count(*) FROM permissions) <> 16
      OR (SELECT count(*) FROM role_permissions) <> 15 THEN
     RAISE EXCEPTION 'Conflict-safe seed replay changed the number of seed records';
   END IF;
