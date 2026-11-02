@@ -990,7 +990,11 @@ export function OrderManagementPage({
                       (!canCreateWithDependencies || activeLocations.length === 0))
                   }
                 >
-                  {saving ? 'Saving…' : view === 'create' ? 'Create order' : 'Save amendment'}
+                  {saving
+                    ? 'Saving…'
+                    : view === 'create'
+                      ? 'Create order'
+                      : 'Save amendment'}
                 </button>
               </div>
             </div>
