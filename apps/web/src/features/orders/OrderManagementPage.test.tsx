@@ -180,8 +180,12 @@ describe('OrderManagementPage', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search orders' }), {
       target: { value: 'Synthetic' },
     });
-    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'received' } });
-    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'whatsapp' } });
+    fireEvent.change(screen.getByLabelText('Status'), {
+      target: { value: 'received' },
+    });
+    fireEvent.change(screen.getByLabelText('Source'), {
+      target: { value: 'whatsapp' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
 
     await waitFor(() => {
@@ -224,15 +228,21 @@ describe('OrderManagementPage', () => {
       await waitFor(() =>
         expect(screen.getByRole('option', { name: /Synthetic Customer/ })).toBeTruthy(),
       );
-      fireEvent.change(screen.getByLabelText('Customer'), { target: { value: customerId } });
-      fireEvent.change(screen.getByLabelText('Source channel'), { target: { value: 'whatsapp' } });
+      fireEvent.change(screen.getByLabelText('Customer'), {
+        target: { value: customerId },
+      });
+      fireEvent.change(screen.getByLabelText('Source channel'), {
+        target: { value: 'whatsapp' },
+      });
       fireEvent.change(screen.getByLabelText('Fulfilment location'), {
         target: { value: locationId },
       });
       fireEvent.change(screen.getByLabelText('Product / variant'), {
         target: { value: productId + '|' + variantId },
       });
-      fireEvent.change(screen.getByLabelText('New item quantity'), { target: { value: '2' } });
+      fireEvent.change(screen.getByLabelText('New item quantity'), {
+        target: { value: '2' },
+      });
       fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
 
       expect(screen.getByText('Estimated subtotal')).toBeTruthy();
@@ -316,7 +326,9 @@ describe('OrderManagementPage', () => {
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
-    fireEvent.change(screen.getByLabelText('Order notes'), { target: { value: 'Updated note' } });
+    fireEvent.change(screen.getByLabelText('Order notes'), {
+      target: { value: 'Updated note' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Save amendment' }));
 
     await screen.findByText('Updated note');
