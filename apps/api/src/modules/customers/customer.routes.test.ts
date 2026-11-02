@@ -162,6 +162,10 @@ describe('Customer Management API', () => {
         .set('X-CSRF-Token', await csrf(agent))
         .send({ fullName: 'Denied synthetic customer' })
         .expect(403);
+      await patch(agent, `/api/v1/customers/${randomUUID()}`, {
+        fullName: 'Denied synthetic update',
+      }).expect(403);
+      await post(agent, `/api/v1/customers/${randomUUID()}/archive`).expect(403);
     }
   });
 
