@@ -726,9 +726,7 @@ export function OrderManagementPage({
               <p className="eyebrow">
                 {view === 'create' ? 'NEW ORDER' : 'RECEIVED ORDER AMENDMENT'}
               </p>
-              <h2 id="order-form-title">
-                {view === 'create' ? 'Create an order' : 'Amend order'}
-              </h2>
+              <h2 id="order-form-title">{view === 'create' ? 'Create an order' : 'Amend order'}</h2>
             </div>
             <button
               className="text-button"
@@ -800,9 +798,7 @@ export function OrderManagementPage({
                 >
                   <option value="">Choose a channel</option>
                   {sourceOptions.map((source) => (
-                    <option key={source.value} value={source.value}>
-                      {source.label}
-                    </option>
+                    <option key={source.value} value={source.value}>{source.label}</option>
                   ))}
                 </select>
               </label>
@@ -818,9 +814,7 @@ export function OrderManagementPage({
                 >
                   <option value="">Choose an available location</option>
                   {activeLocations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.name}
-                    </option>
+                    <option key={location.id} value={location.id}>{location.name}</option>
                   ))}
                   {view === 'edit' && selectedOrder && activeLocations.length === 0 && (
                     <option value={selectedOrder.fulfilmentLocationId}>
