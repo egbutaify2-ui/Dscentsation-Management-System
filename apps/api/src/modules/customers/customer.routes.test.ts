@@ -236,9 +236,9 @@ describe('Customer Management API', () => {
     expect(firstPage.body.data[0].id).toBeTruthy();
     const all = await ownerAgent.get('/api/v1/customers').query({ q: token }).expect(200);
     expect(all.body.data).toHaveLength(2);
-    expect(all.body.data[0].fullName.toLowerCase()).toBeLessThanOrEqual(
-      all.body.data[1].fullName.toLowerCase(),
-    );
+    expect(
+      all.body.data[0].fullName.toLowerCase().localeCompare(all.body.data[1].fullName.toLowerCase()),
+    ).toBeLessThanOrEqual(0);
 
     await post(ownerAgent, `/api/v1/customers/${named.id}/archive`).expect(200);
     const archived = await ownerAgent
