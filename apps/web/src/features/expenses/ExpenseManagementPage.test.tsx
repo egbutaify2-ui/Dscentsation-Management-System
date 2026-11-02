@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExpenseManagementPage } from './ExpenseManagementPage.js';
 
@@ -125,7 +125,11 @@ describe('ExpenseManagementPage', () => {
   it('creates a draft and converts NGN decimal input to integer kobo without floating point', async () => {
     render(<ExpenseManagementPage permissions={permissions} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Add expense' }));
-    await screen.findByRole('option', { name: 'Office supplies' });
+    expect(
+      within(screen.getByLabelText('Expense category')).getByRole('option', {
+        name: 'Office supplies',
+      }),
+    ).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Expense category'), {
       target: { value: categoryId },
     });
@@ -212,8 +216,8 @@ describe('ExpenseManagementPage', () => {
     fireEvent.click(await screen.findByRole('tab', { name: 'Categories' }));
     expect(await screen.findByText('Office supplies')).toBeTruthy();
     expect(screen.getByText('Travel')).toBeTruthy();
-    expect(screen.getByText('Active')).toBeTruthy();
-    expect(screen.getByText('Inactive')).toBeTruthy();
+    expect(within(screen.getByRole('table')).getByText('Active')).toBeTruthy();
+    expect(within(screen.getByRole('table')).getByText('Inactive')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Add category' }));
     fireEvent.change(screen.getByLabelText('Category code'), { target: { value: 'UTILITIES' } });
     fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Utilities' } });
