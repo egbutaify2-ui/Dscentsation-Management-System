@@ -382,9 +382,7 @@ describe('Supplier Directory API', () => {
     const found = await fullAgent
       .get('/api/v1/suppliers?q=' + encodeURIComponent(updatedName.toLowerCase()))
       .expect(200);
-    expect(found.body.data.some((item: { id: string }) => item.id === supplier.id)).toBe(
-      true,
-    );
+    expect(found.body.data.some((item: { id: string }) => item.id === supplier.id)).toBe(true);
     await patch(fullAgent, '/api/v1/suppliers/' + supplier.id, {}).then((response) =>
       expect(response.status).toBe(400),
     );
