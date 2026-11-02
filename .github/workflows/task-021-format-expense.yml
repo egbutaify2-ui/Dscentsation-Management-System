@@ -1,0 +1,54 @@
+name: Task 021 Expense UI formatting
+
+on:
+  push:
+    branches:
+      - task-021-expense-foundation
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the expense branch
+        uses: actions/checkout@v5
+        with:
+          ref: task-021-expense-foundation
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 26.13.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install frozen workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Format Expense UI and combined navigation
+        run: >-
+          pnpm exec prettier --write --single-quote --trailing-comma all --print-width 100
+          apps/web/src/App.tsx
+          apps/web/src/components/AppShell.tsx
+          apps/web/src/components/AppShell.test.tsx
+          apps/web/src/features/expenses/ExpenseManagementPage.tsx
+          apps/web/src/features/expenses/ExpenseManagementPage.css
+          apps/web/src/features/expenses/ExpenseManagementPage.test.tsx
+      - name: Commit formatted sources when required
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "All selected frontend files are already formatted."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/App.tsx apps/web/src/components/AppShell.tsx apps/web/src/components/AppShell.test.tsx apps/web/src/features/expenses/ExpenseManagementPage.tsx apps/web/src/features/expenses/ExpenseManagementPage.css apps/web/src/features/expenses/ExpenseManagementPage.test.tsx
+          git commit -m "style(expenses): format expense frontend sources"
+          git push origin HEAD:task-021-expense-foundation
