@@ -4,10 +4,7 @@ const emptyToNull = (value: unknown): unknown =>
   typeof value === 'string' && value.trim() === '' ? null : value;
 
 const optionalNullableText = (max: number) =>
-  z.preprocess(
-    emptyToNull,
-    z.string().trim().min(1).max(max).nullable().optional(),
-  );
+  z.preprocess(emptyToNull, z.string().trim().min(1).max(max).nullable().optional());
 
 const optionalEmail = z.preprocess(
   emptyToNull,
@@ -31,7 +28,10 @@ export const updateCustomerSchema = z
     notes: optionalNullableText(1000),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, 'Provide at least one customer field to update.');
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    'Provide at least one customer field to update.',
+  );
 
 const positiveIntegerQuery = (maximum: number) =>
   z
