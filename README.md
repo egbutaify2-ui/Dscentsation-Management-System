@@ -6,7 +6,7 @@ An internal business management platform being actively built for Dscentsation's
 >
 > **Build direction:** New tasks are implementation tasks: build features, fix bugs, integrate modules, improve the UI and add the tests needed to ship them. Investigation-only and audit-only task streams are not the default. When a dependency is pending, agents should build the independent parts instead of leaving the whole task idle.
 >
-> **Current main baseline:** `57e83e37655604b34ff5813d7fe7aebf05daf579`. The application foundation, Product Management, Employee Account Administration and Customer Management are available in `main`. Supplier Directory, Expense Management and Order Capture remain in active development.
+> **Customer Management merge commit:** `57e83e37655604b34ff5813d7fe7aebf05daf579`. The application foundation, Product Management, Employee Account Administration and Customer Management are available in `main`. Supplier Directory, Expense Management and Order Capture remain in active development.
 
 ## Contents
 
