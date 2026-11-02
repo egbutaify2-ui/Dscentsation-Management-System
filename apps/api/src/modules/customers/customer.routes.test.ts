@@ -347,10 +347,13 @@ describe('Customer Management API', () => {
 
   it('records create, update and archive events without writing customer PII into audit metadata', async () => {
     const marker = `PII_MARKER_${suffix}`;
+    const phoneMarker = `P_${suffix.slice(0, 20)}`;
+    const emailMarker = `EMAIL_${suffix}@example.invalid`;
+    const notesMarker = `NOTES_${suffix}`;
     const customer = await createCustomer(marker, {
-      phone: `PHONE_${suffix}`,
-      email: `EMAIL_${suffix}@example.invalid`,
-      notes: `NOTES_${suffix}`,
+      phone: phoneMarker,
+      email: emailMarker,
+      notes: notesMarker,
     });
     await patch(ownerAgent, `/api/v1/customers/${customer.id}`, {
       notes: 'Changed synthetic note',
@@ -369,7 +372,7 @@ describe('Customer Management API', () => {
       'customer.archived',
     ]);
     const serialized = JSON.stringify(result.rows.map((row) => row.safe_metadata));
-    for (const personalValue of [marker, `PHONE_${suffix}`, `EMAIL_${suffix}`, `NOTES_${suffix}`]) {
+    for (const personalValue of [marker, phoneMarker, emailMarker, notesMarker]) {
       expect(serialized).not.toContain(personalValue);
     }
   });

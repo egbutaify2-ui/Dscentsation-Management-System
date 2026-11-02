@@ -1,0 +1,33 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "main",
+    "origin",
+    "task-011-customer-management-foundation",
+    "task-020-supplier-directory-foundation",
+    "task-021-expense-foundation",
+    "task-022-order-capture-implementation",
+    "task-024-supplier-directory-frontend",
+    "task-024-supplier-directory-frontend-ci-fixes"
+  ],
+  "parent": {
+    "main": null,
+    "origin": "main",
+    "task-011-customer-management-foundation": "main",
+    "task-020-supplier-directory-foundation": "main",
+    "task-021-expense-foundation": "main",
+    "task-022-order-capture-implementation": "main",
+    "task-024-supplier-directory-frontend": "main",
+    "task-024-supplier-directory-frontend-ci-fixes": "task-024-supplier-directory-frontend"
+  },
+  "order": [
+    "main",
+    "origin",
+    "task-011-customer-management-foundation",
+    "task-020-supplier-directory-foundation",
+    "task-021-expense-foundation",
+    "task-022-order-capture-implementation",
+    "task-024-supplier-directory-frontend",
+    "task-024-supplier-directory-frontend-ci-fixes"
+  ]
+}
