@@ -2,11 +2,11 @@
 
 An internal business management platform being actively built for Dscentsation's Nigerian operations. DMS brings orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
 
-> **Project status — active development:** DMS is in its build phase. The team is implementing working modules in parallel, not just documenting plans. Customer Management (Task 011, PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14)) has now been merged into `main`. Active implementation work continues on Supplier Directory (PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16)), Expense Categories and Draft Expenses (PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17)), and Order Capture (Task 022).
+> **Project status — active development:** DMS is in its build phase. The team is implementing working modules in parallel, not just documenting plans. Customer Management (Task 011, PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14)) and Supplier Directory backend foundation (Task 020, PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16)) are now merged into `main`. Active implementation continues on Expense Management (PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17)), Order Capture (Task 022), Expense Management frontend (Task 023) and Supplier Directory frontend (Task 024).
 >
 > **Build direction:** New tasks are implementation tasks: build features, fix bugs, integrate modules, improve the UI and add the tests needed to ship them. Investigation-only and audit-only task streams are not the default. When a dependency is pending, agents should build the independent parts instead of leaving the whole task idle.
 >
-> **Customer Management merge commit:** `57e83e37655604b34ff5813d7fe7aebf05daf579`. The application foundation, Product Management, Employee Account Administration and Customer Management are available in `main`. Supplier Directory, Expense Management and Order Capture remain in active development.
+> **Latest feature merge:** Supplier Directory backend Task 020 merged through PR #16 at `64ac4b6a11c3ddce39a3646cdede0d570e338f77`. Customer Management (migration 004) and Supplier Directory (migration 005) are available in `main`. Expense migration 006 remains in its active PR and must follow migration 005.
 
 ## Contents
 
@@ -561,21 +561,21 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 ### Current project position
 
-**Implemented in `main`:** The application foundation, authentication and employee account administration, Product Management, and the documentation reconciliation from Task 010. The latest recorded `main` baseline is `07bf296d2ce32d1cb91854f91b492540bdc5a954`.
+**Implemented in `main`:** Application foundation, authentication and employee account administration, Product Management, Customer Management (migration 004), Supplier Directory backend foundation (migration 005), and Task 010 documentation reconciliation.
 
 **Recently shipped:**
 
-- **Task 011 — Customer Management:** merged through PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14). Migration 004, customer API/service and customer database/API tests are now in `main`.
+- **Task 011 — Customer Management:** merged through PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14). Customer database, API/service and tests are in `main`.
+- **Task 020 — Supplier Directory backend:** merged through PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16), merge commit `64ac4b6a11c3ddce39a3646cdede0d570e338f77`. Migration 005, supplier APIs, audit integration and automated tests are in `main`.
 
 **Active implementation work:**
 
-- **Task 020 — Supplier Directory:** PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16). Supplier directory backend foundation is being implemented.
-- **Task 021 — Expense Categories & Draft Expenses:** PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17). Expense categories and draft expense recording are being implemented.
-- **Task 022 — Order Capture:** independent order-capture components are authorised to be built in parallel. Customer integration and the order database migration are connected when the customer module and coordinated migration sequence are available.
+- **Task 021 — Expense Categories & Draft Expenses:** PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17), branch `task-021-expense-foundation`. Backend migration 006 and APIs are implemented in the PR; it needs integration after migration 005. Expense frontend work is continuing in parallel.
+- **Task 022 — Order Capture:** independent order-capture components and merged customer integration are being implemented. Database migration 007 follows migration 006.
+- **Task 023 — Expense Management frontend:** build the user-facing expense/category screens against the Task 021 API.
+- **Task 024 — Supplier Directory frontend:** build the user-facing supplier screens against the merged supplier API.
 
-These PRs are works in progress; do not treat their features as already shipped in `main`.
-
-**Remaining build areas:** Inventory balances and movements, order fulfilment, incoming customer payments, receipts and notifications, procurement workflows, returns/refunds, reporting, and production deployment still need implementation. Build them in practical increments, reusing the modules already being delivered. Keep business decisions that genuinely affect money, stock ownership or permissions explicit, but do not turn those dependencies into reasons to stop unrelated coding.
+**Remaining build areas:** Inventory balances and movements, order fulfilment, incoming customer payments, receipts and notifications, procurement workflows, returns/refunds, reporting and production deployment still need implementation. Build these in practical increments while keeping independent development moving.
 
 
 ## Working agreement
