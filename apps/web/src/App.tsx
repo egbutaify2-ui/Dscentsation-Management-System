@@ -5,11 +5,12 @@ import { LoginPage } from './features/auth/LoginPage.js';
 import { DashboardPage } from './features/dashboard/DashboardPage.js';
 import { ExpenseManagementPage } from './features/expenses/ExpenseManagementPage.js';
 import { ProductManagementPage } from './features/products/ProductManagementPage.js';
+import { OrderManagementPage } from './features/orders/OrderManagementPage.js';
 import { SupplierManagementPage } from './features/suppliers/SupplierManagementPage.js';
 import { EmployeeManagementPage } from './features/users/EmployeeManagementPage.js';
 import { AcceptInvitationPage } from './features/users/AcceptInvitationPage.js';
 
-type Section = 'overview' | 'products' | 'employees' | 'expenses' | 'suppliers';
+type Section = 'overview' | 'products' | 'employees' | 'expenses' | 'suppliers' | 'orders';
 
 function invitationTokenFromLocation(): string | null {
   if (typeof window === 'undefined') return null;
@@ -25,6 +26,7 @@ export function App() {
   const [invitationToken, setInvitationToken] = useState<string | null>(
     invitationTokenFromLocation,
   );
+  const canViewOrders = permissions.includes('orders.view');
   const canViewProducts = permissions.includes('products.view');
   const canViewEmployees = permissions.includes('users.view');
   const canViewSuppliers = permissions.includes('suppliers.view');
@@ -32,11 +34,12 @@ export function App() {
     permissions.includes('expenses.view') || permissions.includes('expense_categories.view');
 
   useEffect(() => {
+    if (!canViewOrders && activeSection === 'orders') setActiveSection('overview');
     if (!canViewProducts && activeSection === 'products') setActiveSection('overview');
     if (!canViewEmployees && activeSection === 'employees') setActiveSection('overview');
     if (!canViewSuppliers && activeSection === 'suppliers') setActiveSection('overview');
     if (!canViewExpenses && activeSection === 'expenses') setActiveSection('overview');
-  }, [activeSection, canViewProducts, canViewEmployees, canViewSuppliers, canViewExpenses]);
+  }, [activeSection, canViewOrders, canViewProducts, canViewEmployees, canViewSuppliers, canViewExpenses]);
 
   useEffect(() => {
     if (invitationToken && typeof window !== 'undefined') {
@@ -85,7 +88,9 @@ export function App() {
       onNavigate={setActiveSection}
       onLogout={logout}
     >
-      {activeSection === 'products' && canViewProducts ? (
+      {activeSection === 'orders' && canViewOrders ? (
+        <OrderManagementPage permissions={permissions} />
+      ) : activeSection === 'products' && canViewProducts ? (
         <ProductManagementPage />
       ) : activeSection === 'employees' && canViewEmployees ? (
         <EmployeeManagementPage canManage={permissions.includes('users.manage')} />

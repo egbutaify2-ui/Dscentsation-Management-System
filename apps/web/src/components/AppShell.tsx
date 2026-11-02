@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthenticatedUser } from '../features/auth/AuthProvider.js';
 
-type Section = 'overview' | 'products' | 'employees' | 'expenses' | 'suppliers';
+type Section = 'overview' | 'products' | 'employees' | 'expenses' | 'suppliers' | 'orders';
 type NavigationItem = { label: string; section?: Section; symbol: string; enabled: boolean };
 
 export function AppShell({
@@ -23,6 +23,7 @@ export function AppShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const ordersVisible = permissions.includes('orders.view');
   const productVisible = permissions.includes('products.view');
   const employeesVisible = permissions.includes('users.view');
   const suppliersVisible = permissions.includes('suppliers.view');
@@ -36,7 +37,9 @@ export function AppShell({
     ...(employeesVisible
       ? [{ label: 'Employees', section: 'employees' as const, symbol: '♙', enabled: true }]
       : []),
-    { label: 'Orders', symbol: '▤', enabled: false },
+    ...(ordersVisible
+      ? [{ label: 'Orders', section: 'orders' as const, symbol: '▤', enabled: true }]
+      : []),
     { label: 'Inventory', symbol: '▥', enabled: false },
     { label: 'Customers', symbol: '♙', enabled: false },
     ...(suppliersVisible
@@ -66,8 +69,10 @@ export function AppShell({
   }
 
   const activeLabel =
-    activeSection === 'products'
-      ? 'Products'
+    activeSection === 'orders'
+      ? 'Orders'
+      : activeSection === 'products'
+        ? 'Products'
       : activeSection === 'employees'
         ? 'Employees'
         : activeSection === 'suppliers'
