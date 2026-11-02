@@ -155,7 +155,7 @@ describe('OrderManagementPage', () => {
       expect(screen.getByText('₦25,000.00')).toBeTruthy();
       expect(screen.getByText('Received')).toBeTruthy();
     },
-  );;
+  );
 
   it('hides create and amendment actions without their specific permissions', async () => {
     render(<OrderManagementPage permissions={['orders.view']} locations={locations} />);
@@ -262,7 +262,7 @@ describe('OrderManagementPage', () => {
       expect(screen.getByText('₦26,000.00')).toBeTruthy();
       expect(screen.queryByText('₦25,000.00')).toBeNull();
     },
-  );;
+  );
 
   it(
     'validates that an order contains a customer, channel, location and at least one item',
@@ -280,7 +280,7 @@ describe('OrderManagementPage', () => {
       expect(screen.getByRole('alert').textContent).toContain('Choose a customer.');
       expect(api.post).not.toHaveBeenCalled();
     },
-  );;
+  );
 
   it('only shows amendment controls for received orders', async () => {
     render(<OrderManagementPage permissions={permissions} locations={locations} />);
