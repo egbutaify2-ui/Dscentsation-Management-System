@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupplierManagementPage } from './SupplierManagementPage.js';
 
@@ -150,7 +150,9 @@ describe('SupplierManagementPage', () => {
         'synthetic-csrf',
       ),
     );
-    expect(screen.getByText('SUP-000123')).toBeTruthy();
+    expect(
+      within(screen.getByRole('region', { name: 'Renamed Supplier' })).getByText('SUP-000123'),
+    ).toBeTruthy();
   });
 
   it('asks for confirmation before deactivation and uses the status endpoint', async () => {
