@@ -36,9 +36,9 @@ export const updateCustomerSchema = z
 const positiveIntegerQuery = (maximum: number) =>
   z
     .string()
-    .regex(/^[1-9]\\d{0,6}$/, 'Use a positive integer.')
+    .regex(/^[1-9][0-9]{0,6}$/, 'Use a positive integer.')
     .transform(Number)
-    .refine((value) => value <= maximum, `Value must not exceed ${maximum}.`);
+    .refine((value) => value <= maximum, 'The requested pagination value exceeds the limit.');
 
 export const listCustomersQuerySchema = z
   .object({
