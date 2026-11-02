@@ -270,6 +270,10 @@ describe('DMS foundation API', () => {
     ];
     expect(roles.rows.map((row) => row.code)).toEqual(['MANAGER', 'OWNER', 'STAFF']);
     expect(permissions.rows.map((row) => row.code)).toEqual([
+      'customers.archive',
+      'customers.create',
+      'customers.update',
+      'customers.view',
       'inventory.transfer.pickup_warehouse_to_assigned_sheraton',
       'inventory.transfer.receive_destination_assigned',
       'payments.record',
