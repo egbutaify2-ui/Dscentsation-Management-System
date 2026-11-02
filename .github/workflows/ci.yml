@@ -63,26 +63,8 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Format expense frontend and check formatting
-        run: |
-          pnpm exec prettier --write \
-            apps/web/src/components/AppShell.tsx \
-            apps/web/src/features/expenses/ExpenseManagementPage.tsx \
-            apps/web/src/features/expenses/ExpenseManagementPage.css \
-            apps/web/src/features/expenses/ExpenseManagementPage.test.tsx
-          pnpm format:check
-
-      - name: Upload Prettier-formatted frontend sources
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: formatted-expense-frontend
-          path: |
-            apps/web/src/components/AppShell.tsx
-            apps/web/src/features/expenses/ExpenseManagementPage.tsx
-            apps/web/src/features/expenses/ExpenseManagementPage.css
-            apps/web/src/features/expenses/ExpenseManagementPage.test.tsx
-          if-no-files-found: error
+      - name: Check formatting
+        run: pnpm format:check
 
       - name: Run ESLint
         run: pnpm lint
