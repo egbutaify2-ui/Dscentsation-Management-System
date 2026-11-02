@@ -319,6 +319,31 @@ describe('Supplier Directory API', () => {
     await fullAgent.get('/api/v1/suppliers?q=' + 'x'.repeat(101)).expect(400);
   });
 
+  it('rejects names that exceed 200 characters after compatibility normalization', async () => {
+    const expandedName = '\uFB03'.repeat(100);
+    const rejectedCreate = await post(fullAgent, '/api/v1/suppliers', {
+      displayName: expandedName,
+    });
+    expect(rejectedCreate.status).toBe(400);
+    expect(rejectedCreate.body.error.code).toBe('INVALID_REQUEST');
+
+    const created = await post(fullAgent, '/api/v1/suppliers', {
+      displayName: 'Synthetic Unicode Length ' + suffix.slice(0, 8),
+    });
+    expect(created.status).toBe(201);
+    const supplierId = created.body.data.id as string;
+    createdSupplierIds.push(supplierId);
+
+    const rejectedUpdate = await patch(fullAgent, '/api/v1/suppliers/' + supplierId, {
+      displayName: expandedName,
+    });
+    expect(rejectedUpdate.status).toBe(400);
+    expect(rejectedUpdate.body.error.code).toBe('INVALID_REQUEST');
+
+    const persisted = await fullAgent.get('/api/v1/suppliers/' + supplierId).expect(200);
+    expect(persisted.body.data.displayName).toBe('Synthetic Unicode Length ' + suffix.slice(0, 8));
+  });
+
   it('returns supplier details, validates UUIDs and reports missing suppliers', async () => {
     const created = await post(fullAgent, '/api/v1/suppliers', {
       displayName: 'Synthetic Detail ' + suffix.slice(0, 8),
@@ -424,18 +449,31 @@ describe('Supplier Directory API', () => {
     ]);
   });
 
-  it('rolls back supplier creation if the audit insert fails', async () => {
-    const displayName = 'Synthetic Audit Rollback ' + suffix.slice(0, 8);
+  it('rolls back create, update and status mutations if the audit insert fails', async () => {
+    const activeName = 'Synthetic Audit Rollback Active ' + suffix.slice(0, 8);
+    const inactiveName = 'Synthetic Audit Rollback Inactive ' + suffix.slice(0, 8);
+    const rejectedCreateName = 'Synthetic Audit Rollback Create ' + suffix.slice(0, 8);
+
+    const active = await post(fullAgent, '/api/v1/suppliers', { displayName: activeName });
+    const inactive = await post(fullAgent, '/api/v1/suppliers', { displayName: inactiveName });
+    expect(active.status).toBe(201);
+    expect(inactive.status).toBe(201);
+    const activeId = active.body.data.id as string;
+    const inactiveId = inactive.body.data.id as string;
+    createdSupplierIds.push(activeId, inactiveId);
+
+    await post(fullAgent, '/api/v1/suppliers/' + inactiveId + '/deactivate').expect(200);
+
     await pool.query(`
       CREATE OR REPLACE FUNCTION dms_test_reject_supplier_audit() RETURNS trigger
-      LANGUAGE plpgsql AS $$
+      LANGUAGE plpgsql AS $
       BEGIN
         IF NEW.action LIKE 'supplier.%' THEN
           RAISE EXCEPTION 'Synthetic supplier audit failure';
         END IF;
         RETURN NEW;
       END;
-      $$;
+      $;
     `);
     await pool.query(`
       CREATE TRIGGER dms_test_reject_supplier_audit
@@ -444,17 +482,68 @@ describe('Supplier Directory API', () => {
     `);
 
     try {
-      const failed = await post(fullAgent, '/api/v1/suppliers', { displayName });
-      expect(failed.status).toBe(500);
-      expect(failed.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+      const failedCreate = await post(fullAgent, '/api/v1/suppliers', {
+        displayName: rejectedCreateName,
+      });
+      expect(failedCreate.status).toBe(500);
+      expect(failedCreate.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+
+      const failedUpdate = await patch(fullAgent, '/api/v1/suppliers/' + activeId, {
+        displayName: 'Synthetic Audit Rollback Updated ' + suffix.slice(0, 8),
+      });
+      expect(failedUpdate.status).toBe(500);
+      expect(failedUpdate.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+
+      const failedDeactivate = await post(
+        fullAgent,
+        '/api/v1/suppliers/' + activeId + '/deactivate',
+      );
+      expect(failedDeactivate.status).toBe(500);
+      expect(failedDeactivate.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+
+      const failedActivate = await post(
+        fullAgent,
+        '/api/v1/suppliers/' + inactiveId + '/activate',
+      );
+      expect(failedActivate.status).toBe(500);
+      expect(failedActivate.body.error.code).toBe('INTERNAL_SERVER_ERROR');
     } finally {
       await pool.query('DROP TRIGGER IF EXISTS dms_test_reject_supplier_audit ON audit_logs');
       await pool.query('DROP FUNCTION IF EXISTS dms_test_reject_supplier_audit()');
     }
 
-    const persisted = await pool.query('SELECT 1 FROM suppliers WHERE normalized_name = $1', [
-      displayName.toLowerCase(),
+    const persisted = await pool.query<{
+      id: string;
+      display_name: string;
+      status: string;
+    }>(
+      'SELECT id, display_name, status FROM suppliers WHERE id = ANY($1::uuid[]) ORDER BY id',
+      [[activeId, inactiveId].sort()],
+    );
+    expect(persisted.rows).toHaveLength(2);
+    const activeRecord = persisted.rows.find((row) => row.id === activeId);
+    const inactiveRecord = persisted.rows.find((row) => row.id === inactiveId);
+    expect(activeRecord).toMatchObject({ display_name: activeName, status: 'active' });
+    expect(inactiveRecord).toMatchObject({ display_name: inactiveName, status: 'inactive' });
+
+    const failedCreateRecord = await pool.query(
+      'SELECT 1 FROM suppliers WHERE normalized_name = $1',
+      [rejectedCreateName.toLowerCase()],
+    );
+    expect(failedCreateRecord.rowCount).toBe(0);
+
+    const activeAudit = await pool.query<{ action: string }>(
+      'SELECT action FROM audit_logs WHERE entity_type = \'supplier\' AND entity_id = $1 ORDER BY occurred_at, id',
+      [activeId],
+    );
+    const inactiveAudit = await pool.query<{ action: string }>(
+      'SELECT action FROM audit_logs WHERE entity_type = \'supplier\' AND entity_id = $1 ORDER BY occurred_at, id',
+      [inactiveId],
+    );
+    expect(activeAudit.rows.map((row) => row.action)).toEqual(['supplier.created']);
+    expect(inactiveAudit.rows.map((row) => row.action)).toEqual([
+      'supplier.created',
+      'supplier.deactivated',
     ]);
-    expect(persisted.rowCount).toBe(0);
   });
 });

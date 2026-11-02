@@ -75,6 +75,12 @@ function normalizeSupplierName(value: string): {
   };
 }
 
+function assertSupplierNameLength(displayName: string, normalizedName: string): void {
+  if (Array.from(displayName).length > 200 || Array.from(normalizedName).length > 200) {
+    throw supplierInvalid('Supplier business names must not exceed 200 characters after normalization.');
+  }
+}
+
 function supplierFromRow(row: SupplierRow): Supplier {
   return {
     id: row.id,
@@ -201,6 +207,7 @@ export async function createSupplier(
   if (!displayName || !normalizedName) {
     throw supplierInvalid('A supplier business name is required.');
   }
+  assertSupplierNameLength(displayName, normalizedName);
 
   return inTransaction(async (client) => {
     const inserted = await client.query<{ id: string }>(
@@ -245,6 +252,9 @@ export async function updateSupplier(
 
   if (displayName !== undefined && (!displayName || !normalizedName)) {
     throw supplierInvalid('A supplier business name is required.');
+  }
+  if (displayName !== undefined && normalizedName !== undefined) {
+    assertSupplierNameLength(displayName, normalizedName);
   }
 
   return inTransaction(async (client) => {
