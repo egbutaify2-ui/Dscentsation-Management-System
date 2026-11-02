@@ -468,14 +468,14 @@ describe('Supplier Directory API', () => {
 
     await pool.query(`
       CREATE OR REPLACE FUNCTION dms_test_reject_supplier_audit() RETURNS trigger
-      LANGUAGE plpgsql AS $
+      LANGUAGE plpgsql AS $$
       BEGIN
         IF NEW.action LIKE 'supplier.%' THEN
           RAISE EXCEPTION 'Synthetic supplier audit failure';
         END IF;
         RETURN NEW;
       END;
-      $;
+      $$;
     `);
     await pool.query(`
       CREATE TRIGGER dms_test_reject_supplier_audit
