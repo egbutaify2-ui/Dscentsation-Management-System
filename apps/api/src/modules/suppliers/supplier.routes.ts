@@ -83,13 +83,20 @@ router.get('/suppliers', requirePermission('suppliers.view'), async (request, re
       response.status(400).json(validationResponse(parsed.error));
       return;
     }
+    const page = await listSuppliers(actor(request), {
+      query: parsed.data.q,
+      status: parsed.data.status,
+      page: parsed.data.page ?? 1,
+      pageSize: parsed.data.pageSize ?? 25,
+    });
     response.json({
-      data: await listSuppliers(actor(request), {
-        query: parsed.data.q,
-        status: parsed.data.status,
-        page: parsed.data.page ?? 1,
-        pageSize: parsed.data.pageSize ?? 20,
-      }),
+      data: page.items,
+      meta: {
+        page: page.page,
+        pageSize: page.pageSize,
+        total: page.total,
+        totalPages: page.totalPages,
+      },
     });
   } catch (error) {
     next(error);

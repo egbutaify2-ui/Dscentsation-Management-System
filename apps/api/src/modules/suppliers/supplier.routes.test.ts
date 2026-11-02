@@ -299,20 +299,24 @@ describe('Supplier Directory API', () => {
     const pageOne = await fullAgent
       .get('/api/v1/suppliers?q=' + encodeURIComponent(name.toLowerCase()) + '&page=1&pageSize=1')
       .expect(200);
-    expect(pageOne.body.data.items).toHaveLength(1);
-    expect(pageOne.body.data.total).toBe(2);
-    expect(pageOne.body.data.totalPages).toBe(2);
+    expect(pageOne.body.data).toHaveLength(1);
+    expect(pageOne.body.meta).toMatchObject({
+      page: 1,
+      pageSize: 1,
+      total: 2,
+      totalPages: 2,
+    });
 
     const pageTwo = await fullAgent
       .get('/api/v1/suppliers?q=' + encodeURIComponent(name.toLowerCase()) + '&page=2&pageSize=1')
       .expect(200);
-    expect(pageTwo.body.data.items).toHaveLength(1);
-    expect(pageTwo.body.data.items[0].id).not.toBe(pageOne.body.data.items[0].id);
+    expect(pageTwo.body.data).toHaveLength(1);
+    expect(pageTwo.body.data[0].id).not.toBe(pageOne.body.data[0].id);
 
     const inactive = await fullAgent
       .get('/api/v1/suppliers?status=inactive&q=task020-no-match-' + suffix.slice(0, 8))
       .expect(200);
-    expect(inactive.body.data.items).toEqual([]);
+    expect(inactive.body.data).toEqual([]);
     await fullAgent.get('/api/v1/suppliers?page=0').expect(400);
     await fullAgent.get('/api/v1/suppliers?pageSize=101').expect(400);
     await fullAgent.get('/api/v1/suppliers?status=blocked').expect(400);
