@@ -39,7 +39,14 @@ export function App() {
     if (!canViewEmployees && activeSection === 'employees') setActiveSection('overview');
     if (!canViewSuppliers && activeSection === 'suppliers') setActiveSection('overview');
     if (!canViewExpenses && activeSection === 'expenses') setActiveSection('overview');
-  }, [activeSection, canViewOrders, canViewProducts, canViewEmployees, canViewSuppliers, canViewExpenses]);
+  }, [
+    activeSection,
+    canViewOrders,
+    canViewProducts,
+    canViewEmployees,
+    canViewSuppliers,
+    canViewExpenses,
+  ]);
 
   useEffect(() => {
     if (invitationToken && typeof window !== 'undefined') {

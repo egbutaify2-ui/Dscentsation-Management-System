@@ -444,7 +444,9 @@ export function OrderManagementPage({
         return;
       }
       if (selectedOrder?.fulfilmentLocationId !== form.fulfilmentLocationId) {
-        setError('A fulfilment location cannot be changed until available locations can be listed.');
+        setError(
+          'A fulfilment location cannot be changed until available locations can be listed.',
+        );
         return;
       }
     }
@@ -465,7 +467,8 @@ export function OrderManagementPage({
     if (view === 'edit' && selectedOrder) {
       const changes: Record<string, unknown> = {};
       if (form.customerId !== selectedOrder.customerId) changes.customerId = form.customerId;
-      if (form.sourceChannel !== selectedOrder.sourceChannel) changes.sourceChannel = form.sourceChannel;
+      if (form.sourceChannel !== selectedOrder.sourceChannel)
+        changes.sourceChannel = form.sourceChannel;
       if (form.fulfilmentLocationId !== selectedOrder.fulfilmentLocationId) {
         changes.fulfilmentLocationId = form.fulfilmentLocationId;
       }
@@ -505,7 +508,9 @@ export function OrderManagementPage({
         const refreshed = await api.get<OrderRecord>('/orders/' + selectedOrder.id);
         setSelectedOrder(refreshed);
         setView('detail');
-        setNotice('Order amendment saved. The displayed record has been re-fetched from the server.');
+        setNotice(
+          'Order amendment saved. The displayed record has been re-fetched from the server.',
+        );
         await loadOrders(pageMeta.page, search, statusFilter, sourceFilter);
       }
     } catch (saveError) {
@@ -543,7 +548,11 @@ export function OrderManagementPage({
         <div className="order-heading-actions">
           <span className="module-status-pill">Internal records</span>
           {view === 'register' && canCreateOrders && (
-            <button className="primary-button order-action-button" type="button" onClick={beginCreate}>
+            <button
+              className="primary-button order-action-button"
+              type="button"
+              onClick={beginCreate}
+            >
               Create order
             </button>
           )}
@@ -651,12 +660,20 @@ export function OrderManagementPage({
                         <strong>{order.customerNameSnapshot}</strong>
                         <small>{order.customerPhoneSnapshot ?? 'No phone recorded'}</small>
                       </td>
-                      <td>{sourceOptions.find((item) => item.value === order.sourceChannel)?.label ?? order.sourceChannel}</td>
+                      <td>
+                        {sourceOptions.find((item) => item.value === order.sourceChannel)?.label ??
+                          order.sourceChannel}
+                      </td>
                       <td className="order-location-cell" title={order.fulfilmentLocationId}>
                         {locationLabel(order.fulfilmentLocationId, locations)}
                       </td>
                       <td className="order-money">{formatMoney(order.totalMinor)}</td>
-                      <td><span className={'order-status ' + order.status}>{statusOptions.find((item) => item.value === order.status)?.label ?? order.status}</span></td>
+                      <td>
+                        <span className={'order-status ' + order.status}>
+                          {statusOptions.find((item) => item.value === order.status)?.label ??
+                            order.status}
+                        </span>
+                      </td>
                       <td>{formatTimestamp(order.createdAt)}</td>
                       <td>
                         <button
@@ -681,7 +698,9 @@ export function OrderManagementPage({
                 className="secondary-button"
                 type="button"
                 disabled={loading || pageMeta.page <= 1}
-                onClick={() => void loadOrders(pageMeta.page - 1, search, statusFilter, sourceFilter)}
+                onClick={() =>
+                  void loadOrders(pageMeta.page - 1, search, statusFilter, sourceFilter)
+                }
               >
                 Previous
               </button>
@@ -689,7 +708,9 @@ export function OrderManagementPage({
                 className="secondary-button"
                 type="button"
                 disabled={loading || pageMeta.page >= pageMeta.totalPages}
-                onClick={() => void loadOrders(pageMeta.page + 1, search, statusFilter, sourceFilter)}
+                onClick={() =>
+                  void loadOrders(pageMeta.page + 1, search, statusFilter, sourceFilter)
+                }
               >
                 Next
               </button>
@@ -702,10 +723,16 @@ export function OrderManagementPage({
         <section className="order-card order-form-card" aria-labelledby="order-form-title">
           <div className="order-card-heading">
             <div>
-              <p className="eyebrow">{view === 'create' ? 'NEW ORDER' : 'RECEIVED ORDER AMENDMENT'}</p>
+              <p className="eyebrow">
+                {view === 'create' ? 'NEW ORDER' : 'RECEIVED ORDER AMENDMENT'}
+              </p>
               <h2 id="order-form-title">{view === 'create' ? 'Create an order' : 'Amend order'}</h2>
             </div>
-            <button className="text-button" type="button" onClick={() => setView(selectedOrder ? 'detail' : 'register')}>
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => setView(selectedOrder ? 'detail' : 'register')}
+            >
               Cancel
             </button>
           </div>
@@ -713,16 +740,25 @@ export function OrderManagementPage({
           {referenceError && (
             <div className="order-alert error" role="alert">
               <span>{referenceError}</span>
-              <button className="text-button" type="button" onClick={() => void loadReferenceData()}>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => void loadReferenceData()}
+              >
                 Retry
               </button>
             </div>
           )}
-          {loadingReferences && <p className="order-helper" role="status">Loading customers and products…</p>}
+          {loadingReferences && (
+            <p className="order-helper" role="status">
+              Loading customers and products…
+            </p>
+          )}
 
           {(!canViewCustomers || !canViewProducts) && (
             <p className="order-alert error" role="alert">
-              Order capture requires customers.view and products.view. No additional permissions are granted by this frontend.
+              Order capture requires customers.view and products.view. No additional permissions
+              are granted by this frontend.
             </p>
           )}
 
@@ -756,7 +792,9 @@ export function OrderManagementPage({
                 <select
                   required
                   value={form.sourceChannel}
-                  onChange={(event) => setForm({ ...form, sourceChannel: event.target.value as SourceChannel | '' })}
+                  onChange={(event) =>
+                    setForm({ ...form, sourceChannel: event.target.value as SourceChannel | '' })
+                  }
                 >
                   <option value="">Choose a channel</option>
                   {sourceOptions.map((source) => (
@@ -770,19 +808,24 @@ export function OrderManagementPage({
                   required
                   value={form.fulfilmentLocationId}
                   disabled={activeLocations.length === 0}
-                  onChange={(event) => setForm({ ...form, fulfilmentLocationId: event.target.value })}
+                  onChange={(event) =>
+                    setForm({ ...form, fulfilmentLocationId: event.target.value })
+                  }
                 >
                   <option value="">Choose an available location</option>
                   {activeLocations.map((location) => (
                     <option key={location.id} value={location.id}>{location.name}</option>
                   ))}
                   {view === 'edit' && selectedOrder && activeLocations.length === 0 && (
-                    <option value={selectedOrder.fulfilmentLocationId}>Current fulfilment location</option>
+                    <option value={selectedOrder.fulfilmentLocationId}>
+                      Current fulfilment location
+                    </option>
                   )}
                 </select>
                 {activeLocations.length === 0 && (
                   <small className="order-field-warning">
-                    The baseline has no authenticated location-list API. New orders and location changes stay blocked until that contract is supplied.
+                    The baseline has no authenticated location-list API. New orders and location
+                    changes stay blocked until that contract is supplied.
                   </small>
                 )}
               </label>
@@ -825,7 +868,12 @@ export function OrderManagementPage({
                     onChange={(event) => setQuantityChoice(event.target.value)}
                   />
                 </label>
-                <button className="secondary-button" type="button" onClick={addItem} disabled={!productChoice}>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={addItem}
+                  disabled={!productChoice}
+                >
                   Add item
                 </button>
               </div>
@@ -839,10 +887,16 @@ export function OrderManagementPage({
                     const variant = selectedVariant(item.productId, item.variantId);
                     const unitMinor = nairaToMinor(variant?.sellingPrice ?? '0').toString();
                     return (
-                      <div className="order-line" key={productVariantKey(item.productId, item.variantId)}>
+                      <div
+                        className="order-line"
+                        key={productVariantKey(item.productId, item.variantId)}
+                      >
                         <div className="order-line-name">
                           <strong>{product?.name ?? 'Product snapshot'}</strong>
-                          <small>{variant?.name ?? 'Variant snapshot'}{variant?.sku ? ' · ' + variant.sku : ''}</small>
+                          <small>
+                            {variant?.name ?? 'Variant snapshot'}
+                            {variant?.sku ? ' · ' + variant.sku : ''}
+                          </small>
                         </div>
                         <label>
                           Qty
@@ -852,14 +906,24 @@ export function OrderManagementPage({
                             min="1"
                             step="1"
                             value={item.quantity}
-                            onChange={(event) => updateItem(index, { quantity: Number(event.target.value) })}
+                            onChange={(event) =>
+                              updateItem(index, { quantity: Number(event.target.value) })
+                            }
                           />
                         </label>
                         <div className="order-line-total">
                           <small>{formatMoney(unitMinor)} each</small>
-                          <strong>{formatMoney((safeQuantity(item.quantity) * BigInt(unitMinor)).toString())}</strong>
+                          <strong>
+                            {formatMoney(
+                              (safeQuantity(item.quantity) * BigInt(unitMinor)).toString(),
+                            )}
+                          </strong>
                         </div>
-                        <button className="text-button remove-line" type="button" onClick={() => removeItem(index)}>
+                        <button
+                          className="text-button remove-line"
+                          type="button"
+                          onClick={() => removeItem(index)}
+                        >
                           Remove
                         </button>
                       </div>
@@ -870,7 +934,10 @@ export function OrderManagementPage({
               <div className="order-preview-total">
                 <span>Estimated subtotal</span>
                 <strong>{formatMoney(preview.subtotal.toString())}</strong>
-                <small>Preview only. The server resolves current prices and returns the authoritative totals.</small>
+                <small>
+                  Preview only. The server resolves current prices and returns the authoritative
+                  totals.
+                </small>
               </div>
             </div>
 
@@ -898,9 +965,17 @@ export function OrderManagementPage({
             </div>
 
             <div className="order-form-footer">
-              <p className="order-helper">New orders are assigned the received status by the server. This form does not collect payment or change order lifecycle state.</p>
+              <p className="order-helper">
+                New orders are assigned the received status by the server. This form does not
+                collect payment or change order lifecycle state.
+              </p>
               <div>
-                <button className="secondary-button" type="button" disabled={saving} onClick={() => setView(selectedOrder ? 'detail' : 'register')}>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setView(selectedOrder ? 'detail' : 'register')}
+                >
                   Cancel
                 </button>
                 <button
@@ -911,7 +986,8 @@ export function OrderManagementPage({
                     loadingReferences ||
                     !canViewCustomers ||
                     !canViewProducts ||
-                    (view === 'create' && (!canCreateWithDependencies || activeLocations.length === 0))
+                    (view === 'create' &&
+                      (!canCreateWithDependencies || activeLocations.length === 0))
                   }
                 >
                   {saving ? 'Saving…' : view === 'create' ? 'Create order' : 'Save amendment'}
@@ -932,25 +1008,38 @@ export function OrderManagementPage({
                 <div>
                   <p className="eyebrow">ORDER DETAILS</p>
                   <h2 id="order-detail-title">{orderReference(selectedOrder.id)}</h2>
-                  <p className="order-detail-id" title={selectedOrder.id}>Record ID · {selectedOrder.id}</p>
+                  <p className="order-detail-id" title={selectedOrder.id}>
+                    Record ID · {selectedOrder.id}
+                  </p>
                 </div>
                 <div className="order-heading-actions">
                   <span className={'order-status ' + selectedOrder.status}>
-                    {statusOptions.find((item) => item.value === selectedOrder.status)?.label ?? selectedOrder.status}
+                    {statusOptions.find((item) => item.value === selectedOrder.status)?.label ??
+                      selectedOrder.status}
                   </span>
                   {canUpdateOrders && selectedOrder.status === 'received' && (
-                    <button className="primary-button order-action-button" type="button" onClick={beginAmendment}>
+                    <button
+                      className="primary-button order-action-button"
+                      type="button"
+                      onClick={beginAmendment}
+                    >
                       Amend order
                     </button>
                   )}
-                  <button className="secondary-button" type="button" onClick={() => setView('register')}>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => setView('register')}
+                  >
                     Back to register
                   </button>
                 </div>
               </div>
 
               {selectedOrder.status !== 'received' && (
-                <p className="order-helper">This order is not amendable. Only orders in the received status can be edited.</p>
+                <p className="order-helper">
+                  This order is not amendable. Only orders in the received status can be edited.
+                </p>
               )}
 
               <div className="order-detail-grid">
@@ -963,10 +1052,22 @@ export function OrderManagementPage({
                 <section>
                   <p className="eyebrow">ORDER INFORMATION</p>
                   <dl>
-                    <div><dt>Source channel</dt><dd>{sourceOptions.find((item) => item.value === selectedOrder.sourceChannel)?.label ?? selectedOrder.sourceChannel}</dd></div>
-                    <div><dt>Fulfilment location</dt><dd>{locationLabel(selectedOrder.fulfilmentLocationId, locations)}</dd></div>
+                    <div>
+                      <dt>Source channel</dt>
+                      <dd>
+                        {sourceOptions.find((item) => item.value === selectedOrder.sourceChannel)
+                          ?.label ?? selectedOrder.sourceChannel}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Fulfilment location</dt>
+                      <dd>{locationLabel(selectedOrder.fulfilmentLocationId, locations)}</dd>
+                    </div>
                     <div><dt>Created</dt><dd>{formatTimestamp(selectedOrder.createdAt)}</dd></div>
-                    <div><dt>Last updated</dt><dd>{formatTimestamp(selectedOrder.updatedAt)}</dd></div>
+                    <div>
+                      <dt>Last updated</dt>
+                      <dd>{formatTimestamp(selectedOrder.updatedAt)}</dd>
+                    </div>
                   </dl>
                 </section>
                 <section>
@@ -984,11 +1085,24 @@ export function OrderManagementPage({
                 </div>
                 <div className="order-table-wrap">
                   <table className="order-table">
-                    <thead><tr><th>Product snapshot</th><th>SKU</th><th>Quantity</th><th>Unit price</th><th>Line total</th></tr></thead>
+                    <thead>
+                      <tr>
+                        <th>Product snapshot</th>
+                        <th>SKU</th>
+                        <th>Quantity</th>
+                        <th>Unit price</th>
+                        <th>Line total</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {selectedOrder.items.map((item, index) => (
                         <tr key={item.productVariantId + '-' + index}>
-                          <td><strong>{item.productNameSnapshot}</strong><small>{item.variantNameSnapshot} · {item.unitOfMeasureSnapshot}</small></td>
+                          <td>
+                            <strong>{item.productNameSnapshot}</strong>
+                            <small>
+                              {item.variantNameSnapshot} · {item.unitOfMeasureSnapshot}
+                            </small>
+                          </td>
                           <td>{item.skuSnapshot ?? '—'}</td>
                           <td>{item.quantity}</td>
                           <td className="order-money">{formatMoney(item.unitPriceMinor)}</td>
@@ -1001,10 +1115,22 @@ export function OrderManagementPage({
               </div>
 
               <div className="order-totals">
-                <div><span>Subtotal</span><strong>{formatMoney(selectedOrder.subtotalMinor)}</strong></div>
-                <div><span>Discount</span><strong>{formatMoney(selectedOrder.discountMinor)}</strong></div>
-                <div><span>Delivery fee</span><strong>{formatMoney(selectedOrder.deliveryFeeMinor)}</strong></div>
-                <div className="grand-total"><span>Order total</span><strong>{formatMoney(selectedOrder.totalMinor)}</strong></div>
+                <div>
+                  <span>Subtotal</span>
+                  <strong>{formatMoney(selectedOrder.subtotalMinor)}</strong>
+                </div>
+                <div>
+                  <span>Discount</span>
+                  <strong>{formatMoney(selectedOrder.discountMinor)}</strong>
+                </div>
+                <div>
+                  <span>Delivery fee</span>
+                  <strong>{formatMoney(selectedOrder.deliveryFeeMinor)}</strong>
+                </div>
+                <div className="grand-total">
+                  <span>Order total</span>
+                  <strong>{formatMoney(selectedOrder.totalMinor)}</strong>
+                </div>
               </div>
             </>
           ) : (
@@ -1020,7 +1146,11 @@ export function OrderManagementPage({
                 >
                   Retry
                 </button>
-                <button className="secondary-button" type="button" onClick={() => setView('register')}>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setView('register')}
+                >
                   Back to register
                 </button>
               </div>

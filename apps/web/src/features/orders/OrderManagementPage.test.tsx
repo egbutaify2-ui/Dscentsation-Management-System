@@ -132,13 +132,17 @@ beforeEach(() => {
 
 describe('OrderManagementPage', () => {
   it('does not expose the module or order actions without orders.view', () => {
-    render(<OrderManagementPage permissions={['orders.create', 'orders.update']} locations={locations} />);
+    render(
+      <OrderManagementPage permissions={['orders.create', 'orders.update']} locations={locations} />,
+    );
     expect(screen.getByText('You do not have access to Order Management.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Create order' })).toBeNull();
     expect(api.getPage).not.toHaveBeenCalled();
   });
 
-  it('renders the order register with customer, source, location, total, status and date', async () => {
+  it(
+    'renders the order register with customer, source, location, total, status and date',
+    async () => {
     render(<OrderManagementPage permissions={['orders.view']} locations={locations} />);
 
     expect(await screen.findByText('Synthetic Customer')).toBeTruthy();
@@ -191,7 +195,9 @@ describe('OrderManagementPage', () => {
     expect(screen.getByText('Page 2 of 3')).toBeTruthy();
   });
 
-  it('selects a customer and product variant, creates the order and displays server totals', async () => {
+  it(
+    'selects a customer and product variant, creates the order and displays server totals',
+    async () => {
     vi.mocked(api.post).mockResolvedValue({
       ...sampleOrder,
       subtotalMinor: '2600000',
@@ -211,10 +217,14 @@ describe('OrderManagementPage', () => {
     render(<OrderManagementPage permissions={permissions} locations={locations} />);
     openCreateForm();
 
-    await waitFor(() => expect(screen.getByRole('option', { name: /Synthetic Customer/ })).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByRole('option', { name: /Synthetic Customer/ })).toBeTruthy(),
+    );
     fireEvent.change(screen.getByLabelText('Customer'), { target: { value: customerId } });
     fireEvent.change(screen.getByLabelText('Source channel'), { target: { value: 'whatsapp' } });
-    fireEvent.change(screen.getByLabelText('Fulfilment location'), { target: { value: locationId } });
+    fireEvent.change(screen.getByLabelText('Fulfilment location'), {
+      target: { value: locationId },
+    });
     fireEvent.change(screen.getByLabelText('Product / variant'), {
       target: { value: productId + '|' + variantId },
     });
@@ -249,10 +259,17 @@ describe('OrderManagementPage', () => {
     expect(screen.queryByText('₦25,000.00')).toBeNull();
   });
 
-  it('validates that an order contains a customer, channel, location and at least one item', async () => {
+  it(
+    'validates that an order contains a customer, channel, location and at least one item',
+    async () => {
     render(<OrderManagementPage permissions={permissions} locations={locations} />);
     openCreateForm();
-    fireEvent.submit(screen.getByRole('heading', { name: 'Create an order' }).closest('section')!.querySelector('form')!);
+    fireEvent.submit(
+      screen
+        .getByRole('heading', { name: 'Create an order' })
+        .closest('section')!
+        .querySelector('form')!,
+    );
 
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toContain('Choose a customer.');
@@ -278,7 +295,11 @@ describe('OrderManagementPage', () => {
   });
 
   it('patches only changed fields and re-fetches the saved order after amendment', async () => {
-    const amended = { ...sampleOrder, notes: 'Updated note', updatedAt: '2026-11-02T10:00:00.000Z' };
+    const amended = {
+      ...sampleOrder,
+      notes: 'Updated note',
+      updatedAt: '2026-11-02T10:00:00.000Z',
+    };
     vi.mocked(api.patch).mockResolvedValue(amended as never);
     vi.mocked(api.get).mockImplementation((path) => {
       if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
@@ -293,7 +314,11 @@ describe('OrderManagementPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save amendment' }));
 
     await screen.findByText('Updated note');
-    expect(api.patch).toHaveBeenCalledWith('/orders/' + orderId, { notes: 'Updated note' }, 'synthetic-csrf');
+    expect(api.patch).toHaveBeenCalledWith(
+      '/orders/' + orderId,
+      { notes: 'Updated note' },
+      'synthetic-csrf',
+    );
     expect(api.get).toHaveBeenCalledWith('/orders/' + orderId);
   });
 
@@ -305,7 +330,9 @@ describe('OrderManagementPage', () => {
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
 
-    expect((await screen.findByRole('alert')).textContent).toContain('Order detail service unavailable.');
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Order detail service unavailable.',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('heading', { name: 'ORD-555555555555' })).toBeTruthy();
   });
@@ -314,7 +341,9 @@ describe('OrderManagementPage', () => {
     render(<OrderManagementPage permissions={permissions} />);
     openCreateForm();
     expect(screen.getByText(/no authenticated location-list API/i)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Create order' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: 'Create order' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it('shows API failures and supports retry', async () => {

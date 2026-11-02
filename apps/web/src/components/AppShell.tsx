@@ -73,13 +73,13 @@ export function AppShell({
       ? 'Orders'
       : activeSection === 'products'
         ? 'Products'
-      : activeSection === 'employees'
-        ? 'Employees'
-        : activeSection === 'suppliers'
-          ? 'Suppliers'
-          : activeSection === 'expenses'
-            ? 'Expenses'
-            : 'Overview';
+        : activeSection === 'employees'
+          ? 'Employees'
+          : activeSection === 'suppliers'
+            ? 'Suppliers'
+            : activeSection === 'expenses'
+              ? 'Expenses'
+              : 'Overview';
 
   return (
     <div className="app-shell">
@@ -103,7 +103,9 @@ export function AppShell({
               <button
                 key={item.label}
                 type="button"
-                className={`nav-item ${active ? 'nav-active' : ''} ${!item.enabled ? 'nav-disabled' : ''}`}
+                className={`nav-item ${active ? 'nav-active' : ''} ${
+                  !item.enabled ? 'nav-disabled' : ''
+                }`}
                 disabled={!item.enabled}
                 aria-current={active ? 'page' : undefined}
                 title={item.enabled ? item.label : 'Module not yet implemented'}
