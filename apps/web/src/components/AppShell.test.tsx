@@ -74,6 +74,36 @@ describe('AppShell permission-aware navigation', () => {
     expect(onNavigate).toHaveBeenCalledWith('employees');
   });
 
+  it('shows Suppliers only when the backend session reports suppliers.view', () => {
+    const onNavigate = vi.fn();
+    const { rerender } = render(
+      <AppShell
+        user={user}
+        permissions={[]}
+        activeSection="overview"
+        onNavigate={onNavigate}
+        onLogout={async () => undefined}
+      >
+        <p>Overview content</p>
+      </AppShell>,
+    );
+    expect(screen.queryByRole('button', { name: 'Suppliers' })).toBeNull();
+
+    rerender(
+      <AppShell
+        user={user}
+        permissions={['suppliers.view']}
+        activeSection="overview"
+        onNavigate={onNavigate}
+        onLogout={async () => undefined}
+      >
+        <p>Overview content</p>
+      </AppShell>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Suppliers' }));
+    expect(onNavigate).toHaveBeenCalledWith('suppliers');
+  });
+
   it('keeps unfinished business modules disabled', () => {
     render(
       <AppShell

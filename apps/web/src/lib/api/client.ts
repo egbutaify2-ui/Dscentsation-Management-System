@@ -20,11 +20,15 @@ export class ApiError extends Error {
   }
 }
 
-interface ApiResponse<T> {
+interface ApiResponse<T, Meta = unknown> {
   data: T;
+  meta?: Meta;
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function requestEnvelope<T, Meta = unknown>(
+  path: string,
+  init: RequestInit = {},
+): Promise<ApiResponse<T, Meta>> {
   const headers = new Headers(init.headers);
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
@@ -36,10 +40,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     credentials: 'include',
   });
 
-  if (response.status === 204) return undefined as T;
-  const body = (await response.json()) as ApiResponse<T> & ApiErrorBody;
+  if (response.status === 204) return { data: undefined as T };
+  const body = (await response.json()) as ApiResponse<T, Meta> & ApiErrorBody;
   if (!response.ok) throw new ApiError(response.status, body);
-  return body.data;
+  return body;
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return (await requestEnvelope<T>(path, init)).data;
 }
 
 export async function getCsrfToken(): Promise<string> {
@@ -48,6 +56,13 @@ export async function getCsrfToken(): Promise<string> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  getPage: async <T, Meta>(path: string): Promise<{ data: T; meta: Meta }> => {
+    const response = await requestEnvelope<T, Meta>(path);
+    if (response.meta === undefined) {
+      throw new Error('The server did not return pagination metadata.');
+    }
+    return { data: response.data, meta: response.meta };
+  },
   post: <T>(path: string, body: unknown, csrfToken: string) =>
     request<T>(path, {
       method: 'POST',
