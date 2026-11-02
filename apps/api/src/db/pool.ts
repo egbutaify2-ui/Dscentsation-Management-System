@@ -32,6 +32,9 @@ const requiredApplicationTables = [
   'user_invitations',
   'customers',
   'suppliers',
+  'expense_categories',
+  'expenses',
+  'expense_revisions',
 ] as const;
 
 export async function assertDatabaseReady(): Promise<void> {

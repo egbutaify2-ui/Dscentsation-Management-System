@@ -138,10 +138,11 @@ ON CONFLICT DO NOTHING;
 
 DO $$
 BEGIN
+  -- Domain modules may add unassigned permission definitions. Keep the
+  -- built-in role count and confirmed role-permission matrix fixed.
   IF (SELECT count(*) FROM roles) <> 3
-     OR (SELECT count(*) FROM permissions) <> 20
      OR (SELECT count(*) FROM role_permissions) <> 15 THEN
-    RAISE EXCEPTION 'Conflict-safe seed replay changed the number of seed records';
+    RAISE EXCEPTION 'Conflict-safe foundation seed replay changed roles or role assignments';
   END IF;
 
   IF EXISTS (

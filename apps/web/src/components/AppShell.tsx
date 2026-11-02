@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthenticatedUser } from '../features/auth/AuthProvider.js';
 
-type Section = 'overview' | 'products' | 'employees' | 'suppliers';
+type Section = 'overview' | 'products' | 'employees' | 'expenses' | 'suppliers';
 type NavigationItem = { label: string; section?: Section; symbol: string; enabled: boolean };
 
 export function AppShell({
@@ -26,6 +26,8 @@ export function AppShell({
   const productVisible = permissions.includes('products.view');
   const employeesVisible = permissions.includes('users.view');
   const suppliersVisible = permissions.includes('suppliers.view');
+  const expensesVisible =
+    permissions.includes('expenses.view') || permissions.includes('expense_categories.view');
   const navigation: NavigationItem[] = [
     { label: 'Overview', section: 'overview' as const, symbol: '◫', enabled: true },
     ...(productVisible
@@ -39,6 +41,9 @@ export function AppShell({
     { label: 'Customers', symbol: '♙', enabled: false },
     ...(suppliersVisible
       ? [{ label: 'Suppliers', section: 'suppliers' as const, symbol: '▧', enabled: true }]
+      : []),
+    ...(expensesVisible
+      ? [{ label: 'Expenses', section: 'expenses' as const, symbol: '₦', enabled: true }]
       : []),
     { label: 'Finance', symbol: '₦', enabled: false },
     { label: 'Reports', symbol: '▦', enabled: false },
@@ -67,7 +72,9 @@ export function AppShell({
         ? 'Employees'
         : activeSection === 'suppliers'
           ? 'Suppliers'
-          : 'Overview';
+          : activeSection === 'expenses'
+            ? 'Expenses'
+            : 'Overview';
 
   return (
     <div className="app-shell">

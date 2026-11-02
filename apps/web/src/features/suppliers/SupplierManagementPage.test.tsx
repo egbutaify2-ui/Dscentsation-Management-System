@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupplierManagementPage } from './SupplierManagementPage.js';
 
@@ -133,7 +133,9 @@ describe('SupplierManagementPage', () => {
   it('edits a supplier business name without changing its generated reference', async () => {
     render(<SupplierManagementPage permissions={fullPermissions} />);
     fireEvent.click(await screen.findByRole('button', { name: 'View' }));
-    expect(await screen.findByRole('heading', { name: 'Synthetic Fragrance Supplies Ltd' })).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: 'Synthetic Fragrance Supplies Ltd' }),
+    ).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit name' }));
     fireEvent.change(screen.getByLabelText('Business name'), {
@@ -148,7 +150,11 @@ describe('SupplierManagementPage', () => {
         'synthetic-csrf',
       ),
     );
-    expect(screen.getByText('SUP-000123')).toBeTruthy();
+    expect(
+      within(screen.getByRole('region', { name: 'Renamed Supplier' })).getByText('SUP-000123', {
+        selector: 'p',
+      }),
+    ).toBeTruthy();
   });
 
   it('asks for confirmation before deactivation and uses the status endpoint', async () => {
@@ -187,7 +193,9 @@ describe('SupplierManagementPage', () => {
     expect(screen.queryByRole('button', { name: 'Add supplier' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
-    expect(await screen.findByRole('heading', { name: 'Synthetic Fragrance Supplies Ltd' })).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: 'Synthetic Fragrance Supplies Ltd' }),
+    ).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Edit name' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Deactivate supplier' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Activate supplier' })).toBeNull();
@@ -207,7 +215,9 @@ describe('SupplierManagementPage', () => {
       .mockRejectedValueOnce(new Error('Supplier directory unavailable.'))
       .mockResolvedValueOnce({ data: [sampleSupplier], meta: pageMeta });
     render(<SupplierManagementPage permissions={fullPermissions} />);
-    expect((await screen.findByRole('alert')).textContent).toContain('Supplier directory unavailable.');
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Supplier directory unavailable.',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('Synthetic Fragrance Supplies Ltd')).toBeTruthy();
   });

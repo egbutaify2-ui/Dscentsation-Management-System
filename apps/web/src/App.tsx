@@ -3,12 +3,13 @@ import { AppShell } from './components/AppShell.js';
 import { useAuth } from './features/auth/AuthProvider.js';
 import { LoginPage } from './features/auth/LoginPage.js';
 import { DashboardPage } from './features/dashboard/DashboardPage.js';
+import { ExpenseManagementPage } from './features/expenses/ExpenseManagementPage.js';
 import { ProductManagementPage } from './features/products/ProductManagementPage.js';
 import { SupplierManagementPage } from './features/suppliers/SupplierManagementPage.js';
 import { EmployeeManagementPage } from './features/users/EmployeeManagementPage.js';
 import { AcceptInvitationPage } from './features/users/AcceptInvitationPage.js';
 
-type Section = 'overview' | 'products' | 'employees' | 'suppliers';
+type Section = 'overview' | 'products' | 'employees' | 'expenses' | 'suppliers';
 
 function invitationTokenFromLocation(): string | null {
   if (typeof window === 'undefined') return null;
@@ -27,12 +28,15 @@ export function App() {
   const canViewProducts = permissions.includes('products.view');
   const canViewEmployees = permissions.includes('users.view');
   const canViewSuppliers = permissions.includes('suppliers.view');
+  const canViewExpenses =
+    permissions.includes('expenses.view') || permissions.includes('expense_categories.view');
 
   useEffect(() => {
     if (!canViewProducts && activeSection === 'products') setActiveSection('overview');
     if (!canViewEmployees && activeSection === 'employees') setActiveSection('overview');
     if (!canViewSuppliers && activeSection === 'suppliers') setActiveSection('overview');
-  }, [activeSection, canViewProducts, canViewEmployees, canViewSuppliers]);
+    if (!canViewExpenses && activeSection === 'expenses') setActiveSection('overview');
+  }, [activeSection, canViewProducts, canViewEmployees, canViewSuppliers, canViewExpenses]);
 
   useEffect(() => {
     if (invitationToken && typeof window !== 'undefined') {
@@ -85,6 +89,8 @@ export function App() {
         <ProductManagementPage />
       ) : activeSection === 'employees' && canViewEmployees ? (
         <EmployeeManagementPage canManage={permissions.includes('users.manage')} />
+      ) : activeSection === 'expenses' && canViewExpenses ? (
+        <ExpenseManagementPage permissions={permissions} />
       ) : activeSection === 'suppliers' && canViewSuppliers ? (
         <SupplierManagementPage permissions={permissions} />
       ) : (
