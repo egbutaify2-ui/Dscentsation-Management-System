@@ -151,7 +151,9 @@ describe('SupplierManagementPage', () => {
       ),
     );
     expect(
-      within(screen.getByRole('region', { name: 'Renamed Supplier' })).getByText('SUP-000123'),
+      within(screen.getByRole('region', { name: 'Renamed Supplier' })).getByText('SUP-000123', {
+        selector: 'p',
+      }),
     ).toBeTruthy();
   });
 
