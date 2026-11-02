@@ -51,25 +51,29 @@ async function csrf(agent: ReturnType<typeof request.agent>): Promise<string> {
 
 function post(agent: ReturnType<typeof request.agent>, path: string, body: object = {}) {
   return {
-    expect: async (status: number) =>
-      agent
+    expect: async (status: number) => {
+      const token = await csrf(agent);
+      return agent
         .post(path)
         .set('Origin', env.APP_ORIGIN)
-        .set('X-CSRF-Token', await csrf(agent))
+        .set('X-CSRF-Token', token)
         .send(body)
-        .expect(status),
+        .expect(status);
+    },
   };
 }
 
 function patch(agent: ReturnType<typeof request.agent>, path: string, body: object) {
   return {
-    expect: async (status: number) =>
-      agent
+    expect: async (status: number) => {
+      const token = await csrf(agent);
+      return agent
         .patch(path)
         .set('Origin', env.APP_ORIGIN)
-        .set('X-CSRF-Token', await csrf(agent))
+        .set('X-CSRF-Token', token)
         .send(body)
-        .expect(status),
+        .expect(status);
+    },
   };
 }
 
@@ -158,12 +162,9 @@ describe('Customer Management API', () => {
   it('denies Manager and Staff when they do not hold the exact customer permissions', async () => {
     for (const agent of [managerAgent, staffAgent]) {
       await agent.get('/api/v1/customers').expect(403);
-      await agent
-        .post('/api/v1/customers')
-        .set('Origin', env.APP_ORIGIN)
-        .set('X-CSRF-Token', await csrf(agent))
-        .send({ fullName: 'Denied synthetic customer' })
-        .expect(403);
+      await post(agent, '/api/v1/customers', {
+        fullName: 'Denied synthetic customer',
+      }).expect(403);
       await patch(agent, `/api/v1/customers/${randomUUID()}`, {
         fullName: 'Denied synthetic update',
       }).expect(403);
