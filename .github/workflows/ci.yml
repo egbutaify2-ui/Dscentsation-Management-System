@@ -108,23 +108,23 @@ jobs:
           fi
           cat /tmp/dms-production-rollback.log
           grep -F "Production database rollback is disabled" /tmp/dms-production-rollback.log
-          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants', 'user_invitations')")"
-          if [ "$remaining" != "12" ]; then
+          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants', 'user_invitations', 'customers')")"
+          if [ "$remaining" != "13" ]; then
             echo "Production rollback guard did not preserve all application tables (found $remaining)."
             exit 1
           fi
-          echo "Production rollback was rejected before migrations ran; all twelve application tables remain."
+          echo "Production rollback was rejected before migrations ran; all thirteen application tables remain."
 
       - name: Verify rollback removes the full disposable schema
         shell: bash
         run: |
-          pnpm --filter @dms/api exec tsx src/cli/migrate.ts down 3
-          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants', 'user_invitations')")"
+          pnpm --filter @dms/api exec tsx src/cli/migrate.ts down 4
+          remaining="$(psql "$DATABASE_URL" -At -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('roles', 'permissions', 'role_permissions', 'users', 'locations', 'user_location_access', 'user_sessions', 'audit_logs', 'product_categories', 'products', 'product_variants', 'user_invitations', 'customers')")"
           if [ "$remaining" != "0" ]; then
             echo "Rollback left $remaining application tables behind."
             exit 1
           fi
-          echo "Rollback removed all twelve application tables."
+          echo "Rollback removed all thirteen application tables."
 
       - name: Reapply migrations and reverify the application schema
         run: |
@@ -132,6 +132,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-foundation.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-product-management.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-employee-account-administration.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-customer-management.sql
 
       - name: Run API integration and security tests
         run: pnpm --filter @dms/api test
