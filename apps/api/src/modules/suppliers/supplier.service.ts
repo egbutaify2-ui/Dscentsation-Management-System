@@ -77,7 +77,9 @@ function normalizeSupplierName(value: string): {
 
 function assertSupplierNameLength(displayName: string, normalizedName: string): void {
   if (Array.from(displayName).length > 200 || Array.from(normalizedName).length > 200) {
-    throw supplierInvalid('Supplier business names must not exceed 200 characters after normalization.');
+    throw supplierInvalid(
+      'Supplier business names must not exceed 200 characters after normalization.',
+    );
   }
 }
 

@@ -532,14 +532,15 @@ describe('Supplier Directory API', () => {
     );
     expect(failedCreateRecord.rowCount).toBe(0);
 
-    const activeAudit = await pool.query<{ action: string }>(
-      'SELECT action FROM audit_logs WHERE entity_type = \'supplier\' AND entity_id = $1 ORDER BY occurred_at, id',
-      [activeId],
-    );
-    const inactiveAudit = await pool.query<{ action: string }>(
-      'SELECT action FROM audit_logs WHERE entity_type = \'supplier\' AND entity_id = $1 ORDER BY occurred_at, id',
-      [inactiveId],
-    );
+    const auditActionQuery = `
+      SELECT action
+        FROM audit_logs
+       WHERE entity_type = 'supplier'
+         AND entity_id = $1
+       ORDER BY occurred_at, id
+    `;
+    const activeAudit = await pool.query<{ action: string }>(auditActionQuery, [activeId]);
+    const inactiveAudit = await pool.query<{ action: string }>(auditActionQuery, [inactiveId]);
     expect(activeAudit.rows.map((row) => row.action)).toEqual(['supplier.created']);
     expect(inactiveAudit.rows.map((row) => row.action)).toEqual([
       'supplier.created',
