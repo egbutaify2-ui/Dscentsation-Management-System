@@ -225,9 +225,7 @@ describe('OrderManagementPage', () => {
         expect(screen.getByRole('option', { name: /Synthetic Customer/ })).toBeTruthy(),
       );
       fireEvent.change(screen.getByLabelText('Customer'), { target: { value: customerId } });
-      fireEvent.change(screen.getByLabelText('Source channel'), {
-        target: { value: 'whatsapp' },
-      });
+      fireEvent.change(screen.getByLabelText('Source channel'), { target: { value: 'whatsapp' } });
       fireEvent.change(screen.getByLabelText('Fulfilment location'), {
         target: { value: locationId },
       });
@@ -318,9 +316,7 @@ describe('OrderManagementPage', () => {
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
-    fireEvent.change(screen.getByLabelText('Order notes'), {
-      target: { value: 'Updated note' },
-    });
+    fireEvent.change(screen.getByLabelText('Order notes'), { target: { value: 'Updated note' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save amendment' }));
 
     await screen.findByText('Updated note');
@@ -362,9 +358,7 @@ describe('OrderManagementPage', () => {
       .mockResolvedValueOnce({ data: [sampleOrder], meta: pageMeta } as never);
     render(<OrderManagementPage permissions={['orders.view']} />);
 
-    expect((await screen.findByRole('alert')).textContent).toContain(
-      'Order service unavailable.',
-    );
+    expect((await screen.findByRole('alert')).textContent).toContain('Order service unavailable.');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('Synthetic Customer')).toBeTruthy();
   });
