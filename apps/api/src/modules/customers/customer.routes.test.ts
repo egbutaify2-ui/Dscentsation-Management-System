@@ -49,28 +49,36 @@ async function csrf(agent: ReturnType<typeof request.agent>): Promise<string> {
   return response.body.data.token as string;
 }
 
-async function post(
+function post(
   agent: ReturnType<typeof request.agent>,
   path: string,
   body: object = {},
 ) {
-  return agent
-    .post(path)
-    .set('Origin', env.APP_ORIGIN)
-    .set('X-CSRF-Token', await csrf(agent))
-    .send(body);
+  return {
+    expect: async (status: number) =>
+      agent
+        .post(path)
+        .set('Origin', env.APP_ORIGIN)
+        .set('X-CSRF-Token', await csrf(agent))
+        .send(body)
+        .expect(status),
+  };
 }
 
-async function patch(
+function patch(
   agent: ReturnType<typeof request.agent>,
   path: string,
   body: object,
 ) {
-  return agent
-    .patch(path)
-    .set('Origin', env.APP_ORIGIN)
-    .set('X-CSRF-Token', await csrf(agent))
-    .send(body);
+  return {
+    expect: async (status: number) =>
+      agent
+        .patch(path)
+        .set('Origin', env.APP_ORIGIN)
+        .set('X-CSRF-Token', await csrf(agent))
+        .send(body)
+        .expect(status),
+  };
 }
 
 describe('Customer Management API', () => {
