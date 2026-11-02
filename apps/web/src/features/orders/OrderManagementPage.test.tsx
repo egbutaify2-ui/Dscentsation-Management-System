@@ -358,7 +358,9 @@ describe('OrderManagementPage', () => {
       .mockResolvedValueOnce({ data: [sampleOrder], meta: pageMeta } as never);
     render(<OrderManagementPage permissions={['orders.view']} />);
 
-    expect((await screen.findByRole('alert')).textContent).toContain('Order service unavailable.');
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Order service unavailable.',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('Synthetic Customer')).toBeTruthy();
   });

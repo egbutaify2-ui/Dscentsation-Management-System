@@ -628,7 +628,9 @@ export function OrderManagementPage({
           </form>
 
           {loading ? (
-            <div className="order-state" role="status">Loading orders…</div>
+            <div className="order-state" role="status">
+              Loading orders…
+            </div>
           ) : orders.length === 0 ? (
             <div className="order-state">
               <strong>No orders found</strong>
@@ -646,7 +648,9 @@ export function OrderManagementPage({
                     <th>Total</th>
                     <th>Status</th>
                     <th>Date</th>
-                    <th><span className="sr-only">Open</span></th>
+                    <th>
+                      <span className="sr-only">Open</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -692,7 +696,9 @@ export function OrderManagementPage({
           )}
 
           <div className="order-pagination">
-            <span>Page {pageMeta.page} of {Math.max(1, pageMeta.totalPages)}</span>
+            <span>
+              Page {pageMeta.page} of {Math.max(1, pageMeta.totalPages)}
+            </span>
             <div>
               <button
                 className="secondary-button"
@@ -726,7 +732,9 @@ export function OrderManagementPage({
               <p className="eyebrow">
                 {view === 'create' ? 'NEW ORDER' : 'RECEIVED ORDER AMENDMENT'}
               </p>
-              <h2 id="order-form-title">{view === 'create' ? 'Create an order' : 'Amend order'}</h2>
+              <h2 id="order-form-title">
+                {view === 'create' ? 'Create an order' : 'Amend order'}
+              </h2>
             </div>
             <button
               className="text-button"
@@ -1005,7 +1013,9 @@ export function OrderManagementPage({
       {view === 'detail' && (
         <section className="order-card order-detail-card" aria-labelledby="order-detail-title">
           {loading ? (
-            <div className="order-state" role="status">Loading order details…</div>
+            <div className="order-state" role="status">
+              Loading order details…
+            </div>
           ) : selectedOrder ? (
             <>
               <div className="order-card-heading order-detail-heading">
