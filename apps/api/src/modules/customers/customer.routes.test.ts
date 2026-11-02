@@ -49,11 +49,7 @@ async function csrf(agent: ReturnType<typeof request.agent>): Promise<string> {
   return response.body.data.token as string;
 }
 
-function post(
-  agent: ReturnType<typeof request.agent>,
-  path: string,
-  body: object = {},
-) {
+function post(agent: ReturnType<typeof request.agent>, path: string, body: object = {}) {
   return {
     expect: async (status: number) =>
       agent
@@ -65,11 +61,7 @@ function post(
   };
 }
 
-function patch(
-  agent: ReturnType<typeof request.agent>,
-  path: string,
-  body: object,
-) {
+function patch(agent: ReturnType<typeof request.agent>, path: string, body: object) {
   return {
     expect: async (status: number) =>
       agent
@@ -136,7 +128,9 @@ describe('Customer Management API', () => {
   });
 
   async function createCustomer(fullName: string, fields: Record<string, unknown> = {}) {
-    const response = await post(ownerAgent, '/api/v1/customers', { fullName, ...fields }).expect(201);
+    const response = await post(ownerAgent, '/api/v1/customers', { fullName, ...fields }).expect(
+      201,
+    );
     return response.body.data as {
       id: string;
       fullName: string;
@@ -270,7 +264,9 @@ describe('Customer Management API', () => {
     const all = await ownerAgent.get('/api/v1/customers').query({ q: token }).expect(200);
     expect(all.body.data).toHaveLength(2);
     expect(
-      all.body.data[0].fullName.toLowerCase().localeCompare(all.body.data[1].fullName.toLowerCase()),
+      all.body.data[0].fullName
+        .toLowerCase()
+        .localeCompare(all.body.data[1].fullName.toLowerCase()),
     ).toBeLessThanOrEqual(0);
 
     await post(ownerAgent, `/api/v1/customers/${named.id}/archive`).expect(200);
@@ -284,7 +280,9 @@ describe('Customer Management API', () => {
       .query({ q: token, status: 'active' })
       .expect(200);
     expect(active.body.data.map((item: { id: string }) => item.id)).toEqual(
-      all.body.data.filter((item: { id: string }) => item.id !== named.id).map((item: { id: string }) => item.id),
+      all.body.data
+        .filter((item: { id: string }) => item.id !== named.id)
+        .map((item: { id: string }) => item.id),
     );
     await ownerAgent.get('/api/v1/customers?page=1&pageSize=101').expect(400);
   });
@@ -353,7 +351,9 @@ describe('Customer Management API', () => {
       email: `EMAIL_${suffix}@example.invalid`,
       notes: `NOTES_${suffix}`,
     });
-    await patch(ownerAgent, `/api/v1/customers/${customer.id}`, { notes: 'Changed synthetic note' }).expect(200);
+    await patch(ownerAgent, `/api/v1/customers/${customer.id}`, {
+      notes: 'Changed synthetic note',
+    }).expect(200);
     await post(ownerAgent, `/api/v1/customers/${customer.id}/archive`).expect(200);
     const result = await pool.query<{ action: string; safe_metadata: Record<string, unknown> }>(
       `SELECT action, safe_metadata
@@ -395,10 +395,9 @@ describe('Customer Management API', () => {
       await post(ownerAgent, '/api/v1/customers', {
         fullName: `RolledBackCreate ${suffix}`,
       }).expect(500);
-      const created = await pool.query(
-        'SELECT 1 FROM customers WHERE full_name = $1',
-        [`RolledBackCreate ${suffix}`],
-      );
+      const created = await pool.query('SELECT 1 FROM customers WHERE full_name = $1', [
+        `RolledBackCreate ${suffix}`,
+      ]);
       expect(created.rowCount).toBe(0);
 
       await patch(ownerAgent, `/api/v1/customers/${existing.id}`, {
