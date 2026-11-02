@@ -4,10 +4,11 @@ import { useAuth } from './features/auth/AuthProvider.js';
 import { LoginPage } from './features/auth/LoginPage.js';
 import { DashboardPage } from './features/dashboard/DashboardPage.js';
 import { ProductManagementPage } from './features/products/ProductManagementPage.js';
+import { SupplierManagementPage } from './features/suppliers/SupplierManagementPage.js';
 import { EmployeeManagementPage } from './features/users/EmployeeManagementPage.js';
 import { AcceptInvitationPage } from './features/users/AcceptInvitationPage.js';
 
-type Section = 'overview' | 'products' | 'employees';
+type Section = 'overview' | 'products' | 'employees' | 'suppliers';
 
 function invitationTokenFromLocation(): string | null {
   if (typeof window === 'undefined') return null;
@@ -25,11 +26,13 @@ export function App() {
   );
   const canViewProducts = permissions.includes('products.view');
   const canViewEmployees = permissions.includes('users.view');
+  const canViewSuppliers = permissions.includes('suppliers.view');
 
   useEffect(() => {
     if (!canViewProducts && activeSection === 'products') setActiveSection('overview');
     if (!canViewEmployees && activeSection === 'employees') setActiveSection('overview');
-  }, [activeSection, canViewProducts, canViewEmployees]);
+    if (!canViewSuppliers && activeSection === 'suppliers') setActiveSection('overview');
+  }, [activeSection, canViewProducts, canViewEmployees, canViewSuppliers]);
 
   useEffect(() => {
     if (invitationToken && typeof window !== 'undefined') {
@@ -82,6 +85,8 @@ export function App() {
         <ProductManagementPage />
       ) : activeSection === 'employees' && canViewEmployees ? (
         <EmployeeManagementPage canManage={permissions.includes('users.manage')} />
+      ) : activeSection === 'suppliers' && canViewSuppliers ? (
+        <SupplierManagementPage permissions={permissions} />
       ) : (
         <DashboardPage user={user} />
       )}
