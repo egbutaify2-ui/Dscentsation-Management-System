@@ -356,7 +356,7 @@ All seven decisions below remain **Pending confirmation** in the existing decisi
 
 **Current status:** Pending confirmation
 
-**Already confirmed:** ADR-016's dedicated Warehouse-to-assigned-Sheraton pickup mode, backend availability check, no-Warehouse-balance-disclosure rule, atomic source-to-in-transit movement, partial pickup, actor/time attribution and idempotency are fixed. The physical paperwork/reference process is explicitly left open.
+**Already confirmed:** ADR-016's dedicated Warehouse-to-assigned-Sheraton pickup mode, transactional stock-availability revalidation, shared read-only visibility of Warehouse quantities and availability through authorised operational read surfaces, atomic source-to-in-transit movement, partial pickup, actor/time attribution and idempotency are fixed. An insufficient-stock submission rejects the entire pickup event without changing the Warehouse balance, in-transit quantity, pickup event or stock movement. A failed pickup response need not duplicate balance values already available through those read surfaces. The physical paperwork/reference process is explicitly left open.
 
 **Still unanswered:** Whether a Staff member must present or record a transfer reference, printed slip, dispatch note, signed handover, Warehouse confirmation, identity check or other evidence; who creates/checks it; and whether DMS must retain a file or only a reference.
 

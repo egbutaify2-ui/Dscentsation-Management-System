@@ -419,7 +419,7 @@ This checklist is the project's shared progress record. It is intended to help f
 - [x] Confirm products will be entered manually; no bulk website catalogue import.
 - [x] Create the public GitHub repository.
 - [x] Establish this central README and project progress checklist.
-- [x] Document and independently review the Sheraton-to-Warehouse stock pickup workflow, separate Warehouse and Sheraton stock balances, destination-assigned pickup permissions and ADR-016 security boundaries (Task 002; merged PRs #3 and #4).
+- [x] Document and independently review the dedicated Ajose Warehouse-to-Sheraton Store physical pickup and destination receipt workflow, separate Warehouse and Sheraton stock balances, destination-assigned pickup permissions and ADR-016 security boundaries (Task 002; merged PRs #3 and #4).
 - [ ] Verify the current company email provider's supported SMTP/API sending method and requirements.
 - [x] Identify the two initial operating stock locations and purposes: Ajose Warehouse (main warehouse and stock holding) and Sheraton Store (customer-facing walk-in retail). This does not approve unique location codes, addresses/identifiers or actual account assignments.
 - [ ] Approve unique location codes and any required address/identifying details; securely establish employee-to-location mappings and assignment authority (DMS-DEC-001).
@@ -559,7 +559,7 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 ### Current project position
 
-**Completed:** Business discovery, core requirements, product scope decisions, public repository creation, initial project documentation, Task 002 architecture work for the Sheraton-to-Warehouse pickup workflow (ADR-016) merged in PRs #3 and #4, and the Task 005 application foundation approved and merged into `main` through PR #7. The Task 005 CI run passed on the exact reviewed head using disposable PostgreSQL and synthetic test records.
+**Completed:** Business discovery, core requirements, product scope decisions, public repository creation, initial project documentation, Task 002 architecture work for the dedicated Ajose Warehouse-to-Sheraton Store physical pickup and destination receipt workflow (ADR-016) merged in PRs #3 and #4, and the Task 005 application foundation approved and merged into `main` through PR #7. The Task 005 CI run passed on the exact reviewed head using disposable PostgreSQL and synthetic test records.
 
 **Task 005 status:** Approved and merged. Merge commit: `652b5d51d17ecb36e78871a99164c12238a8ac41`. The application foundation is now part of `main`; this does not represent approval of the full target architecture or implementation of the business application.
 
