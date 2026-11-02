@@ -256,7 +256,11 @@ describe('DMS foundation API', () => {
   });
 
   it('preserves foundation permissions and assigns Product Management permissions only to Owner', async () => {
-    const roles = await pool.query<{ code: string }>('SELECT code FROM roles ORDER BY code');
+    const roles = await pool.query<{ code: string }>(
+      `SELECT code FROM roles
+        WHERE code IN ('OWNER', 'MANAGER', 'STAFF')
+        ORDER BY code`,
+    );
     const permissions = await pool.query<{ code: string }>(
       'SELECT code FROM permissions ORDER BY code',
     );
@@ -267,6 +271,12 @@ describe('DMS foundation API', () => {
       'products.update',
       'products.variants.manage',
       'products.view',
+    ];
+    const supplierPermissions = [
+      'suppliers.create',
+      'suppliers.manage_status',
+      'suppliers.update',
+      'suppliers.view',
     ];
     expect(roles.rows.map((row) => row.code)).toEqual(['MANAGER', 'OWNER', 'STAFF']);
     expect(permissions.rows.map((row) => row.code)).toEqual([
@@ -279,6 +289,7 @@ describe('DMS foundation API', () => {
       'payments.record',
       'payments.verify',
       ...productPermissions,
+      ...supplierPermissions,
       'users.manage',
       'users.view',
     ]);
@@ -294,6 +305,11 @@ describe('DMS foundation API', () => {
     expect(owner.permissions).toContain('payments.verify');
     for (const permission of productPermissions) {
       expect(owner.permissions).toContain(permission);
+      expect(manager.permissions).not.toContain(permission);
+      expect(staff.permissions).not.toContain(permission);
+    }
+    for (const permission of supplierPermissions) {
+      expect(owner.permissions).not.toContain(permission);
       expect(manager.permissions).not.toContain(permission);
       expect(staff.permissions).not.toContain(permission);
     }
