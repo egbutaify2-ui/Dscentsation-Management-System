@@ -143,7 +143,14 @@ describe('Customer Management API', () => {
 
   it('rejects unauthenticated customer access', async () => {
     await request(app).get('/api/v1/customers').expect(401);
-    await request(app).post('/api/v1/customers').send({ fullName: 'No session' }).expect(401);
+    const agent = request.agent(app);
+    const token = await agent.get('/api/v1/auth/csrf').expect(200);
+    await agent
+      .post('/api/v1/customers')
+      .set('Origin', env.APP_ORIGIN)
+      .set('X-CSRF-Token', token.body.data.token as string)
+      .send({ fullName: 'No session' })
+      .expect(401);
   });
 
   it('denies Manager and Staff when they do not hold the exact customer permissions', async () => {
