@@ -94,6 +94,7 @@ jobs:
 
       - name: Verify Employee Account Administration schema and Owner-only permission seeds
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-employee-account-administration.sql
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-customer-management.sql
 
       - name: Verify production migration up remains permitted
         run: NODE_ENV=production COOKIE_SECURE=true APP_ORIGIN=https://dms.example.invalid pnpm db:migrate
@@ -132,7 +133,6 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-foundation.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-product-management.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-employee-account-administration.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-customer-management.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-customer-management.sql
 
       - name: Run API integration and security tests
