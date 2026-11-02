@@ -464,7 +464,11 @@ describe('Supplier Directory API', () => {
     const inactiveId = inactive.body.data.id as string;
     createdSupplierIds.push(activeId, inactiveId);
 
-    await post(fullAgent, '/api/v1/suppliers/' + inactiveId + '/deactivate').expect(200);
+    const preconditionDeactivation = await post(
+      fullAgent,
+      '/api/v1/suppliers/' + inactiveId + '/deactivate',
+    );
+    expect(preconditionDeactivation.status).toBe(200);
 
     await pool.query(`
       CREATE OR REPLACE FUNCTION dms_test_reject_supplier_audit() RETURNS trigger
