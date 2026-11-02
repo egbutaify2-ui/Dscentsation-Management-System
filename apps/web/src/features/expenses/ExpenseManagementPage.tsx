@@ -162,48 +162,49 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryForm, setCategoryForm] = useState<CategoryForm>(emptyCategoryForm);
 
-  const loadExpenses = useCallback(async (query: string, categoryId: string) => {
-    if (!canViewExpenses) return;
-    setLoadingExpenses(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (query.trim()) params.set('q', query.trim());
-      if (categoryId) params.set('categoryId', categoryId);
-      params.set('pageSize', '100');
-      const response = await api.get<Page<ExpenseRecord>>(
-        '/expenses?' + params.toString(),
-      );
-      setExpenses(response.items);
-    } catch (loadError) {
-      setError(getErrorMessage(loadError));
-    } finally {
-      setLoadingExpenses(false);
-    }
-  }, [canViewExpenses]);
+  const loadExpenses = useCallback(
+    async (query: string, categoryId: string) => {
+      if (!canViewExpenses) return;
+      setLoadingExpenses(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        if (query.trim()) params.set('q', query.trim());
+        if (categoryId) params.set('categoryId', categoryId);
+        params.set('pageSize', '100');
+        const response = await api.get<Page<ExpenseRecord>>('/expenses?' + params.toString());
+        setExpenses(response.items);
+      } catch (loadError) {
+        setError(getErrorMessage(loadError));
+      } finally {
+        setLoadingExpenses(false);
+      }
+    },
+    [canViewExpenses],
+  );
 
-  const loadCategories = useCallback(async (
-    query: string,
-    status: 'all' | 'active' | 'inactive',
-  ) => {
-    if (!canViewCategories) return;
-    setLoadingCategories(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (query.trim()) params.set('q', query.trim());
-      params.set('status', status);
-      params.set('pageSize', '100');
-      const response = await api.get<Page<ExpenseCategory>>(
-        '/expense-categories?' + params.toString(),
-      );
-      setCategories(response.items);
-    } catch (loadError) {
-      setError(getErrorMessage(loadError));
-    } finally {
-      setLoadingCategories(false);
-    }
-  }, [canViewCategories]);
+  const loadCategories = useCallback(
+    async (query: string, status: 'all' | 'active' | 'inactive') => {
+      if (!canViewCategories) return;
+      setLoadingCategories(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        if (query.trim()) params.set('q', query.trim());
+        params.set('status', status);
+        params.set('pageSize', '100');
+        const response = await api.get<Page<ExpenseCategory>>(
+          '/expense-categories?' + params.toString(),
+        );
+        setCategories(response.items);
+      } catch (loadError) {
+        setError(getErrorMessage(loadError));
+      } finally {
+        setLoadingCategories(false);
+      }
+    },
+    [canViewCategories],
+  );
 
   useEffect(() => {
     if (canViewExpenses) void loadExpenses('', '');
@@ -344,11 +345,7 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
         await api.post<ExpenseCategory>('/expense-categories', payload, csrf);
         setNotice('Expense category created.');
       } else if (editingCategoryId) {
-        await api.patch<ExpenseCategory>(
-          '/expense-categories/' + editingCategoryId,
-          payload,
-          csrf,
-        );
+        await api.patch<ExpenseCategory>('/expense-categories/' + editingCategoryId, payload, csrf);
         setNotice('Expense category updated.');
       }
       setCategoryDialog(null);
@@ -365,7 +362,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
     const action = nextActive ? 'activate' : 'deactivate';
     const prompt = nextActive
       ? 'Activate the "' + category.name + '" category?'
-      : 'Deactivate the "' + category.name + '" category? Existing expense history will be retained.';
+      : 'Deactivate the "' +
+        category.name +
+        '" category? Existing expense history will be retained.';
     if (!window.confirm(prompt)) return;
     setSaving(true);
     setError(null);
@@ -406,15 +405,18 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
               Add expense
             </button>
           )}
-          {section === 'categories' && !canViewExpenses && canCreateExpense && canViewCategories && (
-            <button
-              className="primary-button expense-action-button"
-              type="button"
-              onClick={openCreateExpense}
-            >
-              Add expense
-            </button>
-          )}
+          {section === 'categories' &&
+            !canViewExpenses &&
+            canCreateExpense &&
+            canViewCategories && (
+              <button
+                className="primary-button expense-action-button"
+                type="button"
+                onClick={openCreateExpense}
+              >
+                Add expense
+              </button>
+            )}
           {section === 'categories' && canManageCategories && (
             <button
               className="primary-button expense-action-button"
@@ -521,7 +523,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
           </form>
 
           {loadingDetail && (
-            <div className="expense-state" role="status">Loading expense details…</div>
+            <div className="expense-state" role="status">
+              Loading expense details…
+            </div>
           )}
           {loadingExpenses ? (
             <div className="expense-state" role="status">
@@ -530,9 +534,7 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
           ) : expenses.length === 0 ? (
             <div className="expense-state">
               <strong>No expense records found</strong>
-              <span>
-                Create an expense draft or adjust your search and category filters.
-              </span>
+              <span>Create an expense draft or adjust your search and category filters.</span>
             </div>
           ) : (
             <div className="expense-table-wrap">
@@ -544,7 +546,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                     <th>Amount</th>
                     <th>Date incurred</th>
                     <th>Status</th>
-                    <th><span className="sr-only">Actions</span></th>
+                    <th>
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -562,7 +566,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                         {formatNaira(expense.currentRevision.amountMinor)}
                       </td>
                       <td>{formatDate(expense.currentRevision.incurredOn)}</td>
-                      <td><span className="expense-status draft">Draft</span></td>
+                      <td>
+                        <span className="expense-status draft">Draft</span>
+                      </td>
                       <td>
                         <button
                           type="button"
@@ -617,12 +623,30 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
             <span className="expense-status draft">Draft</span>
           </div>
           <dl className="expense-facts">
-            <div><dt>Amount</dt><dd>{formatNaira(selectedExpense.currentRevision.amountMinor)}</dd></div>
-            <div><dt>Category</dt><dd>{selectedExpense.currentRevision.categoryName}</dd></div>
-            <div><dt>Date incurred</dt><dd>{formatDate(selectedExpense.currentRevision.incurredOn)}</dd></div>
-            <div><dt>Current revision</dt><dd>Revision {selectedExpense.currentRevision.revisionNumber}</dd></div>
-            <div><dt>Expense ID</dt><dd className="expense-id">{selectedExpense.id}</dd></div>
-            <div><dt>Last updated</dt><dd>{formatTimestamp(selectedExpense.updatedAt)}</dd></div>
+            <div>
+              <dt>Amount</dt>
+              <dd>{formatNaira(selectedExpense.currentRevision.amountMinor)}</dd>
+            </div>
+            <div>
+              <dt>Category</dt>
+              <dd>{selectedExpense.currentRevision.categoryName}</dd>
+            </div>
+            <div>
+              <dt>Date incurred</dt>
+              <dd>{formatDate(selectedExpense.currentRevision.incurredOn)}</dd>
+            </div>
+            <div>
+              <dt>Current revision</dt>
+              <dd>Revision {selectedExpense.currentRevision.revisionNumber}</dd>
+            </div>
+            <div>
+              <dt>Expense ID</dt>
+              <dd className="expense-id">{selectedExpense.id}</dd>
+            </div>
+            <div>
+              <dt>Last updated</dt>
+              <dd>{formatTimestamp(selectedExpense.updatedAt)}</dd>
+            </div>
           </dl>
           <div className="expense-history-heading">
             <div>
@@ -632,7 +656,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
             <span className="record-count">{revisions.length} revisions</span>
           </div>
           {loadingDetail ? (
-            <div className="expense-state" role="status">Loading revision history…</div>
+            <div className="expense-state" role="status">
+              Loading revision history…
+            </div>
           ) : revisions.length === 0 ? (
             <div className="expense-state">No revision history is available.</div>
           ) : (
@@ -651,9 +677,14 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                 <tbody>
                   {revisions.map((revision) => (
                     <tr key={revision.id}>
-                      <td><strong>Revision {revision.revisionNumber}</strong></td>
+                      <td>
+                        <strong>Revision {revision.revisionNumber}</strong>
+                      </td>
                       <td>{formatTimestamp(revision.createdAt)}</td>
-                      <td>{revision.payeeName}<small>{revision.description}</small></td>
+                      <td>
+                        {revision.payeeName}
+                        <small>{revision.description}</small>
+                      </td>
                       <td>{revision.categoryName}</td>
                       <td className="amount-cell">{formatNaira(revision.amountMinor)}</td>
                       <td>{formatDate(revision.incurredOn)}</td>
@@ -675,7 +706,10 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
             </div>
             <span className="record-count">{categories.length} categories</span>
           </div>
-          <form className="expense-search category-search" onSubmit={(event) => void submitCategorySearch(event)}>
+          <form
+            className="expense-search category-search"
+            onSubmit={(event) => void submitCategorySearch(event)}
+          >
             <label>
               <span>Search categories</span>
               <input
@@ -707,12 +741,15 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
             </button>
           </form>
           {loadingCategories ? (
-            <div className="expense-state" role="status">Loading categories…</div>
+            <div className="expense-state" role="status">
+              Loading categories…
+            </div>
           ) : categories.length === 0 ? (
             <div className="expense-state">
               <strong>No expense categories have been added</strong>
               <span>
-                Categories are entered by your team. Add one to make it available when recording an expense.
+                Categories are entered by your team. Add one to make it available when recording an
+                expense.
               </span>
             </div>
           ) : (
@@ -724,17 +761,27 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                     <th>Code</th>
                     <th>Description</th>
                     <th>Status</th>
-                    {canManageCategories && <th><span className="sr-only">Actions</span></th>}
+                    {canManageCategories && (
+                      <th>
+                        <span className="sr-only">Actions</span>
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {categories.map((category) => (
                     <tr key={category.id}>
-                      <td><strong>{category.name}</strong></td>
+                      <td>
+                        <strong>{category.name}</strong>
+                      </td>
                       <td>{category.code}</td>
                       <td>{category.description || '—'}</td>
                       <td>
-                        <span className={'expense-status ' + (category.isActive ? 'active' : 'inactive')}>
+                        <span
+                          className={
+                            'expense-status ' + (category.isActive ? 'active' : 'inactive')
+                          }
+                        >
                           {category.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
@@ -785,7 +832,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
           >
             <div className="modal-heading">
               <div>
-                <p className="eyebrow">{expenseDialog === 'create' ? 'NEW RECORD' : 'NEW REVISION'}</p>
+                <p className="eyebrow">
+                  {expenseDialog === 'create' ? 'NEW RECORD' : 'NEW REVISION'}
+                </p>
                 <h2 id="expense-modal-title">
                   {expenseDialog === 'create' ? 'Create expense draft' : 'Edit expense draft'}
                 </h2>
@@ -806,11 +855,15 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                   aria-label="Expense category"
                   required
                   value={expenseForm.categoryId}
-                  onChange={(event) => setExpenseForm({ ...expenseForm, categoryId: event.target.value })}
+                  onChange={(event) =>
+                    setExpenseForm({ ...expenseForm, categoryId: event.target.value })
+                  }
                 >
                   <option value="">Choose a category</option>
                   {activeCategories.map((category) => (
-                    <option key={category.id} value={category.id}>{category.name}</option>
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -822,7 +875,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                   rows={3}
                   maxLength={5000}
                   value={expenseForm.description}
-                  onChange={(event) => setExpenseForm({ ...expenseForm, description: event.target.value })}
+                  onChange={(event) =>
+                    setExpenseForm({ ...expenseForm, description: event.target.value })
+                  }
                 />
               </label>
               <div className="form-grid">
@@ -836,7 +891,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                     step="0.01"
                     required
                     value={expenseForm.amount}
-                    onChange={(event) => setExpenseForm({ ...expenseForm, amount: event.target.value })}
+                    onChange={(event) =>
+                      setExpenseForm({ ...expenseForm, amount: event.target.value })
+                    }
                     placeholder="0.00"
                   />
                 </label>
@@ -847,7 +904,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                     type="date"
                     required
                     value={expenseForm.incurredOn}
-                    onChange={(event) => setExpenseForm({ ...expenseForm, incurredOn: event.target.value })}
+                    onChange={(event) =>
+                      setExpenseForm({ ...expenseForm, incurredOn: event.target.value })
+                    }
                   />
                 </label>
               </div>
@@ -858,12 +917,15 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                   required
                   maxLength={200}
                   value={expenseForm.payeeName}
-                  onChange={(event) => setExpenseForm({ ...expenseForm, payeeName: event.target.value })}
+                  onChange={(event) =>
+                    setExpenseForm({ ...expenseForm, payeeName: event.target.value })
+                  }
                   placeholder="Person or business paid"
                 />
               </label>
               <p className="expense-form-note">
-                Saving an edit creates a new immutable revision. Previous expense details remain in the history.
+                Saving an edit creates a new immutable revision. Previous expense details remain in
+                the history.
               </p>
               <div className="modal-actions">
                 <button
@@ -874,7 +936,11 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                 >
                   Cancel
                 </button>
-                <button className="primary-button" type="submit" disabled={saving || activeCategories.length === 0}>
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={saving || activeCategories.length === 0}
+                >
                   {saving
                     ? 'Saving…'
                     : expenseDialog === 'create'
@@ -924,7 +990,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                   required
                   maxLength={40}
                   value={categoryForm.code}
-                  onChange={(event) => setCategoryForm({ ...categoryForm, code: event.target.value })}
+                  onChange={(event) =>
+                    setCategoryForm({ ...categoryForm, code: event.target.value })
+                  }
                   placeholder="Enter a unique code"
                 />
               </label>
@@ -935,7 +1003,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                   required
                   maxLength={100}
                   value={categoryForm.name}
-                  onChange={(event) => setCategoryForm({ ...categoryForm, name: event.target.value })}
+                  onChange={(event) =>
+                    setCategoryForm({ ...categoryForm, name: event.target.value })
+                  }
                   placeholder="Enter a category name"
                 />
               </label>
@@ -946,7 +1016,9 @@ export function ExpenseManagementPage({ permissions }: { permissions: string[] }
                   rows={3}
                   maxLength={2000}
                   value={categoryForm.description}
-                  onChange={(event) => setCategoryForm({ ...categoryForm, description: event.target.value })}
+                  onChange={(event) =>
+                    setCategoryForm({ ...categoryForm, description: event.target.value })
+                  }
                   placeholder="Optional description"
                 />
               </label>

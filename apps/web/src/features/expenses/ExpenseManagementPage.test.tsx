@@ -190,11 +190,19 @@ describe('ExpenseManagementPage', () => {
         'synthetic-csrf',
       ),
     );
-    await waitFor(() => expect(mocks.get).toHaveBeenCalledWith('/expenses/' + expenseId + '/revisions'));
+    await waitFor(() =>
+      expect(mocks.get).toHaveBeenCalledWith('/expenses/' + expenseId + '/revisions'),
+    );
   });
 
   it('creates categories and shows explicit active and inactive states', async () => {
-    const inactiveCategory = { ...sampleCategory, id: '66666666-6666-4666-8666-666666666666', code: 'TRAVEL', name: 'Travel', isActive: false };
+    const inactiveCategory = {
+      ...sampleCategory,
+      id: '66666666-6666-4666-8666-666666666666',
+      code: 'TRAVEL',
+      name: 'Travel',
+      isActive: false,
+    };
     mocks.get.mockImplementation(async (path: string) => {
       if (path.startsWith('/expense-categories')) return page([sampleCategory, inactiveCategory]);
       if (path.startsWith('/expenses')) return page([sampleExpense]);
@@ -261,9 +269,7 @@ describe('ExpenseManagementPage', () => {
   });
 
   it('does not render controls without their corresponding permissions', async () => {
-    render(
-      <ExpenseManagementPage permissions={['expenses.view', 'expense_categories.view']} />,
-    );
+    render(<ExpenseManagementPage permissions={['expenses.view', 'expense_categories.view']} />);
     expect(await screen.findByRole('heading', { name: 'Expense records' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Add expense' })).toBeNull();
     fireEvent.click(screen.getByRole('tab', { name: 'Categories' }));
@@ -290,10 +296,13 @@ describe('ExpenseManagementPage', () => {
 
     mocks.get.mockImplementation((path: string) => {
       if (path.startsWith('/expense-categories')) return Promise.resolve(page([sampleCategory]));
-      if (path.startsWith('/expenses')) return Promise.reject(new Error('Expense service unavailable.'));
+      if (path.startsWith('/expenses'))
+        return Promise.reject(new Error('Expense service unavailable.'));
       return Promise.resolve(sampleExpense);
     });
     render(<ExpenseManagementPage permissions={permissions} />);
-    expect((await screen.findByRole('alert')).textContent).toContain('Expense service unavailable.');
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Expense service unavailable.',
+    );
   });
 });

@@ -59,7 +59,10 @@
 .expense-modal .modal-heading h2 {
   margin: 0;
   color: var(--green-950);
-  font: 500 25px Georgia, 'Times New Roman', serif;
+  font:
+    500 25px Georgia,
+    'Times New Roman',
+    serif;
 }
 .expense-card-heading .eyebrow,
 .expense-modal .modal-heading .eyebrow {
@@ -98,7 +101,11 @@
   outline: none;
   background: #fff;
   color: var(--ink);
-  font: 400 12px Inter, ui-sans-serif, system-ui, sans-serif;
+  font:
+    400 12px Inter,
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
 }
 .expense-search input:focus,
 .expense-search select:focus,
@@ -275,7 +282,10 @@
 .expense-history-heading h3 {
   margin: 0;
   color: var(--green-950);
-  font: 500 20px Georgia, 'Times New Roman', serif;
+  font:
+    500 20px Georgia,
+    'Times New Roman',
+    serif;
 }
 .expense-history-heading .eyebrow {
   margin-bottom: 5px;
