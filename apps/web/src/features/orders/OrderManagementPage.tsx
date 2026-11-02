@@ -806,7 +806,9 @@ export function OrderManagementPage({
                 >
                   <option value="">Choose a channel</option>
                   {sourceOptions.map((source) => (
-                    <option key={source.value} value={source.value}>{source.label}</option>
+                    <option key={source.value} value={source.value}>
+                      {source.label}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -822,7 +824,9 @@ export function OrderManagementPage({
                 >
                   <option value="">Choose an available location</option>
                   {activeLocations.map((location) => (
-                    <option key={location.id} value={location.id}>{location.name}</option>
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
                   ))}
                   {view === 'edit' && selectedOrder && activeLocations.length === 0 && (
                     <option value={selectedOrder.fulfilmentLocationId}>
