@@ -1063,7 +1063,10 @@ export function OrderManagementPage({
                       <dt>Fulfilment location</dt>
                       <dd>{locationLabel(selectedOrder.fulfilmentLocationId, locations)}</dd>
                     </div>
-                    <div><dt>Created</dt><dd>{formatTimestamp(selectedOrder.createdAt)}</dd></div>
+                    <div>
+                      <dt>Created</dt>
+                      <dd>{formatTimestamp(selectedOrder.createdAt)}</dd>
+                    </div>
                     <div>
                       <dt>Last updated</dt>
                       <dd>{formatTimestamp(selectedOrder.updatedAt)}</dd>
@@ -1081,7 +1084,10 @@ export function OrderManagementPage({
 
               <div className="order-detail-items">
                 <div className="order-section-heading">
-                  <div><p className="eyebrow">SAVED SNAPSHOTS</p><h3>Order items</h3></div>
+                  <div>
+                    <p className="eyebrow">SAVED SNAPSHOTS</p>
+                    <h3>Order items</h3>
+                  </div>
                 </div>
                 <div className="order-table-wrap">
                   <table className="order-table">

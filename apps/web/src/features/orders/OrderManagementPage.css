@@ -38,7 +38,10 @@
 .order-card-heading h2 {
   margin: 0;
   color: var(--green-950);
-  font: 500 25px Georgia, 'Times New Roman', serif;
+  font:
+    500 25px Georgia,
+    'Times New Roman',
+    serif;
 }
 .order-card-heading .eyebrow,
 .order-section-heading .eyebrow {
@@ -82,7 +85,11 @@
   outline: none;
   background: #fff;
   color: var(--ink);
-  font: 400 12px Inter, ui-sans-serif, system-ui, sans-serif;
+  font:
+    400 12px Inter,
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
 }
 .order-form textarea {
   min-height: 90px;
@@ -291,7 +298,10 @@
 .order-section-heading h3 {
   margin: 0;
   color: #34443a;
-  font: 500 18px Georgia, 'Times New Roman', serif;
+  font:
+    500 18px Georgia,
+    'Times New Roman',
+    serif;
 }
 .order-add-item {
   display: grid;
