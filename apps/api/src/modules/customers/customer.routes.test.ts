@@ -213,7 +213,7 @@ describe('Customer Management API', () => {
   });
 
   it('lists, paginates, searches by name, phone and email, and filters by status', async () => {
-    const token = suffix.slice(0, 8);
+    const token = randomUUID().replaceAll('-', '').slice(0, 8);
     const named = await createCustomer(`NameSearch${token}`, {
       phone: `+23480001${token}`,
       email: `emailsearch${token}@example.invalid`,
