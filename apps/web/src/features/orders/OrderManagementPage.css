@@ -486,15 +486,12 @@
   .order-page {
     padding: 32px 24px 48px;
   }
-
   .order-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
   .order-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
   .order-detail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -503,11 +500,9 @@
   .order-page {
     padding: 26px 15px 40px;
   }
-
   .order-card {
     padding: 17px;
   }
-
   .order-page-heading,
   .order-card-heading,
   .order-detail-heading,
@@ -515,11 +510,9 @@
     align-items: flex-start;
     flex-direction: column;
   }
-
   .order-heading-actions {
     width: 100%;
   }
-
   .order-filters,
   .order-form-grid,
   .order-form-grid.order-form-notes,
@@ -527,31 +520,25 @@
   .order-detail-grid {
     grid-template-columns: 1fr;
   }
-
   .order-line {
     grid-template-columns: minmax(0, 1fr) 88px;
   }
-
   .order-line-total {
     grid-column: 1;
   }
-
   .order-line .remove-line {
     grid-column: 2;
     grid-row: 2;
   }
-
   .order-pagination {
     align-items: flex-start;
     flex-direction: column;
   }
-
   .order-detail-grid dl div {
     align-items: flex-start;
     flex-direction: column;
     gap: 4px;
   }
-
   .order-detail-grid dd {
     text-align: left;
     overflow-wrap: anywhere;
