@@ -9,9 +9,14 @@ import type {
   OrderMutationContext,
   OrderProductSnapshot,
   OrderRecord,
+  OrderActor,
+  OrderItemRequest,
 } from './order.types.js';
 
-const actor = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', permissions: ['customers.view'] };
+const actor = {
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  permissions: ['customers.view', 'products.view'],
+};
 const customerId = '11111111-1111-4111-8111-111111111111';
 const locationId = '22222222-2222-4222-8222-222222222222';
 const productId = '33333333-3333-4333-8333-333333333333';
@@ -65,7 +70,7 @@ function makeRepository(initial?: OrderRecord) {
 }
 
 function makeService(repository: OrderRepository, customerStatus: 'active' | 'archived' = 'active') {
-  const customerLookup = vi.fn(async (_actor: typeof actor, requestedId: string) => {
+  const customerLookup = vi.fn(async (_actor: OrderActor, requestedId: string) => {
     if (customerStatus === 'archived') {
       throw orderConflict('Archived customers cannot be selected for a new or amended order.');
     }
@@ -82,7 +87,9 @@ function makeService(repository: OrderRepository, customerStatus: 'active' | 'ar
       updatedAt: '2026-11-02T00:00:00.000Z',
     };
   });
-  const productSnapshotLookup = vi.fn(async () => [productSnapshot]);
+  const productSnapshotLookup = vi.fn(
+    async (_actor: OrderActor, _items: readonly OrderItemRequest[]) => [productSnapshot],
+  );
   return {
     service: new OrderService({ repository, customerLookup, productSnapshotLookup }),
     customerLookup,
