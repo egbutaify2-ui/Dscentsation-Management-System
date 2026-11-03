@@ -26,6 +26,7 @@ export type OrderCustomerLookup = (
 ) => Promise<CustomerRecord>;
 
 export type OrderProductSnapshotLookup = (
+  actor: OrderActor,
   items: readonly OrderItemRequest[],
 ) => Promise<OrderProductSnapshot[]>;
 
@@ -53,7 +54,7 @@ export class OrderService {
     input: CreateOrderInput,
   ): Promise<OrderRecord> {
     await this.customerLookup(actor, input.customerId);
-    const items = await this.buildItems(input.items);
+    const items = await this.buildItems(actor, input.items);
     const totals = calculateOrderTotals(items);
     const context: OrderMutationContext = { actorId: actor.id, requestId };
 
@@ -92,7 +93,8 @@ export class OrderService {
         await this.customerLookup(actor, customerId);
       }
 
-      const items = input.items === undefined ? current.items : await this.buildItems(input.items);
+      const items =
+        input.items === undefined ? current.items : await this.buildItems(actor, input.items);
       const totals = calculateOrderTotals(items);
 
       return {
@@ -112,12 +114,15 @@ export class OrderService {
     });
   }
 
-  private async buildItems(requestedItems: readonly OrderItemRequest[]): Promise<OrderItemSnapshot[]> {
+  private async buildItems(
+    actor: OrderActor,
+    requestedItems: readonly OrderItemRequest[],
+  ): Promise<OrderItemSnapshot[]> {
     if (requestedItems.length === 0) {
       throw orderConflict('An order must contain at least one item.');
     }
 
-    const snapshots = await this.productSnapshotLookup(requestedItems);
+    const snapshots = await this.productSnapshotLookup(actor, requestedItems);
     if (snapshots.length !== requestedItems.length) {
       throw new Error('The product snapshot resolver returned an inconsistent number of items.');
     }
