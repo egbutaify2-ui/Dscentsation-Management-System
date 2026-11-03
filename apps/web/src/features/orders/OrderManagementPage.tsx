@@ -732,9 +732,7 @@ export function OrderManagementPage({
               <p className="eyebrow">
                 {view === 'create' ? 'NEW ORDER' : 'RECEIVED ORDER AMENDMENT'}
               </p>
-              <h2 id="order-form-title">
-                {view === 'create' ? 'Create an order' : 'Amend order'}
-              </h2>
+              <h2 id="order-form-title">{view === 'create' ? 'Create an order' : 'Amend order'}</h2>
             </div>
             <button
               className="text-button"
@@ -765,8 +763,8 @@ export function OrderManagementPage({
 
           {(!canViewCustomers || !canViewProducts) && (
             <p className="order-alert error" role="alert">
-              Order capture requires customers.view and products.view. No additional permissions
-              are granted by this frontend.
+              Order capture requires customers.view and products.view. No additional permissions are
+              granted by this frontend.
             </p>
           )}
 
@@ -790,7 +788,8 @@ export function OrderManagementPage({
                     )}
                   {customers.map((customer) => (
                     <option key={customer.id} value={customer.id}>
-                      {customer.fullName}{customer.phone ? ' · ' + customer.phone : ''}
+                      {customer.fullName}
+                      {customer.phone ? ' · ' + customer.phone : ''}
                     </option>
                   ))}
                 </select>
@@ -1002,11 +1001,7 @@ export function OrderManagementPage({
                       (!canCreateWithDependencies || activeLocations.length === 0))
                   }
                 >
-                  {saving
-                    ? 'Saving…'
-                    : view === 'create'
-                      ? 'Create order'
-                      : 'Save amendment'}
+                  {saving ? 'Saving…' : view === 'create' ? 'Create order' : 'Save amendment'}
                 </button>
               </div>
             </div>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, getCsrfToken } from '../../lib/api/client.js';
 import { OrderManagementPage, type OrderLocationOption } from './OrderManagementPage.js';
@@ -143,20 +143,19 @@ describe('OrderManagementPage', () => {
     expect(api.getPage).not.toHaveBeenCalled();
   });
 
-  it(
-    'renders the order register with customer, source, location, total, status and date',
-    async () => {
-      render(<OrderManagementPage permissions={['orders.view']} locations={locations} />);
+  it('renders the order register with customer, source, location, total, status and date', async () => {
+    render(<OrderManagementPage permissions={['orders.view']} locations={locations} />);
 
-      expect(await screen.findByText('Synthetic Customer')).toBeTruthy();
-      expect(screen.getByText('ORD-555555555555')).toBeTruthy();
-      expect(screen.getByText('WhatsApp')).toBeTruthy();
-      expect(screen.getByText('Sheraton Stock')).toBeTruthy();
-      expect(screen.getByText('₦25,000.00')).toBeTruthy();
-      expect(screen.getByText('Received')).toBeTruthy();
-    },
-  );
-
+    const orderTable = await screen.findByRole('table');
+    const orderRow = within(orderTable).getByRole('row', {
+      name: /ORD-555555555555/,
+    });
+    expect(within(orderRow).getByText('Synthetic Customer')).toBeTruthy();
+    expect(within(orderRow).getByText('WhatsApp')).toBeTruthy();
+    expect(within(orderRow).getByText('Sheraton Stock')).toBeTruthy();
+    expect(within(orderRow).getByText('₦25,000.00')).toBeTruthy();
+    expect(within(orderRow).getByText('Received')).toBeTruthy();
+  });
   it('hides create and amendment actions without their specific permissions', async () => {
     render(<OrderManagementPage permissions={['orders.view']} locations={locations} />);
     await screen.findByText('Synthetic Customer');
@@ -203,94 +202,89 @@ describe('OrderManagementPage', () => {
     expect(screen.getByText('Page 2 of 3')).toBeTruthy();
   });
 
-  it(
-    'selects a customer and product variant, creates the order and displays server totals',
-    async () => {
-      vi.mocked(api.post).mockResolvedValue({
-        ...sampleOrder,
-        subtotalMinor: '2600000',
-        totalMinor: '2600000',
-      } as never);
-      vi.mocked(api.get).mockImplementation((path) => {
-        if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
-        if (path.startsWith('/orders/')) {
-          return Promise.resolve({
-            ...sampleOrder,
-            subtotalMinor: '2600000',
-            totalMinor: '2600000',
-          } as never);
-        }
-        return Promise.reject(new Error('Unexpected API GET ' + path));
-      });
-      render(<OrderManagementPage permissions={permissions} locations={locations} />);
-      openCreateForm();
+  it('selects a customer and product variant, creates the order and displays server totals', async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      ...sampleOrder,
+      subtotalMinor: '2600000',
+      totalMinor: '2600000',
+    } as never);
+    vi.mocked(api.get).mockImplementation((path) => {
+      if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
+      if (path.startsWith('/orders/')) {
+        return Promise.resolve({
+          ...sampleOrder,
+          subtotalMinor: '2600000',
+          totalMinor: '2600000',
+        } as never);
+      }
+      return Promise.reject(new Error('Unexpected API GET ' + path));
+    });
+    render(<OrderManagementPage permissions={permissions} locations={locations} />);
+    openCreateForm();
 
-      await waitFor(() =>
-        expect(screen.getByRole('option', { name: /Synthetic Customer/ })).toBeTruthy(),
-      );
-      fireEvent.change(screen.getByLabelText('Customer'), {
-        target: { value: customerId },
-      });
-      fireEvent.change(screen.getByLabelText('Source channel'), {
-        target: { value: 'whatsapp' },
-      });
-      fireEvent.change(screen.getByLabelText('Fulfilment location'), {
-        target: { value: locationId },
-      });
-      fireEvent.change(screen.getByLabelText('Product / variant'), {
-        target: { value: productId + '|' + variantId },
-      });
-      fireEvent.change(screen.getByLabelText('New item quantity'), {
-        target: { value: '2' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
+    await waitFor(() =>
+      expect(screen.getByRole('option', { name: /Synthetic Customer/ })).toBeTruthy(),
+    );
+    fireEvent.change(screen.getByLabelText('Customer'), {
+      target: { value: customerId },
+    });
+    fireEvent.change(screen.getByLabelText('Source channel'), {
+      target: { value: 'whatsapp' },
+    });
+    fireEvent.change(screen.getByLabelText('Fulfilment location'), {
+      target: { value: locationId },
+    });
+    fireEvent.change(screen.getByLabelText('Product / variant'), {
+      target: { value: productId + '|' + variantId },
+    });
+    fireEvent.change(screen.getByLabelText('New item quantity'), {
+      target: { value: '2' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
 
-      expect(screen.getByText('Estimated subtotal')).toBeTruthy();
-      expect(screen.getByText('₦25,000.00')).toBeTruthy();
+    const subtotal = screen.getByText('Estimated subtotal').parentElement;
+    expect(subtotal).not.toBeNull();
+    expect(within(subtotal as HTMLElement).getByText('₦25,000.00')).toBeTruthy();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Create order' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create order' }));
 
-      await screen.findByRole('heading', { name: 'ORD-555555555555' });
-      expect(api.post).toHaveBeenCalledWith(
-        '/orders',
-        {
-          customerId,
-          sourceChannel: 'whatsapp',
-          fulfilmentLocationId: locationId,
-          items: [{ productId, variantId, quantity: 2 }],
-          deliveryAddress: null,
-          notes: null,
-        },
-        'synthetic-csrf',
-      );
-      const posted = vi.mocked(api.post).mock.calls[0]?.[1] as Record<string, unknown>;
-      expect(posted).not.toHaveProperty('unitPriceMinor');
-      expect(posted).not.toHaveProperty('totalMinor');
-      expect(posted).not.toHaveProperty('discountMinor');
-      expect(posted).not.toHaveProperty('deliveryFeeMinor');
-      expect(screen.getByText('Order total')).toBeTruthy();
-      expect(screen.getByText('₦26,000.00')).toBeTruthy();
-      expect(screen.queryByText('₦25,000.00')).toBeNull();
-    },
-  );
+    await screen.findByRole('heading', { name: 'ORD-555555555555' });
+    expect(api.post).toHaveBeenCalledWith(
+      '/orders',
+      {
+        customerId,
+        sourceChannel: 'whatsapp',
+        fulfilmentLocationId: locationId,
+        items: [{ productId, variantId, quantity: 2 }],
+        deliveryAddress: null,
+        notes: null,
+      },
+      'synthetic-csrf',
+    );
+    const posted = vi.mocked(api.post).mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(posted).not.toHaveProperty('unitPriceMinor');
+    expect(posted).not.toHaveProperty('totalMinor');
+    expect(posted).not.toHaveProperty('discountMinor');
+    expect(posted).not.toHaveProperty('deliveryFeeMinor');
+    const orderTotal = screen.getByText('Order total').parentElement;
+    expect(orderTotal).not.toBeNull();
+    expect(within(orderTotal as HTMLElement).getByText('₦26,000.00')).toBeTruthy();
+    expect(screen.queryByText('Estimated subtotal')).toBeNull();
+  });
+  it('validates that an order contains a customer, channel, location and at least one item', async () => {
+    render(<OrderManagementPage permissions={permissions} locations={locations} />);
+    openCreateForm();
+    fireEvent.submit(
+      screen
+        .getByRole('heading', { name: 'Create an order' })
+        .closest('section')!
+        .querySelector('form')!,
+    );
 
-  it(
-    'validates that an order contains a customer, channel, location and at least one item',
-    async () => {
-      render(<OrderManagementPage permissions={permissions} locations={locations} />);
-      openCreateForm();
-      fireEvent.submit(
-        screen
-          .getByRole('heading', { name: 'Create an order' })
-          .closest('section')!
-          .querySelector('form')!,
-      );
-
-      expect(await screen.findByRole('alert')).toBeTruthy();
-      expect(screen.getByRole('alert').textContent).toContain('Choose a customer.');
-      expect(api.post).not.toHaveBeenCalled();
-    },
-  );
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('Choose a customer.');
+    expect(api.post).not.toHaveBeenCalled();
+  });
 
   it('only shows amendment controls for received orders', async () => {
     render(<OrderManagementPage permissions={permissions} locations={locations} />);
@@ -317,9 +311,13 @@ describe('OrderManagementPage', () => {
       updatedAt: '2026-11-02T10:00:00.000Z',
     };
     vi.mocked(api.patch).mockResolvedValue(amended as never);
+    let orderDetailFetches = 0;
     vi.mocked(api.get).mockImplementation((path) => {
       if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
-      if (path.startsWith('/orders/')) return Promise.resolve(amended as never);
+      if (path.startsWith('/orders/')) {
+        orderDetailFetches += 1;
+        return Promise.resolve((orderDetailFetches === 1 ? sampleOrder : amended) as never);
+      }
       return Promise.reject(new Error('Unexpected API GET ' + path));
     });
     render(<OrderManagementPage permissions={permissions} />);
@@ -331,13 +329,15 @@ describe('OrderManagementPage', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save amendment' }));
 
-    await screen.findByText('Updated note');
+    expect((await screen.findByRole('status')).textContent).toContain('Order amendment saved.');
+    expect(screen.getByText('Updated note')).toBeTruthy();
     expect(api.patch).toHaveBeenCalledWith(
       '/orders/' + orderId,
       { notes: 'Updated note' },
       'synthetic-csrf',
     );
-    expect(api.get).toHaveBeenCalledWith('/orders/' + orderId);
+    expect(api.get).toHaveBeenCalledTimes(3);
+    expect(api.get).toHaveBeenLastCalledWith('/orders/' + orderId);
   });
 
   it('recovers from an order detail API failure using the detail retry action', async () => {
@@ -370,9 +370,7 @@ describe('OrderManagementPage', () => {
       .mockResolvedValueOnce({ data: [sampleOrder], meta: pageMeta } as never);
     render(<OrderManagementPage permissions={['orders.view']} />);
 
-    expect((await screen.findByRole('alert')).textContent).toContain(
-      'Order service unavailable.',
-    );
+    expect((await screen.findByRole('alert')).textContent).toContain('Order service unavailable.');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('Synthetic Customer')).toBeTruthy();
   });
