@@ -1,11 +1,18 @@
 import { getProduct } from '../products/product.service.js';
-import { invalidOrder, orderConflict } from './order.errors.js';
+import { invalidOrder, orderConflict, orderForbidden } from './order.errors.js';
 import { toNgnMinorUnits } from './order.money.js';
-import type { OrderItemRequest, OrderProductSnapshot } from './order.types.js';
+import type { OrderActor, OrderItemRequest, OrderProductSnapshot } from './order.types.js';
 
 export async function prepareOrderProductSnapshots(
+  actor: OrderActor,
   requestedItems: readonly OrderItemRequest[],
 ): Promise<OrderProductSnapshot[]> {
+  // Product routes are protected by products.view; getProduct itself is an
+  // unguarded data service, so the adapter must preserve that permission gate.
+  if (!actor.permissions.includes('products.view')) {
+    throw orderForbidden();
+  }
+
   const products = new Map<string, ReturnType<typeof getProduct>>();
 
   return Promise.all(
