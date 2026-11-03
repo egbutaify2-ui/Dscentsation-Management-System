@@ -32,9 +32,7 @@ export async function prepareOrderProductSnapshots(
         (candidate) => candidate.id === requestedItem.variantId,
       );
       if (!variant) {
-        throw invalidOrder(
-          'The selected product variant does not belong to the selected product.',
-        );
+        throw invalidOrder('The selected product variant does not belong to the selected product.');
       }
       if (!variant.isActive) {
         throw orderConflict('Inactive product variants cannot be added to an order.');
