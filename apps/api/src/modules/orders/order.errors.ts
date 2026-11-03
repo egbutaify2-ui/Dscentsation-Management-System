@@ -20,3 +20,7 @@ export function orderNotFound(): OrderError {
 export function orderConflict(message: string): OrderError {
   return new OrderError(message, 409, 'CONFLICT');
 }
+
+export function orderForbidden(): OrderError {
+  return new OrderError('The current user cannot view product records for order capture.', 403, 'FORBIDDEN');
+}
