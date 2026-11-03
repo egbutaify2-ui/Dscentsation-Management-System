@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { amendOrderSchema, createOrderSchema } from './order.validation.js';
+import { ORDER_STATUSES } from './order.types.js';
+import { amendOrderSchema, createOrderSchema, orderStatusSchema } from './order.validation.js';
 
 const customerId = '11111111-1111-4111-8111-111111111111';
 const locationId = '22222222-2222-4222-8222-222222222222';
@@ -7,6 +8,27 @@ const productId = '33333333-3333-4333-8333-333333333333';
 const variantId = '44444444-4444-4444-8444-444444444444';
 
 describe('order request validation', () => {
+  it('accepts exactly the Task 019 order lifecycle vocabulary', () => {
+    expect(ORDER_STATUSES).toEqual([
+      'received',
+      'confirmed',
+      'processing',
+      'packed',
+      'dispatched',
+      'delivered',
+      'cancelled',
+      'failed_delivery',
+      'fulfilment_hold',
+    ]);
+
+    for (const status of ORDER_STATUSES) {
+      expect(orderStatusSchema.safeParse(status).success).toBe(true);
+    }
+
+    expect(orderStatusSchema.safeParse('failed').success).toBe(false);
+    expect(orderStatusSchema.safeParse('unknown').success).toBe(false);
+  });
+
   it('accepts a valid order capture request', () => {
     const parsed = createOrderSchema.safeParse({
       customerId,

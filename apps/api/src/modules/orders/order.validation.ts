@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { ORDER_STATUSES } from './order.types.js';
+
+export const orderStatusSchema = z.enum(ORDER_STATUSES);
 
 const orderSourceChannelSchema = z.enum(['whatsapp', 'instagram', 'website', 'phone']);
 

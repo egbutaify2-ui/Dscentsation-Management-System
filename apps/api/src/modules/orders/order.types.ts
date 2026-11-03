@@ -4,15 +4,19 @@ export type OrderActor = CustomerActor;
 
 export type OrderSourceChannel = 'whatsapp' | 'instagram' | 'website' | 'phone';
 
-export type OrderStatus =
-  | 'received'
-  | 'confirmed'
-  | 'processing'
-  | 'packed'
-  | 'dispatched'
-  | 'delivered'
-  | 'cancelled'
-  | 'failed';
+export const ORDER_STATUSES = [
+  'received',
+  'confirmed',
+  'processing',
+  'packed',
+  'dispatched',
+  'delivered',
+  'cancelled',
+  'failed_delivery',
+  'fulfilment_hold',
+] as const;
+
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export interface OrderItemRequest {
   productId: string;

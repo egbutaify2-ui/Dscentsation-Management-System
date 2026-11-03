@@ -155,6 +155,7 @@ describe('OrderService', () => {
     const result = await service.createOrder(actor, 'request-create', createInput);
 
     expect(customerLookup).toHaveBeenCalledWith(actor, customerId);
+    expect(result.status).toBe('received');
     expect(repository.createReceivedOrder).toHaveBeenCalledTimes(1);
     expect(repository.createReceivedOrder).toHaveBeenCalledWith(
       expect.objectContaining({
