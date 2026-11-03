@@ -65,7 +65,7 @@ describe('prepareOrderProductSnapshots', () => {
         unitPriceMinor: '125050',
       },
     ]);
-      expect(JSON.stringify(result)).not.toContain('900.00');
+    expect(JSON.stringify(result)).not.toContain('900.00');
   });
 
   it('loads each product once when multiple variants/items share the same product', async () => {
