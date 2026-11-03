@@ -121,7 +121,16 @@ function makeService(
     };
   });
   const productSnapshotLookup = vi.fn(
-    async (_actor: OrderActor, _items: readonly OrderItemRequest[]) => [productSnapshot],
+    async (requestingActor: OrderActor, requestedItems: readonly OrderItemRequest[]) => {
+      if (!requestingActor.permissions.includes('products.view')) {
+        throw new Error('Missing products.view permission in service test fixture.');
+      }
+      return requestedItems.map((item) => ({
+        ...productSnapshot,
+        productId: item.productId,
+        productVariantId: item.variantId,
+      }));
+    },
   );
 
   return {
