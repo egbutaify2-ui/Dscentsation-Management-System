@@ -151,7 +151,9 @@ const createInput: CreateOrderInput = {
 };
 
 describe('OrderService', () => {
-  it('creates a received order using server-resolved product prices and zero fees/discounts', async () => {
+  it(
+    'creates a received order using server-resolved product prices and zero fees/discounts',
+    async () => {
     const { repository } = makeRepository();
     const { service, customerLookup } = makeService(repository);
 
@@ -180,7 +182,8 @@ describe('OrderService', () => {
       lineTotalMinor: '250000',
       discountMinor: '0',
     });
-  });
+    },
+  );
 
   it('does not persist an order for an archived customer', async () => {
     const { repository } = makeRepository();

@@ -2,11 +2,11 @@
 
 An internal business management platform being actively built for Dscentsation's Nigerian operations. DMS brings orders, inventory, customers, sales, expenses, suppliers, receipts and operational reporting into one reliable system.
 
-> **Project status — active development:** DMS is in its implementation phase. Customer Management (Task 011, PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14)), Supplier Directory (Task 020, PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16)) and Expense Foundation plus frontend (Task 021/023, PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17)) are merged into `main`. Order Capture backend persistence and APIs are being completed in Draft PR [#18](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/18).
+> **Project status — active development:** Customer Management (Task 011, PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14)), Supplier Directory (Task 020/024, PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16)) and Expense Foundation plus frontend (Task 021/023, PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17)) are merged into `main`. Order database persistence and authenticated APIs are implemented in Draft PR [#18](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/18), awaiting full CI verification.
 >
 > **Build direction:** New tasks are implementation tasks: build features, fix bugs, integrate modules, improve the UI and add the tests needed to ship them. Investigation-only and audit-only task streams are not the default. When a dependency is pending, agents should build the independent parts instead of leaving the whole task idle.
 >
-> **Latest feature merge:** Supplier Directory backend Task 020 merged through PR #16 at `64ac4b6a11c3ddce39a3646cdede0d570e338f77`. Customer Management (migration 004) and Supplier Directory (migration 005) are available in `main`. Expense migration 006 remains in its active PR and must follow migration 005.
+> **Latest feature merge:** Expense Foundation and Expense Management frontend (Tasks 021/023) merged through PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17) at `f43b14fa310e20ef26d4ae35e46382b14163a4a9`. Customer, Supplier and Expense migrations 004–006 are now in `main`; Task 022 migration 007 is in Draft PR #18.
 
 ## Contents
 
@@ -377,11 +377,11 @@ Task 005 established the initial application foundation in `main`. The table bel
 |---|---|---|
 | Workspace | pnpm 12.16.1 workspace/monorepo; Node.js 26.13.0; separate `apps/web` and `apps/api` applications. | The code structure is consistent with a modular-monolith proposal; formal architecture ratification remains tracked in DMS-DEC-021. |
 | Web frontend | React 19.3.0, TypeScript 6.0.3 and Vite 8.3.5; sign-in, authenticated shell, dashboard and the merged permission-aware Product Management experience. | Other operational screens are not implemented. TypeScript/Vite formal ratification remains open. |
-| API | Node.js 26.13.0, Express 5.3.0 and TypeScript 6.0.3; authenticated Product, Customer, Supplier and Expense routes are merged into `main`; Order Capture routes are implemented in Draft PR #18. | Inventory, receipts, payments and delivery execution remain outside this Order Capture increment. The API is not a public customer/ecommerce API. |
-| Database | PostgreSQL via `pg` 8.23.1, explicit parameterised SQL, `node-pg-migrate` 9.0.0 and no ORM. Task 007 adds three product tables; merged Task 008 migration 003 adds `user_invitations`, the invited status and last-active-Owner protections. | Other business schema is not implemented. CI uses disposable PostgreSQL; no production database has been provisioned. |
+| API | Node.js 26.13.0, Express 5.3.0 and TypeScript 6.0.3; authenticated Product, Customer, Supplier and Expense routes are in `main`; Order list/create/detail/amend routes are implemented in Draft PR #18. | Inventory, receipts, payment processing/verification and delivery execution remain outside this Order Capture increment. The API is not a public customer/ecommerce API. |
+| Database | PostgreSQL via `pg` 8.23.1, explicit parameterised SQL and `node-pg-migrate` 9.0.0. Migrations 001–006 cover the foundation, products, users, customers, suppliers and expenses. Draft PR #18 adds migration 007 for orders and order items, including customer/product snapshots and NGN BIGINT/kobo storage. | Inventory balances/movements, payment records, receipts and dispatch schema remain unimplemented. CI uses disposable PostgreSQL; no production database has been provisioned. |
 | Authentication | Task 005 provides Argon2id login, PostgreSQL-backed sessions, secure cookies, CSRF and the Owner bootstrap. Task 008 adds employee invitations, initial password setup, last-login display, suspension/reactivation and transactional session revocation. | Password recovery, session-history browsing, MFA, approved production idle/absolute session values, high-risk-action re-authentication and a distributed rate limiter remain unresolved or unimplemented. |
-| Roles, permissions and audit | Six `products.*` permissions and two `users.*` permissions are assigned to Owner only. Product and employee-account lifecycle events use transactional before/after audit records; append-only audit protections remain. | DMS-DEC-002 remains open; these Owner-only assignments do not define the complete role-permission matrix. Audit coverage for future business modules remains incomplete. |
-| Verification | Prettier, ESLint, TypeScript checks, Vitest, Supertest, React Testing Library, PostgreSQL-backed API integration tests, migration/seed/rollback/reapplication checks and production builds in GitHub Actions. | Comprehensive Playwright journeys and business-specific stock-concurrency, inventory-transfer and financial-workflow coverage remain future work. |
+| Roles, permissions and audit | Six `products.*` permissions and two `users.*` permissions are assigned to Owner only. Customer, Supplier, Expense and Order permission definitions remain unassigned to production roles. Order create/amend audit writes are transactional in Draft PR #18; the append-only audit foundation remains. | DMS-DEC-002 remains open; the complete role-permission matrix is not approved. Comprehensive business-event audit history remains incomplete. |
+| Verification | DMS CI is configured for Prettier, ESLint, TypeScript, Vitest, Supertest, React Testing Library, PostgreSQL migration/seed/rollback/reapplication checks and production builds. Draft PR #18 adds database-backed Order tests and a migration 007 verifier. | The final Task 022 full CI run is pending: GitHub reported `startup_failure` before creating any job, so the new Order tests/builds have not yet been verified by CI. Comprehensive Playwright and stock/financial workflow coverage remain future work. |
 | Infrastructure and integrations | No Task 005 production infrastructure or external integration was provisioned. | Render hosting/database, background workers, email delivery, file storage, production secrets, backups and deployment remain subject to separate verification and approval. |
 
 The implementation details and evidence are reconciled in [the architecture overview](docs/architecture/overview.md), [database design](docs/architecture/database-design.md), [architecture decisions](docs/architecture/decisions.md) and [decision register](docs/architecture/decision-register.md). A codebase implementation is evidence of what was built, not automatic approval of a Proposed architecture decision.
@@ -464,7 +464,7 @@ This checklist is the project's shared delivery record. It helps coding agents a
 
 ### Phase 3 — Customers and order management
 
-- [ ] Implement customer registration and customer search.
+- [x] Implement customer registration and customer search (Task 011, merged PR #14).
 - [ ] Implement customer profiles and purchase history.
 - [ ] Implement order creation for all four agreed order sources.
 - [ ] Implement order line items, prices, discounts and delivery fees.
@@ -561,19 +561,17 @@ Marketing campaigns, birthday messages and product recommendations must respect 
 
 ### Current project position
 
-**Implemented in `main`:** Application foundation, authentication and employee account administration, Product Management, Customer Management (migration 004), Supplier Directory backend foundation (migration 005), and Task 010 documentation reconciliation.
+**Implemented in `main`:** Application foundation, authentication and employee account administration, Product Management, Customer Management (migration 004), Supplier Directory (migration 005 and frontend), Expense Foundation and Expense Management frontend (migration 006), and Task 010 documentation reconciliation.
 
 **Recently shipped:**
 
 - **Task 011 — Customer Management:** merged through PR [#14](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/14). Customer database, API/service and tests are in `main`.
-- **Task 020 — Supplier Directory backend:** merged through PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16), merge commit `64ac4b6a11c3ddce39a3646cdede0d570e338f77`. Migration 005, supplier APIs, audit integration and automated tests are in `main`.
+- **Task 020/024 — Supplier Directory backend and frontend:** merged through PR [#16](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/16). Migration 005, supplier APIs, audit integration, screens and automated tests are in `main`.
 
 **Active implementation work:**
 
 - **Task 021/023 — Expense Categories, Draft Expenses and Expense frontend:** merged through PR [#17](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/17). Migration 006, authenticated Expense APIs, schema verification, tests and frontend are in `main`.
-- **Task 022 — Order Capture:** migration 007, PostgreSQL-backed order header/item persistence, transactional audit writes, received-only row-locked amendments, and authenticated list/create/detail/amend APIs are implemented in Draft PR [#18](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/18). Order permissions are defined but deliberately unassigned to production roles; no stock, payment, receipt, notification or delivery execution is included.
-- **Task 023 — Expense Management frontend:** build the user-facing expense/category screens against the Task 021 API.
-- **Task 024 — Supplier Directory frontend:** build the user-facing supplier screens against the merged supplier API.
+- **Task 022 — Order Capture:** migration 007, PostgreSQL-backed order header/item persistence, transactional audit writes, received-only row-locked amendments, and authenticated list/create/detail/amend APIs are implemented in Draft PR [#18](https://github.com/egbutaify2-ui/Dscentsation-Management-System/pull/18). Order permissions are defined but deliberately unassigned to production roles; no stock, payment, receipt, notification or delivery execution is included. Final full CI verification remains pending because the latest GitHub Actions runs failed before job creation.
 
 **Remaining build areas:** Inventory balances and movements, order fulfilment, incoming customer payments, receipts and notifications, procurement workflows, returns/refunds, reporting and production deployment still need implementation. Build these in practical increments while keeping independent development moving.
 

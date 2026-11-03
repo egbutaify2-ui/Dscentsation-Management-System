@@ -186,7 +186,10 @@ describe('Order database persistence and authenticated API', () => {
       'INSERT INTO role_permissions(role_id, permission_id) ' +
         'SELECT $1, id FROM permissions ' +
         'WHERE code = ANY($2::text[]) ON CONFLICT DO NOTHING',
-      [roleId, ['orders.view', 'orders.create', 'orders.update', 'customers.view', 'products.view']],
+      [
+        roleId,
+        ['orders.view', 'orders.create', 'orders.update', 'customers.view', 'products.view'],
+      ],
     );
 
     actorId = await createUser(ownerEmail, roleId);
@@ -222,7 +225,9 @@ describe('Order database persistence and authenticated API', () => {
     await pool.query('DROP FUNCTION IF EXISTS task022_reject_order_audit_fn()');
   });
 
-  it('creates an order with server-side customer/product snapshots and serves list/detail', async () => {
+  it(
+    'creates an order with server-side customer/product snapshots and serves list/detail',
+    async () => {
     const { agent, csrf } = await login(ownerEmail);
     const response = await postWithCsrf(agent, csrf, createOrderBody()).expect(201);
     const order = response.body.data;
@@ -288,7 +293,8 @@ describe('Order database persistence and authenticated API', () => {
       [createdOrderId],
     );
     expect(audit.rowCount).toBe(1);
-  });
+    },
+  );
 
   it('rejects archived customers, archived products and mismatched product variants', async () => {
     const { agent, csrf } = await login(ownerEmail);

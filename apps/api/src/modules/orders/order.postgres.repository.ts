@@ -200,9 +200,10 @@ export class PostgresOrderRepository implements OrderRepository {
     return withTransaction(async (client) => {
       const inserted = await client.query<{ id: string }>(
         'INSERT INTO orders (' +
-          'customer_id, customer_name_snapshot, customer_phone_snapshot, customer_email_snapshot, ' +
-          'source_channel, status, fulfilment_location_id, currency, subtotal_minor, discount_minor, ' +
-          'delivery_fee_minor, total_minor, delivery_address_snapshot, notes, created_by, updated_by' +
+          'customer_id, customer_name_snapshot, customer_phone_snapshot, ' +
+          'customer_email_snapshot, source_channel, status, fulfilment_location_id, ' +
+          'currency, subtotal_minor, discount_minor, delivery_fee_minor, total_minor, ' +
+          'delivery_address_snapshot, notes, created_by, updated_by' +
           ') VALUES ($1, $2, $3, $4, $5, \'received\', $6, $7, $8::bigint, $9::bigint, ' +
           '$10::bigint, $11::bigint, $12, $13, $14, $14) RETURNING id',
         [
