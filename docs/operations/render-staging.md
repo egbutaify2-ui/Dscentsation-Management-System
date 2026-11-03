@@ -158,9 +158,112 @@ Sources for current Render service syntax, routing, Node version selection, envi
 
 ## Validation and limitations
 
-- Repository commands and variable names were checked against the application manifests and source at the required baseline.
-- The official Render CLI installer completed successfully in a clean GitHub-hosted runner. `render --version` returned `render v2.35.0`.
-- The exact command `env -u RENDER_API_KEY render blueprints validate render.yaml` was attempted with an empty `RENDER_CLI_CONFIG_DIR`. The CLI exited with code 1 before Blueprint validation and returned: `Error: no workspace specified and no default workspace set. Use --workspace or run 'render workspace set'`.
-- **Render-native Blueprint validation is not complete.** The command required a workspace selection. Per the task's authentication boundary, no workspace was selected, no `render workspace set` / login flow was started, and no Render API key or production credential was supplied. This is an environment/authentication prerequisite, not a Blueprint validation result; the Blueprint must not be described as valid based on this attempt.
-- No Blueprint sync, deploy, provisioning, resource creation, live health check, browser cookie/CSRF smoke test or production change was performed.
-- No production credentials or secrets were used or committed.
+### Published Render JSON Schema validation — 3 November 2026
+
+A complete structural validation of the rebased `render.yaml` was run against Render's published JSON Schema. This is independent of, and does not replace, Render CLI/workspace validation.
+
+- **Schema source:** https://render.com/schema/render.yaml.json
+- **Retrieved:** 2026-11-03 13:28:42 UTC; HTTP/2 200
+- **Last-Modified response header:** Tue, 03 Nov 2026 04:36:59 GMT
+- **Downloaded schema SHA-256:** `8a3fb8da6b4f55fe686fbefa790e011d3dd7895f013f355953c572a21ab6494a`
+- **JSON Schema dialect:** Draft 2020-12
+- **Validator:** Python `jsonschema` 4.26.0, using `Draft202012Validator` and `FormatChecker`
+- **YAML parser:** PyYAML 6.0.3
+- **Python runtime:** 3.14.4
+
+The schema self-check passed. The schema contains 44 distinct `$ref` values; all are fragment-local references and no external references were found. The complete loaded YAML instance was validated with format checking enabled.
+
+**Exact validation commands used in the CI run:**
+
+```bash
+schema_url="https://render.com/schema/render.yaml.json"
+curl --fail --silent --show-error --location \
+  --dump-header /tmp/render-schema-headers.txt "$schema_url" \
+  --output /tmp/render-blueprint-schema.json
+python -m pip install --disable-pip-version-check \
+  "jsonschema==4.26.0" "PyYAML==6.0.3"
+```
+
+```bash
+python - <<'PY'
+import json
+import sys
+from pathlib import Path
+from importlib.metadata import version
+import yaml
+from jsonschema import Draft202012Validator, FormatChecker
+
+schema_path = Path("/tmp/render-blueprint-schema.json")
+blueprint_path = Path("render.yaml")
+schema = json.loads(schema_path.read_text(encoding="utf-8"))
+print(f"Validator: jsonschema {version('jsonschema')}")
+print(f"YAML parser: PyYAML {version('PyYAML')}")
+print(f"JSON Schema dialect: {schema.get('$schema')}")
+Draft202012Validator.check_schema(schema)
+print("Published schema self-check: PASS")
+
+refs = set()
+def collect_refs(value):
+    if isinstance(value, dict):
+        ref = value.get("$ref")
+        if isinstance(ref, str):
+            refs.add(ref)
+        for child in value.values():
+            collect_refs(child)
+    elif isinstance(value, list):
+        for child in value:
+            collect_refs(child)
+collect_refs(schema)
+external_refs = sorted(ref for ref in refs if not ref.startswith("#"))
+print(f"Reference count: {len(refs)}")
+print(f"External references: {external_refs}")
+if external_refs:
+    print("ERROR: Published schema contains external references; offline resolution is incomplete.")
+    sys.exit(2)
+
+instance = yaml.safe_load(blueprint_path.read_text(encoding="utf-8"))
+validator = Draft202012Validator(schema, format_checker=FormatChecker())
+errors = sorted(
+    validator.iter_errors(instance),
+    key=lambda e: (list(map(str, e.absolute_path)), e.message),
+)
+print(f"Blueprint file: {blueprint_path}")
+print(f"Schema validation errors: {len(errors)}")
+if errors:
+    for index, error in enumerate(errors, start=1):
+        path = "$" + "".join(
+            f"[{part}]" if isinstance(part, int) else f".{part}"
+            for part in error.absolute_path
+        )
+        print(f"{index}. {path}: {error.message}")
+    sys.exit(1)
+print("RESULT: PASS — render.yaml is valid against the complete published Render JSON Schema.")
+PY
+```
+
+**Complete result:** schema self-check **PASS**; `render.yaml` schema errors **0**; process exited successfully. CI output: `RESULT: PASS — render.yaml is valid against the complete published Render JSON Schema.`
+
+**Published-schema limitations:** the schema's PostgreSQL plan enum still includes legacy labels such as `starter`, `standard`, `pro`, `pro plus` and `basic-*` values alongside current resource-specific identifiers. It also includes `free`. The selected `0.1c-256mb` Postgres plan and `0.5c-512mb` web-service plan are present in the published enums, but a schema pass does not prove that a plan is currently purchasable or enabled for a particular workspace. JSON Schema validation checks document structure, fields, types and enumerated values; it does not check workspace conflicts, resource-name collisions with existing services, account-specific plan availability, billing approval, or actual assigned service hostnames. Those require Render-aware validation and owner review.
+
+### Render-native CLI validation — still outstanding
+
+The official Render CLI installer previously completed in a clean GitHub Actions runner and `render --version` returned `render v2.35.0`. The earlier command:
+
+```bash
+env -u RENDER_API_KEY render blueprints validate render.yaml
+```
+
+stopped before validation with exit code 1:
+
+```text
+Error: no workspace specified and no default workspace set.
+Use --workspace or run 'render workspace set'
+```
+
+No workspace was selected and no login or workspace-setting flow was started. The connected account's only listed workspace was `My Workspace` (`tea-dabf1jn40ujc73arob00`); it has not been authorised as the DMS staging workspace. Do not run the following until the owner explicitly identifies the intended staging workspace and authorises an authenticated CLI session for it:
+
+```bash
+render blueprints validate render.yaml --workspace <authorised-staging-workspace-id>
+```
+
+No Blueprint sync, deploy, provisioning, resource creation, Render resource modification, production credential access, live health check or production change was performed.
