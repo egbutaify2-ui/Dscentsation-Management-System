@@ -57,7 +57,8 @@ export interface OrderListFilters {
   customerId?: string | undefined;
   sourceChannel?: OrderSourceChannel | undefined;
   fulfilmentLocationId?: string | undefined;
-  accessibleLocationIds: readonly string[];
+  actorId: string;
+  actorRoleCode: string;
   page: number;
   pageSize: number;
 }
@@ -369,15 +370,23 @@ export class PostgresOrderRepository implements OrderRepository {
     return loadOrder(pool, orderId);
   }
 
-  async getOrderForLocations(
+  async getOrderForActor(
     orderId: string,
-    accessibleLocationIds: readonly string[],
+    actorId: string,
+    actorRoleCode: string,
   ): Promise<OrderRecord> {
     const result = await pool.query<OrderHeaderRow>(
       'SELECT ' +
         orderHeaderColumns +
-        ' FROM orders o WHERE o.id = $1 AND o.fulfilment_location_id = ANY($2::uuid[])',
-      [orderId, accessibleLocationIds],
+        ' FROM orders o WHERE o.id = $1 AND EXISTS (' +
+        'SELECT 1 FROM locations l ' +
+        'WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
+        'AND ($2::text IN (\'OWNER\', \'MANAGER\') OR (' +
+        '$2::text = \'STAFF\' AND EXISTS (' +
+        'SELECT 1 FROM user_location_access ula ' +
+        'WHERE ula.user_id = $3::uuid AND ula.location_id = l.id' +
+        '))))',
+      [orderId, actorRoleCode, actorId],
     );
     const header = result.rows[0];
     if (!header) throw orderNotFound();
@@ -394,7 +403,8 @@ export class PostgresOrderRepository implements OrderRepository {
       filters.customerId ?? null,
       filters.sourceChannel ?? null,
       filters.fulfilmentLocationId ?? null,
-      filters.accessibleLocationIds,
+      filters.actorRoleCode,
+      filters.actorId,
     ];
 
     const filterSql =
@@ -407,7 +417,14 @@ export class PostgresOrderRepository implements OrderRepository {
       'AND ($3::uuid IS NULL OR o.customer_id = $3) ' +
       'AND ($4::text IS NULL OR o.source_channel = $4) ' +
       'AND ($5::uuid IS NULL OR o.fulfilment_location_id = $5) ' +
-      'AND o.fulfilment_location_id = ANY($6::uuid[])';
+      'AND EXISTS (' +
+      'SELECT 1 FROM locations l ' +
+      'WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
+      'AND ($6::text IN (\'OWNER\', \'MANAGER\') OR (' +
+      '$6::text = \'STAFF\' AND EXISTS (' +
+      'SELECT 1 FROM user_location_access ula ' +
+      'WHERE ula.user_id = $7::uuid AND ula.location_id = l.id' +
+      '))))';
 
     const count = await pool.query<{ total: string }>(
       'SELECT count(*)::text AS total' + filterSql,
@@ -417,7 +434,7 @@ export class PostgresOrderRepository implements OrderRepository {
       'SELECT ' +
         orderHeaderColumns +
         filterSql +
-        ' ORDER BY o.created_at DESC, o.id DESC LIMIT $7 OFFSET $8',
+        ' ORDER BY o.created_at DESC, o.id DESC LIMIT $8 OFFSET $9',
       [...params, filters.pageSize, offset],
     );
 
