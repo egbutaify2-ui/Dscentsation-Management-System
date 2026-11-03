@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  calculateLineTotalMinor,
-  calculateOrderTotals,
-  toNgnMinorUnits,
-} from './order.money.js';
+import { calculateLineTotalMinor, calculateOrderTotals, toNgnMinorUnits } from './order.money.js';
 
 describe('order money', () => {
   it('converts decimal NGN prices to integer kobo without floating-point arithmetic', () => {
@@ -29,10 +25,7 @@ describe('order money', () => {
 
   it('calculates order totals with zero discount and delivery fee', () => {
     expect(
-      calculateOrderTotals([
-        { lineTotalMinor: '15000' },
-        { lineTotalMinor: '25050' },
-      ]),
+      calculateOrderTotals([{ lineTotalMinor: '15000' }, { lineTotalMinor: '25050' }]),
     ).toEqual({
       subtotalMinor: '40050',
       discountMinor: '0',
