@@ -22,5 +22,9 @@ export function orderConflict(message: string): OrderError {
 }
 
 export function orderForbidden(): OrderError {
-  return new OrderError('The current user cannot view product records for order capture.', 403, 'FORBIDDEN');
+  return new OrderError(
+    'The current user cannot view product records for order capture.',
+    403,
+    'FORBIDDEN',
+  );
 }
