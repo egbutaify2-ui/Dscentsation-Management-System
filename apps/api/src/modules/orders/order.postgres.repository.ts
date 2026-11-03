@@ -57,6 +57,7 @@ export interface OrderListFilters {
   customerId?: string | undefined;
   sourceChannel?: OrderSourceChannel | undefined;
   fulfilmentLocationId?: string | undefined;
+  accessibleLocationIds: readonly string[];
   page: number;
   pageSize: number;
 }
@@ -368,6 +369,20 @@ export class PostgresOrderRepository implements OrderRepository {
     return loadOrder(pool, orderId);
   }
 
+  async getOrderForLocations(
+    orderId: string,
+    accessibleLocationIds: readonly string[],
+  ): Promise<OrderRecord> {
+    const result = await pool.query<OrderHeaderRow>(
+      'SELECT ' + orderHeaderColumns +
+        ' FROM orders o WHERE o.id = $1 AND o.fulfilment_location_id = ANY($2::uuid[])',
+      [orderId, accessibleLocationIds],
+    );
+    const header = result.rows[0];
+    if (!header) throw orderNotFound();
+    return mapOrder(header, await loadItems(pool, orderId));
+  }
+
   async listOrders(filters: OrderListFilters): Promise<OrderPage> {
     const query = filters.query?.trim() || null;
     const status = !filters.status || filters.status === 'all' ? null : filters.status;
@@ -378,6 +393,7 @@ export class PostgresOrderRepository implements OrderRepository {
       filters.customerId ?? null,
       filters.sourceChannel ?? null,
       filters.fulfilmentLocationId ?? null,
+      filters.accessibleLocationIds,
     ];
 
     const filterSql =
@@ -389,7 +405,8 @@ export class PostgresOrderRepository implements OrderRepository {
       'AND ($2::text IS NULL OR o.status = $2) ' +
       'AND ($3::uuid IS NULL OR o.customer_id = $3) ' +
       'AND ($4::text IS NULL OR o.source_channel = $4) ' +
-      'AND ($5::uuid IS NULL OR o.fulfilment_location_id = $5)';
+      'AND ($5::uuid IS NULL OR o.fulfilment_location_id = $5) ' +
+      'AND o.fulfilment_location_id = ANY($6::uuid[])';
 
     const count = await pool.query<{ total: string }>(
       'SELECT count(*)::text AS total' + filterSql,
@@ -399,7 +416,7 @@ export class PostgresOrderRepository implements OrderRepository {
       'SELECT ' +
         orderHeaderColumns +
         filterSql +
-        ' ORDER BY o.created_at DESC, o.id DESC LIMIT $6 OFFSET $7',
+        ' ORDER BY o.created_at DESC, o.id DESC LIMIT $7 OFFSET $8',
       [...params, filters.pageSize, offset],
     );
 
