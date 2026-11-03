@@ -92,7 +92,7 @@ async function login(email: string): Promise<{ agent: Agent; csrf: string }> {
   return { agent, csrf: refreshedCsrf.body.data.token as string };
 }
 
-function postWithCsrf(agent: Agent, csrf: string, body: unknown) {
+function postWithCsrf(agent: Agent, csrf: string, body: object) {
   return agent
     .post('/api/v1/orders')
     .set('Origin', env.APP_ORIGIN)
