@@ -438,6 +438,12 @@ describe('Order database persistence and authenticated API', () => {
       ).rejects.toThrow(/Task 022 forced audit failure/);
       const unchanged = await repository.getOrder(amendOrder.id);
       expect(unchanged.notes).toBe('amend-audit-before');
+      expect(unchanged.items).toHaveLength(1);
+      expect(unchanged.items[0]).toMatchObject({
+        productNameSnapshot: 'Captured Integration Product',
+        unitPriceMinor: '150000',
+        lineTotalMinor: '150000',
+      });
       const audit = await pool.query(
         'SELECT 1 FROM audit_logs WHERE request_id = ANY($1::text[])',
         [[requestId, amendRequestId]],
