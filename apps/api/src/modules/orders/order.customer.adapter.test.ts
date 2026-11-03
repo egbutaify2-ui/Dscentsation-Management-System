@@ -8,6 +8,7 @@ vi.mock('../customers/customer.service.js', () => ({
 
 const actor = {
   id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  roleCode: 'OWNER' as const,
   permissions: ['customers.view'],
 };
 const customerId = '11111111-1111-4111-8111-111111111111';
