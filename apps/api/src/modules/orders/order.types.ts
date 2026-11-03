@@ -84,8 +84,10 @@ export interface OrderAmendmentWriteModel extends OrderTotals {
   updatedBy: string;
 }
 
-export interface OrderRecord extends OrderCreateWriteModel {
+export interface OrderRecord extends Omit<OrderCreateWriteModel, 'status'> {
   id: string;
+  status: OrderStatus;
+  updatedBy: string;
   createdAt: string;
   updatedAt: string;
 }
