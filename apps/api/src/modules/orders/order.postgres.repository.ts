@@ -1,6 +1,6 @@
 import type { Pool, PoolClient, QueryResultRow } from 'pg';
 import { pool } from '../../db/pool.js';
-import { appendAuditEvent } from '../audit/audit.service.js';
+import { appendAuditEvent, type AuditJsonValue } from '../audit/audit.service.js';
 import { orderConflict, orderNotFound } from './order.errors.js';
 import type {
   OrderAmendmentWriteModel,
@@ -71,6 +71,56 @@ export interface OrderPage {
 
 function iso(value: Date | string): string {
   return new Date(value).toISOString();
+}
+
+function auditSnapshot(order: {
+  customerId: string;
+  sourceChannel: OrderSourceChannel;
+  status: OrderStatus;
+  fulfilmentLocationId: string;
+  currency: 'NGN';
+  subtotalMinor: string;
+  discountMinor: string;
+  deliveryFeeMinor: string;
+  totalMinor: string;
+  items: readonly OrderItemSnapshot[];
+}): Record<string, AuditJsonValue> {
+  return {
+    customerId: order.customerId,
+    sourceChannel: order.sourceChannel,
+    status: order.status,
+    fulfilmentLocationId: order.fulfilmentLocationId,
+    currency: order.currency,
+    subtotalMinor: order.subtotalMinor,
+    discountMinor: order.discountMinor,
+    deliveryFeeMinor: order.deliveryFeeMinor,
+    totalMinor: order.totalMinor,
+    items: order.items.map((item) => ({
+      productId: item.productId,
+      productVariantId: item.productVariantId,
+      productNameSnapshot: item.productNameSnapshot,
+      variantNameSnapshot: item.variantNameSnapshot,
+      skuSnapshot: item.skuSnapshot,
+      unitOfMeasureSnapshot: item.unitOfMeasureSnapshot,
+      unitPriceMinor: item.unitPriceMinor,
+      quantity: item.quantity,
+      discountMinor: item.discountMinor,
+      lineTotalMinor: item.lineTotalMinor,
+    })),
+  };
+}
+
+function changedFields(current: OrderRecord, next: OrderAmendmentWriteModel): string[] {
+  const fields: string[] = [];
+  if (current.customerId !== next.customerId) fields.push('customerId');
+  if (current.sourceChannel !== next.sourceChannel) fields.push('sourceChannel');
+  if (current.fulfilmentLocationId !== next.fulfilmentLocationId)
+    fields.push('fulfilmentLocationId');
+  if (JSON.stringify(current.items) !== JSON.stringify(next.items)) fields.push('items');
+  if (current.deliveryAddressSnapshot !== next.deliveryAddressSnapshot)
+    fields.push('deliveryAddressSnapshot');
+  if (current.notes !== next.notes) fields.push('notes');
+  return fields;
 }
 
 const orderHeaderColumns = [
@@ -235,10 +285,8 @@ export class PostgresOrderRepository implements OrderRepository {
           entityId: orderId,
           requestId: context.requestId,
           safeMetadata: {
-            status: 'received',
-            sourceChannel: order.sourceChannel,
-            itemCount: order.items.length,
-            totalMinor: order.totalMinor,
+            before: null,
+            after: auditSnapshot(order),
           },
         },
         client,
@@ -304,9 +352,9 @@ export class PostgresOrderRepository implements OrderRepository {
           entityId: orderId,
           requestId: context.requestId,
           safeMetadata: {
-            status: 'received',
-            itemCount: amendment.items.length,
-            totalMinor: amendment.totalMinor,
+            changedFields: changedFields(current, amendment),
+            before: auditSnapshot(current),
+            after: auditSnapshot({ ...amendment, status: current.status }),
           },
         },
         client,

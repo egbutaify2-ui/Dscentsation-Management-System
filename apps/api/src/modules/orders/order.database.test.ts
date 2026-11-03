@@ -27,7 +27,6 @@ let locationId = '';
 let productId = '';
 let variantId = '';
 let otherProductId = '';
-let otherVariantId = '';
 let highValueProductId = '';
 let highValueVariantId = '';
 let createdOrderId = '';
@@ -112,8 +111,7 @@ function createOrderBody(productKey = productId, variantKey = variantId, quantit
   };
 }
 
-function directOrderWrite(requestId: string, notes: string): OrderCreateWriteModel {
-  void requestId;
+function directOrderWrite(notes: string): OrderCreateWriteModel {
   return {
     customerId,
     customerNameSnapshot: 'Captured Integration Customer',
@@ -182,6 +180,7 @@ describe('Order database persistence and authenticated API', () => {
     const roleId = role.rows[0]?.id;
     if (!roleId) throw new Error('Task 022 integration-test role was not created.');
 
+    // A disposable non-production role gives this test actor explicit Order access.
     await pool.query(
       'INSERT INTO role_permissions(role_id, permission_id) ' +
         'SELECT $1, id FROM permissions ' +
@@ -217,7 +216,6 @@ describe('Order database persistence and authenticated API', () => {
     variantId = product.variantId;
     const other = await createProduct('Other Fixture Product', 'T022-PROD-B', '99000');
     otherProductId = other.productId;
-    otherVariantId = other.variantId;
   });
 
   afterAll(async () => {
@@ -287,12 +285,39 @@ describe('Order database persistence and authenticated API', () => {
     expect(list.body.data.some((item: { id: string }) => item.id === createdOrderId)).toBe(true);
     expect(list.body.meta.total).toBeGreaterThan(0);
 
-    const audit = await pool.query(
-      "SELECT 1 FROM audit_logs WHERE entity_type = 'order' AND entity_id = $1 " +
+    const audit = await pool.query<{ safe_metadata: Record<string, unknown> }>(
+      "SELECT safe_metadata FROM audit_logs WHERE entity_type = 'order' AND entity_id = $1 " +
         "AND action = 'order.created'",
       [createdOrderId],
     );
     expect(audit.rowCount).toBe(1);
+    expect(audit.rows[0]?.safe_metadata).toMatchObject({
+      before: null,
+      after: {
+        customerId,
+        sourceChannel: 'whatsapp',
+        status: 'received',
+        items: [
+          {
+            productId,
+            productVariantId: variantId,
+            productNameSnapshot: 'Order Fixture Product',
+            unitPriceMinor: '125000',
+          },
+        ],
+      },
+    });
+    const amendmentAudit = await pool.query<{ safe_metadata: Record<string, unknown> }>(
+      "SELECT safe_metadata FROM audit_logs WHERE entity_type = 'order' AND entity_id = $1 " +
+        "AND action = 'order.amended'",
+      [createdOrderId],
+    );
+    expect(amendmentAudit.rowCount).toBe(1);
+    expect(amendmentAudit.rows[0]?.safe_metadata).toMatchObject({
+      changedFields: ['notes'],
+      before: { totalMinor: '125000' },
+      after: { totalMinor: '125000' },
+    });
     },
   );
 
@@ -375,7 +400,7 @@ describe('Order database persistence and authenticated API', () => {
     const requestId = randomUUID();
     const marker = 'audit-failure-' + requestId;
     const amendOrder = await repository.createReceivedOrder(
-      directOrderWrite(randomUUID(), 'amend-audit-before'),
+      directOrderWrite('amend-audit-before'),
       { actorId, requestId: randomUUID() },
     );
     const amendRequestId = randomUUID();
@@ -397,7 +422,7 @@ describe('Order database persistence and authenticated API', () => {
 
     try {
       await expect(
-        repository.createReceivedOrder(directOrderWrite(requestId, marker), {
+        repository.createReceivedOrder(directOrderWrite(marker), {
           actorId,
           requestId,
         }),
@@ -426,7 +451,7 @@ describe('Order database persistence and authenticated API', () => {
 
   it('serializes concurrent amendments and gives the second amendment the latest row', async () => {
     const order = await repository.createReceivedOrder(
-      directOrderWrite(randomUUID(), 'concurrent-base'),
+      directOrderWrite('concurrent-base'),
       { actorId, requestId: randomUUID() },
     );
 
@@ -483,7 +508,7 @@ describe('Order database persistence and authenticated API', () => {
 
   it('rejects amendments after the order leaves received status', async () => {
     const order = await repository.createReceivedOrder(
-      directOrderWrite(randomUUID(), 'status-guard'),
+      directOrderWrite('status-guard'),
       { actorId, requestId: randomUUID() },
     );
     await pool.query("UPDATE orders SET status = 'confirmed' WHERE id = $1", [order.id]);
