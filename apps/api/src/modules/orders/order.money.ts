@@ -48,9 +48,7 @@ export function calculateLineTotalMinor(unitPriceMinor: string, quantity: number
   return total.toString();
 }
 
-export function calculateOrderTotals(
-  lines: readonly { lineTotalMinor: string }[],
-): OrderTotals {
+export function calculateOrderTotals(lines: readonly { lineTotalMinor: string }[]): OrderTotals {
   let subtotal = 0n;
   for (const line of lines) {
     subtotal += checkedMinorUnits(line.lineTotalMinor);
