@@ -238,98 +238,98 @@ describe('Order database persistence and authenticated API', () => {
   it(
     'creates an order with server-side customer/product snapshots and serves list/detail',
     async () => {
-    const { agent, csrf } = await login(ownerEmail);
-    const response = await postWithCsrf(agent, csrf, createOrderBody()).expect(201);
-    const order = response.body.data;
-    createdOrderId = order.id as string;
+      const { agent, csrf } = await login(ownerEmail);
+      const response = await postWithCsrf(agent, csrf, createOrderBody()).expect(201);
+      const order = response.body.data;
+      createdOrderId = order.id as string;
 
-    expect(order.status).toBe('received');
-    expect(order.currency).toBe('NGN');
-    expect(order.customerNameSnapshot).toBe('Order Fixture Customer');
-    expect(order.customerPhoneSnapshot).toBe('+2348000000001');
-    expect(order.customerEmailSnapshot).toBe('order.fixture@example.invalid');
-    expect(order.items).toHaveLength(1);
-    expect(order.items[0]).toMatchObject({
-      productId,
-      productVariantId: variantId,
-      productNameSnapshot: 'Order Fixture Product',
-      variantNameSnapshot: '100 ml',
-      skuSnapshot: 'T022-PROD-A',
-      unitPriceMinor: '125000',
-      quantity: 1,
-      lineTotalMinor: '125000',
-    });
-    expect(order.subtotalMinor).toBe('125000');
-    expect(order.totalMinor).toBe('125000');
+      expect(order.status).toBe('received');
+      expect(order.currency).toBe('NGN');
+      expect(order.customerNameSnapshot).toBe('Order Fixture Customer');
+      expect(order.customerPhoneSnapshot).toBe('+2348000000001');
+      expect(order.customerEmailSnapshot).toBe('order.fixture@example.invalid');
+      expect(order.items).toHaveLength(1);
+      expect(order.items[0]).toMatchObject({
+        productId,
+        productVariantId: variantId,
+        productNameSnapshot: 'Order Fixture Product',
+        variantNameSnapshot: '100 ml',
+        skuSnapshot: 'T022-PROD-A',
+        unitPriceMinor: '125000',
+        quantity: 1,
+        lineTotalMinor: '125000',
+      });
+      expect(order.subtotalMinor).toBe('125000');
+      expect(order.totalMinor).toBe('125000');
 
-    await pool.query(
-      'UPDATE customers SET full_name = $2, phone = $3, email = $4 WHERE id = $1',
-      [customerId, 'Renamed Customer', '+2348000000999', 'renamed@example.invalid'],
-    );
-    await pool.query('UPDATE products SET name = $2 WHERE id = $1', [
-      productId,
-      'Renamed Product',
-    ]);
-    await pool.query(
-      'UPDATE product_variants SET name = $2, sku = $3, selling_price_minor = 999999 ' +
-        'WHERE id = $1',
-      [variantId, 'Updated Variant', 'T022-UPDATED'],
-    );
+      await pool.query(
+        'UPDATE customers SET full_name = $2, phone = $3, email = $4 WHERE id = $1',
+        [customerId, 'Renamed Customer', '+2348000000999', 'renamed@example.invalid'],
+      );
+      await pool.query('UPDATE products SET name = $2 WHERE id = $1', [
+        productId,
+        'Renamed Product',
+      ]);
+      await pool.query(
+        'UPDATE product_variants SET name = $2, sku = $3, selling_price_minor = 999999 ' +
+          'WHERE id = $1',
+        [variantId, 'Updated Variant', 'T022-UPDATED'],
+      );
 
-    const amended = await agent
-      .patch('/api/v1/orders/' + createdOrderId)
-      .set('Origin', env.APP_ORIGIN)
-      .set('X-CSRF-Token', csrf)
-      .send({ notes: 'Amended through authenticated API' })
-      .expect(200);
-    expect(amended.body.data.status).toBe('received');
-    expect(amended.body.data.notes).toBe('Amended through authenticated API');
+      const amended = await agent
+        .patch('/api/v1/orders/' + createdOrderId)
+        .set('Origin', env.APP_ORIGIN)
+        .set('X-CSRF-Token', csrf)
+        .send({ notes: 'Amended through authenticated API' })
+        .expect(200);
+      expect(amended.body.data.status).toBe('received');
+      expect(amended.body.data.notes).toBe('Amended through authenticated API');
 
-    const detail = await agent.get('/api/v1/orders/' + createdOrderId).expect(200);
-    expect(detail.body.data.customerNameSnapshot).toBe('Order Fixture Customer');
-    expect(detail.body.data.customerPhoneSnapshot).toBe('+2348000000001');
-    expect(detail.body.data.items[0].productNameSnapshot).toBe('Order Fixture Product');
-    expect(detail.body.data.items[0].variantNameSnapshot).toBe('100 ml');
-    expect(detail.body.data.items[0].skuSnapshot).toBe('T022-PROD-A');
-    expect(detail.body.data.items[0].unitPriceMinor).toBe('125000');
+      const detail = await agent.get('/api/v1/orders/' + createdOrderId).expect(200);
+      expect(detail.body.data.customerNameSnapshot).toBe('Order Fixture Customer');
+      expect(detail.body.data.customerPhoneSnapshot).toBe('+2348000000001');
+      expect(detail.body.data.items[0].productNameSnapshot).toBe('Order Fixture Product');
+      expect(detail.body.data.items[0].variantNameSnapshot).toBe('100 ml');
+      expect(detail.body.data.items[0].skuSnapshot).toBe('T022-PROD-A');
+      expect(detail.body.data.items[0].unitPriceMinor).toBe('125000');
 
-    const list = await agent.get('/api/v1/orders?page=1&pageSize=20').expect(200);
-    expect(list.body.data.some((item: { id: string }) => item.id === createdOrderId)).toBe(true);
-    expect(list.body.meta.total).toBeGreaterThan(0);
+      const list = await agent.get('/api/v1/orders?page=1&pageSize=20').expect(200);
+      expect(list.body.data.some((item: { id: string }) => item.id === createdOrderId)).toBe(true);
+      expect(list.body.meta.total).toBeGreaterThan(0);
 
-    const audit = await pool.query<{ safe_metadata: Record<string, unknown> }>(
-      "SELECT safe_metadata FROM audit_logs WHERE entity_type = 'order' AND entity_id = $1 " +
-        "AND action = 'order.created'",
-      [createdOrderId],
-    );
-    expect(audit.rowCount).toBe(1);
-    expect(audit.rows[0]?.safe_metadata).toMatchObject({
-      before: null,
-      after: {
-        customerId,
-        sourceChannel: 'whatsapp',
-        status: 'received',
-        items: [
-          {
-            productId,
-            productVariantId: variantId,
-            productNameSnapshot: 'Order Fixture Product',
-            unitPriceMinor: '125000',
-          },
-        ],
-      },
-    });
-    const amendmentAudit = await pool.query<{ safe_metadata: Record<string, unknown> }>(
-      "SELECT safe_metadata FROM audit_logs WHERE entity_type = 'order' AND entity_id = $1 " +
-        "AND action = 'order.amended'",
-      [createdOrderId],
-    );
-    expect(amendmentAudit.rowCount).toBe(1);
-    expect(amendmentAudit.rows[0]?.safe_metadata).toMatchObject({
-      changedFields: ['notes'],
-      before: { totalMinor: '125000' },
-      after: { totalMinor: '125000' },
-    });
+      const audit = await pool.query<{ safe_metadata: Record<string, unknown> }>(
+        "SELECT safe_metadata FROM audit_logs WHERE entity_type = 'order' AND entity_id = $1 " +
+          "AND action = 'order.created'",
+        [createdOrderId],
+      );
+      expect(audit.rowCount).toBe(1);
+      expect(audit.rows[0]?.safe_metadata).toMatchObject({
+        before: null,
+        after: {
+          customerId,
+          sourceChannel: 'whatsapp',
+          status: 'received',
+          items: [
+            {
+              productId,
+              productVariantId: variantId,
+              productNameSnapshot: 'Order Fixture Product',
+              unitPriceMinor: '125000',
+            },
+          ],
+        },
+      });
+      const amendmentAudit = await pool.query<{ safe_metadata: Record<string, unknown> }>(
+        "SELECT safe_metadata FROM audit_logs WHERE entity_type = 'order' AND entity_id = $1 " +
+          "AND action = 'order.amended'",
+        [createdOrderId],
+      );
+      expect(amendmentAudit.rowCount).toBe(1);
+      expect(amendmentAudit.rows[0]?.safe_metadata).toMatchObject({
+        changedFields: ['notes'],
+        before: { totalMinor: '125000' },
+        after: { totalMinor: '125000' },
+      });
     },
   );
 
