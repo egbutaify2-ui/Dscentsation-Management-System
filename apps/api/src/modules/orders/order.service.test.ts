@@ -139,7 +139,12 @@ function makeService(
   );
 
   return {
-    service: new OrderService({ repository, customerLookup, productSnapshotLookup, locationAccess }),
+    service: new OrderService({
+      repository,
+      customerLookup,
+      productSnapshotLookup,
+      locationAccess,
+    }),
     customerLookup,
     productSnapshotLookup,
   };
@@ -187,7 +192,7 @@ describe('OrderService', () => {
     },
   );
 
-  it('rejects an inaccessible fulfilment location before resolving customer or product data', async () => {
+  it('rejects inaccessible locations before customer and product lookup', async () => {
     const { repository } = makeRepository();
     const customerLookup = vi.fn();
     const productSnapshotLookup = vi.fn();

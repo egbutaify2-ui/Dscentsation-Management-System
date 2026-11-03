@@ -214,7 +214,7 @@ describe('authenticated fulfilment Location API and Order location enforcement',
     await request(app).get('/api/v1/locations').expect(401);
   });
 
-  it('returns the response envelope and only safe active location fields to Owner and Manager', async () => {
+  it('returns safe active location fields to Owner and Manager', async () => {
     const ownerSession = await login(owner.email);
     const ownerResponse = await ownerSession.agent.get('/api/v1/locations').expect(200);
     const managerSession = await login(manager.email);
@@ -243,7 +243,7 @@ describe('authenticated fulfilment Location API and Order location enforcement',
     }
   });
 
-  it('limits Staff to active assigned locations and keeps pickup authority action-scoped', async () => {
+  it('limits Staff to assigned locations and keeps pickup action-scoped', async () => {
     const staffSession = await login(staff.email);
     const response = await staffSession.agent.get('/api/v1/locations').expect(200);
     expect(response.body.data).toEqual([
@@ -283,7 +283,7 @@ describe('authenticated fulfilment Location API and Order location enforcement',
     ).toBe(true);
   });
 
-  it('rejects unauthorised, inactive and unassigned fulfilment IDs on create and amendment', async () => {
+  it('rejects inactive and unauthorised locations on create and amendment', async () => {
     const ownerWrite = await repository.createReceivedOrder(
       {
         customerId,
