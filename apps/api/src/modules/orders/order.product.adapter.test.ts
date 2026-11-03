@@ -9,6 +9,7 @@ vi.mock('../products/product.service.js', () => ({
 
 const actor: OrderActor = {
   id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  roleCode: 'OWNER',
   permissions: ['products.view'],
 };
 const productId = '33333333-3333-4333-8333-333333333333';

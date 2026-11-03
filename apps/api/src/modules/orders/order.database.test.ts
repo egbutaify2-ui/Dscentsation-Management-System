@@ -16,7 +16,6 @@ const app = createApp();
 const repository = new PostgresOrderRepository();
 const suffix = randomUUID();
 const password = 'DMS-task022-test-password';
-const ownerRoleCode = 'T022_' + suffix.slice(0, 8).toUpperCase();
 const ownerEmail = 'task022.owner.' + suffix + '@example.invalid';
 const deniedEmail = 'task022.denied.' + suffix + '@example.invalid';
 const locationCode = 'T022-' + suffix.slice(0, 12).toUpperCase();
@@ -30,6 +29,7 @@ let otherProductId = '';
 let highValueProductId = '';
 let highValueVariantId = '';
 let createdOrderId = '';
+let orderPermissionGrants: Array<{ role_id: string; permission_id: string }> = [];
 
 type Agent = ReturnType<typeof request.agent>;
 
@@ -173,25 +173,26 @@ describe('Order database persistence and authenticated API', () => {
   beforeAll(async () => {
     await pool.query('SELECT 1');
 
-    const role = await pool.query<{ id: string }>(
-      'INSERT INTO roles(code, name, description) VALUES ($1, $2, $3) RETURNING id',
-      [ownerRoleCode, 'Task 022 Test Role', 'Disposable integration-test role.'],
+    const ownerRole = await pool.query<{ id: string }>(
+      "SELECT id FROM roles WHERE code = 'OWNER'",
     );
-    const roleId = role.rows[0]?.id;
-    if (!roleId) throw new Error('Task 022 integration-test role was not created.');
+    const ownerRoleId = ownerRole.rows[0]?.id;
+    if (!ownerRoleId) throw new Error('The seeded OWNER role is missing.');
 
-    // A disposable non-production role gives this test actor explicit Order access.
-    await pool.query(
+    // Add only the Order permissions this test needs, and remove these exact
+    // test-only links afterward. Production role grants remain unchanged.
+    const grants = await pool.query<{ role_id: string; permission_id: string }>(
       'INSERT INTO role_permissions(role_id, permission_id) ' +
-        'SELECT $1, id FROM permissions ' +
-        'WHERE code = ANY($2::text[]) ON CONFLICT DO NOTHING',
+        'SELECT $1, id FROM permissions WHERE code = ANY($2::text[]) ' +
+        'ON CONFLICT DO NOTHING RETURNING role_id, permission_id',
       [
-        roleId,
+        ownerRoleId,
         ['orders.view', 'orders.create', 'orders.update', 'customers.view', 'products.view'],
       ],
     );
+    orderPermissionGrants = grants.rows;
 
-    actorId = await createUser(ownerEmail, roleId);
+    actorId = await createUser(ownerEmail, ownerRoleId);
     const staffRole = await pool.query<{ id: string }>("SELECT id FROM roles WHERE code = 'STAFF'");
     if (!staffRole.rows[0]) throw new Error('The seeded STAFF role is missing.');
     await createUser(deniedEmail, staffRole.rows[0].id);
@@ -221,6 +222,17 @@ describe('Order database persistence and authenticated API', () => {
   afterAll(async () => {
     await pool.query('DROP TRIGGER IF EXISTS task022_reject_order_audit ON audit_logs');
     await pool.query('DROP FUNCTION IF EXISTS task022_reject_order_audit_fn()');
+    if (orderPermissionGrants.length > 0) {
+      await pool.query(
+        'DELETE FROM role_permissions rp ' +
+          'USING unnest($1::uuid[], $2::uuid[]) AS granted(role_id, permission_id) ' +
+          'WHERE rp.role_id = granted.role_id AND rp.permission_id = granted.permission_id',
+        [
+          orderPermissionGrants.map((grant) => grant.role_id),
+          orderPermissionGrants.map((grant) => grant.permission_id),
+        ],
+      );
+    }
   });
 
   it(

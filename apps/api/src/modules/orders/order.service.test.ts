@@ -17,6 +17,7 @@ import type {
 
 const actor: OrderActor = {
   id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  roleCode: 'OWNER',
   permissions: ['customers.view', 'products.view'],
 };
 const customerId = '11111111-1111-4111-8111-111111111111';
@@ -105,6 +106,7 @@ function makeRepository(initial?: OrderRecord) {
 function makeService(
   repository: OrderRepository,
   customerStatus: 'active' | 'archived' = 'active',
+  locationAccess: (actor: OrderActor, locationId: string) => Promise<boolean> = async () => true,
 ) {
   const customerLookup = vi.fn(async (_actor: OrderActor, requestedId: string) => {
     if (customerStatus === 'archived') {
@@ -137,7 +139,7 @@ function makeService(
   );
 
   return {
-    service: new OrderService({ repository, customerLookup, productSnapshotLookup }),
+    service: new OrderService({ repository, customerLookup, productSnapshotLookup, locationAccess }),
     customerLookup,
     productSnapshotLookup,
   };
@@ -185,6 +187,26 @@ describe('OrderService', () => {
     },
   );
 
+  it('rejects an inaccessible fulfilment location before resolving customer or product data', async () => {
+    const { repository } = makeRepository();
+    const customerLookup = vi.fn();
+    const productSnapshotLookup = vi.fn();
+    const service = new OrderService({
+      repository,
+      customerLookup,
+      productSnapshotLookup,
+      locationAccess: async () => false,
+    });
+
+    await expect(service.createOrder(actor, 'request-create', createInput)).rejects.toMatchObject({
+      status: 403,
+      code: 'LOCATION_ACCESS_DENIED',
+    });
+    expect(repository.createReceivedOrder).not.toHaveBeenCalled();
+    expect(customerLookup).not.toHaveBeenCalled();
+    expect(productSnapshotLookup).not.toHaveBeenCalled();
+  });
+
   it('does not persist an order for an archived customer', async () => {
     const { repository } = makeRepository();
     const { service } = makeService(repository, 'archived');
@@ -210,6 +232,27 @@ describe('OrderService', () => {
     expect(updated.notes).toBe('Updated synthetic note');
     expect(updated.status).toBe('received');
     expect(getCurrent()?.updatedBy).toBe(actor.id);
+  });
+
+  it('revalidates the current fulfilment location during amendment', async () => {
+    const { repository } = makeRepository(createRecord(createOrderInput()));
+    const service = new OrderService({
+      repository,
+      customerLookup: async () => {
+        throw new Error('Customer lookup must not run for a notes-only amendment.');
+      },
+      productSnapshotLookup: async () => [],
+      locationAccess: async (_requestingActor, requestedLocationId) =>
+        requestedLocationId !== locationId,
+    });
+
+    await expect(
+      service.amendOrder(actor, 'request-amend', 'order-id', { notes: 'Assignment revoked' }),
+    ).rejects.toMatchObject({
+      status: 403,
+      code: 'LOCATION_ACCESS_DENIED',
+    });
+    expect(repository.amendReceivedOrder).toHaveBeenCalledTimes(1);
   });
 
   it('rejects amendment after an order leaves received status', async () => {

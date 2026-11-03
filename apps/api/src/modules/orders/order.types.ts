@@ -1,6 +1,8 @@
 import type { CustomerActor } from '../customers/customer.service.js';
 
-export type OrderActor = CustomerActor;
+export interface OrderActor extends CustomerActor {
+  roleCode: 'OWNER' | 'MANAGER' | 'STAFF';
+}
 
 export type OrderSourceChannel = 'whatsapp' | 'instagram' | 'website' | 'phone';
 

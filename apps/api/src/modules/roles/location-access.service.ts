@@ -1,3 +1,4 @@
+import type { QueryResultRow } from 'pg';
 import { pool } from '../../db/pool.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import { hasPermission } from './permission.service.js';
@@ -8,23 +9,87 @@ export interface PickupTransferScope {
   pickupMode: string;
 }
 
-/** Owner/Manager have global access; Staff require an explicit active location assignment. */
+export interface AccessibleStockLocation {
+  id: string;
+  code: string;
+  /** UI-ready label. The location code is included when present. */
+  name: string;
+  isActive: true;
+}
+
+interface AccessibleStockLocationRow extends QueryResultRow {
+  id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+}
+
+/**
+ * Returns fulfilment locations the authenticated employee may use.
+ * Owner/Manager can use every active location; Staff require an active
+ * user_location_access assignment. Shared read-only inventory visibility is
+ * deliberately not treated as fulfilment authority.
+ */
+export async function listAccessibleStockLocations(
+  user: Pick<AuthenticatedUser, 'id' | 'roleCode'>,
+): Promise<AccessibleStockLocation[]> {
+  const result = await pool.query<AccessibleStockLocationRow>(
+    `
+      SELECT l.id, l.code, l.name, l.is_active
+      FROM locations l
+      WHERE l.is_active = true
+        AND (
+          $1::boolean = true
+          OR (
+            $2::text = 'STAFF'
+            AND EXISTS (
+              SELECT 1
+              FROM user_location_access ula
+              WHERE ula.user_id = $3 AND ula.location_id = l.id
+            )
+          )
+        )
+      ORDER BY lower(l.name), lower(l.code), l.id
+    `,
+    [user.roleCode === 'OWNER' || user.roleCode === 'MANAGER', user.roleCode, user.id],
+  );
+
+  return result.rows.map((row) => {
+    const code = row.code.trim();
+    return {
+      id: row.id,
+      code: row.code,
+      name: code ? `${row.name} (${code})` : row.name,
+      isActive: true,
+    };
+  });
+}
+
+/** Owner/Manager have global active-location access; Staff require an active assignment. */
 export async function canAccessStockLocation(
-  user: AuthenticatedUser,
+  user: Pick<AuthenticatedUser, 'id' | 'roleCode'>,
   locationId: string,
 ): Promise<boolean> {
-  if (user.roleCode === 'OWNER' || user.roleCode === 'MANAGER') return true;
-  if (user.roleCode !== 'STAFF') return false;
-
   const result = await pool.query(
     `
       SELECT 1
-      FROM user_location_access ula
-      JOIN locations l ON l.id = ula.location_id
-      WHERE ula.user_id = $1 AND ula.location_id = $2 AND l.is_active = true
+      FROM locations l
+      WHERE l.id = $1
+        AND l.is_active = true
+        AND (
+          $2::text IN ('OWNER', 'MANAGER')
+          OR (
+            $2::text = 'STAFF'
+            AND EXISTS (
+              SELECT 1
+              FROM user_location_access ula
+              WHERE ula.user_id = $3 AND ula.location_id = l.id
+            )
+          )
+        )
       LIMIT 1
     `,
-    [user.id, locationId],
+    [locationId, user.roleCode, user.id],
   );
   return result.rowCount === 1;
 }

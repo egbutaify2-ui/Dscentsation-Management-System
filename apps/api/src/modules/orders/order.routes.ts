@@ -34,7 +34,11 @@ function actor(request: Request) {
   if (!request.auth) {
     throw new OrderError('Authentication is required.', 401, 'AUTHENTICATION_REQUIRED');
   }
-  return { id: request.auth.id, permissions: request.auth.permissions };
+  return {
+    id: request.auth.id,
+    permissions: request.auth.permissions,
+    roleCode: request.auth.roleCode,
+  };
 }
 
 function validationResponse(error: ZodError) {

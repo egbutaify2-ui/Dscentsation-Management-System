@@ -1,5 +1,6 @@
 import { loadActiveOrderCustomer } from './order.customer.adapter.js';
-import { orderConflict } from './order.errors.js';
+import { canAccessStockLocation } from '../roles/location-access.service.js';
+import { orderConflict, orderLocationForbidden } from './order.errors.js';
 import {
   calculateLineTotalMinor,
   calculateOrderTotals,
@@ -30,21 +31,32 @@ export type OrderProductSnapshotLookup = (
   items: readonly OrderItemRequest[],
 ) => Promise<OrderProductSnapshot[]>;
 
+export type OrderLocationAccess = (actor: OrderActor, locationId: string) => Promise<boolean>;
+
 export interface OrderServiceDependencies {
   repository: OrderRepository;
   customerLookup?: OrderCustomerLookup;
   productSnapshotLookup?: OrderProductSnapshotLookup;
+  locationAccess?: OrderLocationAccess;
 }
 
 export class OrderService {
   private readonly repository: OrderRepository;
   private readonly customerLookup: OrderCustomerLookup;
   private readonly productSnapshotLookup: OrderProductSnapshotLookup;
+  private readonly locationAccess: OrderLocationAccess;
 
   constructor(dependencies: OrderServiceDependencies) {
     this.repository = dependencies.repository;
     this.customerLookup = dependencies.customerLookup ?? loadActiveOrderCustomer;
     this.productSnapshotLookup = dependencies.productSnapshotLookup ?? prepareOrderProductSnapshots;
+    this.locationAccess = dependencies.locationAccess ?? canAccessStockLocation;
+  }
+
+  private async assertLocationAccess(actor: OrderActor, locationId: string): Promise<void> {
+    if (!(await this.locationAccess(actor, locationId))) {
+      throw orderLocationForbidden();
+    }
   }
 
   async createOrder(
@@ -52,6 +64,7 @@ export class OrderService {
     requestId: string,
     input: CreateOrderInput,
   ): Promise<OrderRecord> {
+    await this.assertLocationAccess(actor, input.fulfilmentLocationId);
     const customer = await this.customerLookup(actor, input.customerId);
     const items = await this.buildItems(actor, input.items);
     const totals = calculateOrderTotals(items);
@@ -90,6 +103,9 @@ export class OrderService {
         throw orderConflict('Only orders in the received state can be amended.');
       }
 
+      const fulfilmentLocationId = input.fulfilmentLocationId ?? current.fulfilmentLocationId;
+      await this.assertLocationAccess(actor, fulfilmentLocationId);
+
       const customerId = input.customerId ?? current.customerId;
       let customerSnapshot = {
         customerNameSnapshot: current.customerNameSnapshot,
@@ -113,7 +129,7 @@ export class OrderService {
         customerId,
         ...customerSnapshot,
         sourceChannel: input.sourceChannel ?? current.sourceChannel,
-        fulfilmentLocationId: input.fulfilmentLocationId ?? current.fulfilmentLocationId,
+        fulfilmentLocationId,
         items,
         currency: ORDER_CURRENCY,
         deliveryAddressSnapshot:

@@ -28,3 +28,11 @@ export function orderForbidden(): OrderError {
     'FORBIDDEN',
   );
 }
+
+export function orderLocationForbidden(): OrderError {
+  return new OrderError(
+    'You are not authorised to use this fulfilment location.',
+    403,
+    'LOCATION_ACCESS_DENIED',
+  );
+}
