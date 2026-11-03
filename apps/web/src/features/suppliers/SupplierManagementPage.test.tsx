@@ -155,6 +155,7 @@ describe('SupplierManagementPage', () => {
         selector: 'p',
       }),
     ).toBeTruthy();
+    expect(screen.getAllByText('SUP-000123')).toHaveLength(2);
   });
 
   it('asks for confirmation before deactivation and uses the status endpoint', async () => {
