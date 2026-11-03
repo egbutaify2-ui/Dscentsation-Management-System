@@ -54,49 +54,57 @@ function validationResponse(error: ZodError) {
   };
 }
 
-router.get('/orders', requirePermission('orders.view'), async (request, response, next) => {
-  try {
-    const parsed = listOrdersQuerySchema.safeParse(request.query);
-    if (!parsed.success) {
-      response.status(400).json(validationResponse(parsed.error));
-      return;
+router.get(
+  '/orders',
+  requirePermission('orders.view'),
+  async (request, response, next) => {
+    try {
+      const parsed = listOrdersQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      const page = await repository.listOrders({
+        query: parsed.data.q,
+        status: parsed.data.status,
+        customerId: parsed.data.customerId,
+        sourceChannel: parsed.data.sourceChannel,
+        fulfilmentLocationId: parsed.data.fulfilmentLocationId,
+        page: parsed.data.page ?? 1,
+        pageSize: parsed.data.pageSize ?? 25,
+      });
+      response.json({
+        data: page.items,
+        meta: {
+          page: page.page,
+          pageSize: page.pageSize,
+          total: page.total,
+          totalPages: page.totalPages,
+        },
+      });
+    } catch (error) {
+      next(error);
     }
-    const page = await repository.listOrders({
-      query: parsed.data.q,
-      status: parsed.data.status,
-      customerId: parsed.data.customerId,
-      sourceChannel: parsed.data.sourceChannel,
-      fulfilmentLocationId: parsed.data.fulfilmentLocationId,
-      page: parsed.data.page ?? 1,
-      pageSize: parsed.data.pageSize ?? 25,
-    });
-    response.json({
-      data: page.items,
-      meta: {
-        page: page.page,
-        pageSize: page.pageSize,
-        total: page.total,
-        totalPages: page.totalPages,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
-router.post('/orders', requirePermission('orders.create'), async (request, response, next) => {
-  try {
-    const parsed = createOrderSchema.safeParse(request.body);
-    if (!parsed.success) {
-      response.status(400).json(validationResponse(parsed.error));
-      return;
+router.post(
+  '/orders',
+  requirePermission('orders.create'),
+  async (request, response, next) => {
+    try {
+      const parsed = createOrderSchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      const record = await service.createOrder(actor(request), request.requestId, parsed.data);
+      response.status(201).json({ data: record });
+    } catch (error) {
+      next(error);
     }
-    const record = await service.createOrder(actor(request), request.requestId, parsed.data);
-    response.status(201).json({ data: record });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
 router.get(
   '/orders/:orderId',
