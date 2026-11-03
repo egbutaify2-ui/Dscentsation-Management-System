@@ -31,6 +31,7 @@ function createRecord(input: OrderCreateWriteModel): OrderRecord {
   return {
     ...input,
     id: '55555555-5555-4555-8555-555555555555',
+    updatedBy: input.createdBy,
     createdAt: '2026-11-02T00:00:00.000Z',
     updatedAt: '2026-11-02T00:00:00.000Z',
   };
