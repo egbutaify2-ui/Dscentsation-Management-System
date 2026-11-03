@@ -176,23 +176,33 @@ describe('authenticated fulfilment Location API and Order location enforcement',
     customerId = customer.rows[0]?.id ?? '';
     if (!customerId) throw new Error('Synthetic order customer fixture was not created.');
 
-    const product = await pool.query<{ id: string }>(
-      'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
-      ['Synthetic Order Location Product', owner.id],
-    );
-    productId = product.rows[0]?.id ?? '';
-    if (!productId) throw new Error('Synthetic order product fixture was not created.');
+    const productClient = await pool.connect();
+    try {
+      await productClient.query('BEGIN');
+      const product = await productClient.query<{ id: string }>(
+        'INSERT INTO products(name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id',
+        ['Synthetic Order Location Product', owner.id],
+      );
+      productId = product.rows[0]?.id ?? '';
+      if (!productId) throw new Error('Synthetic order product fixture was not created.');
 
-    const variant = await pool.query<{ id: string }>(
-      'INSERT INTO product_variants(' +
-        'product_id, name, unit_of_measure, selling_price_minor, cost_price_minor, currency, ' +
-        'is_active, is_default, created_by, updated_by' +
-        ") VALUES ($1, 'Synthetic unit', 'unit', 10000, 5000, 'NGN', true, true, $2, $2) " +
-        'RETURNING id',
-      [productId, owner.id],
-    );
-    variantId = variant.rows[0]?.id ?? '';
-    if (!variantId) throw new Error('Synthetic order variant fixture was not created.');
+      const variant = await productClient.query<{ id: string }>(
+        'INSERT INTO product_variants(' +
+          'product_id, name, unit_of_measure, selling_price_minor, cost_price_minor, currency, ' +
+          'is_active, is_default, created_by, updated_by' +
+          ") VALUES ($1, 'Synthetic unit', 'unit', 10000, 5000, 'NGN', true, true, $2, $2) " +
+          'RETURNING id',
+        [productId, owner.id],
+      );
+      variantId = variant.rows[0]?.id ?? '';
+      if (!variantId) throw new Error('Synthetic order variant fixture was not created.');
+      await productClient.query('COMMIT');
+    } catch (error) {
+      await productClient.query('ROLLBACK');
+      throw error;
+    } finally {
+      productClient.release();
+    }
   });
 
   afterAll(async () => {
