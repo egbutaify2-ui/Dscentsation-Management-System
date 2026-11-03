@@ -9,7 +9,7 @@ const orderItemRequestSchema = z
   .object({
     productId: z.string().uuid(),
     variantId: z.string().uuid(),
-    quantity: z.number().int().positive().safe(),
+    quantity: z.number().int().positive().safe().max(2_147_483_647),
   })
   .strict();
 
@@ -44,5 +44,25 @@ export const amendOrderSchema = z
     message: 'Provide at least one order field to amend.',
   });
 
+const positiveIntegerQuery = (maximum: number) =>
+  z
+    .string()
+    .regex(/^[1-9][0-9]{0,6}$/, 'Use a positive integer.')
+    .transform(Number)
+    .refine((value) => value <= maximum, 'The requested pagination value exceeds the limit.');
+
+export const listOrdersQuerySchema = z
+  .object({
+    q: z.string().trim().max(100).optional(),
+    status: z.union([orderStatusSchema, z.literal('all')]).optional(),
+    customerId: z.string().uuid().optional(),
+    sourceChannel: orderSourceChannelSchema.optional(),
+    fulfilmentLocationId: z.string().uuid().optional(),
+    page: positiveIntegerQuery(1_000_000).optional(),
+    pageSize: positiveIntegerQuery(100).optional(),
+  })
+  .strict();
+
 export type CreateOrderRequest = z.infer<typeof createOrderSchema>;
 export type AmendOrderRequest = z.infer<typeof amendOrderSchema>;
+export type ListOrdersRequest = z.infer<typeof listOrdersQuerySchema>;

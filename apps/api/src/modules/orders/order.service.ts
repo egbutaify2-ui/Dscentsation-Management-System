@@ -52,7 +52,7 @@ export class OrderService {
     requestId: string,
     input: CreateOrderInput,
   ): Promise<OrderRecord> {
-    await this.customerLookup(actor, input.customerId);
+    const customer = await this.customerLookup(actor, input.customerId);
     const items = await this.buildItems(actor, input.items);
     const totals = calculateOrderTotals(items);
     const context: OrderMutationContext = { actorId: actor.id, requestId };
@@ -60,6 +60,9 @@ export class OrderService {
     return this.repository.createReceivedOrder(
       {
         customerId: input.customerId,
+        customerNameSnapshot: customer.fullName,
+        customerPhoneSnapshot: customer.phone,
+        customerEmailSnapshot: customer.email,
         sourceChannel: input.sourceChannel,
         status: 'received',
         fulfilmentLocationId: input.fulfilmentLocationId,
@@ -88,8 +91,18 @@ export class OrderService {
       }
 
       const customerId = input.customerId ?? current.customerId;
+      let customerSnapshot = {
+        customerNameSnapshot: current.customerNameSnapshot,
+        customerPhoneSnapshot: current.customerPhoneSnapshot,
+        customerEmailSnapshot: current.customerEmailSnapshot,
+      };
       if (input.customerId !== undefined && input.customerId !== current.customerId) {
-        await this.customerLookup(actor, customerId);
+        const customer = await this.customerLookup(actor, customerId);
+        customerSnapshot = {
+          customerNameSnapshot: customer.fullName,
+          customerPhoneSnapshot: customer.phone,
+          customerEmailSnapshot: customer.email,
+        };
       }
 
       const items =
@@ -98,6 +111,7 @@ export class OrderService {
 
       return {
         customerId,
+        ...customerSnapshot,
         sourceChannel: input.sourceChannel ?? current.sourceChannel,
         fulfilmentLocationId: input.fulfilmentLocationId ?? current.fulfilmentLocationId,
         items,

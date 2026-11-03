@@ -8,9 +8,8 @@ import type {
 /**
  * Persistence boundary for Task 022.
  *
- * The concrete PostgreSQL adapter is intentionally connected when migration 007
- * can be added after migrations 005 and 006 are integrated. Its implementation
- * must keep each header/item/audit write in one transaction.
+ * The PostgreSQL adapter in order.postgres.repository.ts implements this contract.
+ * It keeps each header/item/audit write in one transaction.
  */
 export interface OrderRepository {
   createReceivedOrder(

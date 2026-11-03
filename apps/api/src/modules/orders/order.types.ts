@@ -65,7 +65,13 @@ export interface OrderTotals {
   totalMinor: string;
 }
 
-export interface OrderCreateWriteModel extends OrderTotals {
+export interface OrderCustomerSnapshot {
+  customerNameSnapshot: string;
+  customerPhoneSnapshot: string | null;
+  customerEmailSnapshot: string | null;
+}
+
+export interface OrderCreateWriteModel extends OrderTotals, OrderCustomerSnapshot {
   customerId: string;
   sourceChannel: OrderSourceChannel;
   status: 'received';
@@ -77,7 +83,7 @@ export interface OrderCreateWriteModel extends OrderTotals {
   createdBy: string;
 }
 
-export interface OrderAmendmentWriteModel extends OrderTotals {
+export interface OrderAmendmentWriteModel extends OrderTotals, OrderCustomerSnapshot {
   customerId: string;
   sourceChannel: OrderSourceChannel;
   fulfilmentLocationId: string;

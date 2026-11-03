@@ -35,6 +35,8 @@ const requiredApplicationTables = [
   'expense_categories',
   'expenses',
   'expense_revisions',
+  'orders',
+  'order_items',
 ] as const;
 
 export async function assertDatabaseReady(): Promise<void> {

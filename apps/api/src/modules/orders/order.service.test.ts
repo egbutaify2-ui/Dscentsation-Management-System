@@ -37,6 +37,9 @@ const productSnapshot: OrderProductSnapshot = {
 function createOrderInput(): OrderCreateWriteModel {
   return {
     customerId,
+    customerNameSnapshot: 'Synthetic Customer',
+    customerPhoneSnapshot: null,
+    customerEmailSnapshot: null,
     sourceChannel: 'whatsapp',
     status: 'received',
     fulfilmentLocationId: locationId,

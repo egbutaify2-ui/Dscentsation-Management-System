@@ -9,6 +9,7 @@ import { customerRoutes } from './modules/customers/customer.routes.js';
 import { supplierRoutes } from './modules/suppliers/supplier.routes.js';
 import { expenseRoutes } from './modules/expenses/expense.routes.js';
 import { productRoutes } from './modules/products/product.routes.js';
+import { orderRoutes } from './modules/orders/order.routes.js';
 import { userAdminRoutes } from './modules/users/user-admin.routes.js';
 
 export function createApp(): express.Express {
@@ -35,6 +36,7 @@ export function createApp(): express.Express {
   app.use('/api/v1', supplierRoutes);
   app.use('/api/v1', expenseRoutes);
   app.use('/api/v1', productRoutes);
+  app.use('/api/v1', orderRoutes);
 
   app.use((_request, response) => {
     response.status(404).json({
