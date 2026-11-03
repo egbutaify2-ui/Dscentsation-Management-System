@@ -4,7 +4,6 @@ import { z } from 'zod';
 import type { ZodError } from 'zod';
 import { requireAuthentication } from '../../middleware/authentication.js';
 import { requirePermission } from '../../middleware/authorization.js';
-import { listAccessibleStockLocations } from '../roles/location-access.service.js';
 import { CustomerError } from '../customers/customer.errors.js';
 import { ProductError } from '../products/product.errors.js';
 import { OrderError } from './order.errors.js';
@@ -59,14 +58,14 @@ router.get('/orders', requirePermission('orders.view'), async (request, response
       return;
     }
     const currentActor = actor(request);
-    const accessibleLocations = await listAccessibleStockLocations(currentActor);
     const page = await repository.listOrders({
       query: parsed.data.q,
       status: parsed.data.status,
       customerId: parsed.data.customerId,
       sourceChannel: parsed.data.sourceChannel,
       fulfilmentLocationId: parsed.data.fulfilmentLocationId,
-      accessibleLocationIds: accessibleLocations.map((location) => location.id),
+      actorId: currentActor.id,
+      actorRoleCode: currentActor.roleCode,
       page: parsed.data.page ?? 1,
       pageSize: parsed.data.pageSize ?? 25,
     });
@@ -104,11 +103,11 @@ router.get(
   async (request, response, next) => {
     try {
       const currentActor = actor(request);
-      const accessibleLocations = await listAccessibleStockLocations(currentActor);
       response.json({
-        data: await repository.getOrderForLocations(
+        data: await repository.getOrderForActor(
           routeId(request.params.orderId!),
-          accessibleLocations.map((location) => location.id),
+          currentActor.id,
+          currentActor.roleCode,
         ),
       });
     } catch (error) {
