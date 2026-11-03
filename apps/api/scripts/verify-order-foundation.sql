@@ -12,6 +12,8 @@ DECLARE
   item_fk_count INTEGER;
   index_count INTEGER;
   trigger_count INTEGER;
+  order_status_definition TEXT;
+  order_channel_definition TEXT;
 BEGIN
   SELECT array_agg(table_name ORDER BY table_name)
     INTO order_tables
@@ -22,6 +24,40 @@ BEGIN
 
   IF order_tables IS DISTINCT FROM ARRAY['order_items', 'orders']::TEXT[] THEN
     RAISE EXCEPTION 'Order Foundation tables are missing or unexpected: %', order_tables;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'orders'
+       AND column_name IN (
+         'customer_name_snapshot', 'customer_phone_snapshot', 'customer_email_snapshot'
+       )
+     GROUP BY table_name HAVING count(*) = 3
+  ) OR NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'order_items'
+       AND column_name IN (
+         'product_name_snapshot', 'variant_name_snapshot', 'sku_snapshot',
+         'unit_of_measure_snapshot'
+       )
+     GROUP BY table_name HAVING count(*) = 4
+  ) THEN
+    RAISE EXCEPTION 'Customer and product snapshot columns are incomplete';
+  END IF;
+
+  SELECT pg_get_constraintdef(oid) INTO order_status_definition
+    FROM pg_constraint
+   WHERE conrelid = 'orders'::regclass AND conname = 'orders_status_check';
+  SELECT pg_get_constraintdef(oid) INTO order_channel_definition
+    FROM pg_constraint
+   WHERE conrelid = 'orders'::regclass AND conname = 'orders_source_channel_check';
+  IF order_status_definition IS NULL
+     OR position('received' in order_status_definition) = 0
+     OR position('fulfilment_hold' in order_status_definition) = 0
+     OR order_channel_definition IS NULL
+     OR position('whatsapp' in order_channel_definition) = 0
+     OR position('website' in order_channel_definition) = 0 THEN
+    RAISE EXCEPTION 'Order source-channel or accepted lifecycle constraints are incomplete';
   END IF;
 
   SELECT data_type INTO amount_type
