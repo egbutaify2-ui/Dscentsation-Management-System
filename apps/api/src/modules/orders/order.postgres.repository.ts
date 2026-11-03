@@ -381,8 +381,8 @@ export class PostgresOrderRepository implements OrderRepository {
         ' FROM orders o WHERE o.id = $1 AND EXISTS (' +
         'SELECT 1 FROM locations l ' +
         'WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
-        'AND ($2::text IN (\'OWNER\', \'MANAGER\') OR (' +
-        '$2::text = \'STAFF\' AND EXISTS (' +
+        "AND ($2::text IN ('OWNER', 'MANAGER') OR (" +
+        "$2::text = 'STAFF' AND EXISTS (" +
         'SELECT 1 FROM user_location_access ula ' +
         'WHERE ula.user_id = $3::uuid AND ula.location_id = l.id' +
         '))))',
@@ -420,8 +420,8 @@ export class PostgresOrderRepository implements OrderRepository {
       'AND EXISTS (' +
       'SELECT 1 FROM locations l ' +
       'WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
-      'AND ($6::text IN (\'OWNER\', \'MANAGER\') OR (' +
-      '$6::text = \'STAFF\' AND EXISTS (' +
+      "AND ($6::text IN ('OWNER', 'MANAGER') OR (" +
+      "$6::text = 'STAFF' AND EXISTS (" +
       'SELECT 1 FROM user_location_access ula ' +
       'WHERE ula.user_id = $7::uuid AND ula.location_id = l.id' +
       '))))';
