@@ -44,8 +44,7 @@ export class OrderService {
   constructor(dependencies: OrderServiceDependencies) {
     this.repository = dependencies.repository;
     this.customerLookup = dependencies.customerLookup ?? loadActiveOrderCustomer;
-    this.productSnapshotLookup =
-      dependencies.productSnapshotLookup ?? prepareOrderProductSnapshots;
+    this.productSnapshotLookup = dependencies.productSnapshotLookup ?? prepareOrderProductSnapshots;
   }
 
   async createOrder(
