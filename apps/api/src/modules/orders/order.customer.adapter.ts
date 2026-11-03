@@ -1,7 +1,4 @@
-import {
-  getCustomer,
-  type CustomerRecord,
-} from '../customers/customer.service.js';
+import { getCustomer, type CustomerRecord } from '../customers/customer.service.js';
 import { orderConflict } from './order.errors.js';
 import type { OrderActor } from './order.types.js';
 
