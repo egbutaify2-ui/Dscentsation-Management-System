@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getProduct } from '../products/product.service.js';
 import { prepareOrderProductSnapshots } from './order.product.adapter.js';
+import type { OrderActor } from './order.types.js';
 
 vi.mock('../products/product.service.js', () => ({
   getProduct: vi.fn(),
 }));
 
+const actor: OrderActor = {
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  permissions: ['products.view'],
+};
 const productId = '33333333-3333-4333-8333-333333333333';
 const variantId = '44444444-4444-4444-8444-444444444444';
 
@@ -45,7 +50,7 @@ describe('prepareOrderProductSnapshots', () => {
   it('copies the active product/variant identity and server selling price, never cost price', async () => {
     vi.mocked(getProduct).mockResolvedValue(activeProduct);
 
-    const result = await prepareOrderProductSnapshots([
+    const result = await prepareOrderProductSnapshots(actor, [
       { productId, variantId, quantity: 2 },
     ]);
 
@@ -66,7 +71,7 @@ describe('prepareOrderProductSnapshots', () => {
   it('loads each product once when multiple variants/items share the same product', async () => {
     vi.mocked(getProduct).mockResolvedValue(activeProduct);
 
-    await prepareOrderProductSnapshots([
+    await prepareOrderProductSnapshots(actor, [
       { productId, variantId, quantity: 1 },
       { productId, variantId, quantity: 2 },
     ]);
@@ -74,10 +79,19 @@ describe('prepareOrderProductSnapshots', () => {
     expect(getProduct).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects access without products.view before loading any product', async () => {
+    await expect(
+      prepareOrderProductSnapshots({ ...actor, permissions: [] }, [
+        { productId, variantId, quantity: 1 },
+      ]),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(getProduct).not.toHaveBeenCalled();
+  });
+
   it('rejects archived products, inactive variants and variants outside the product', async () => {
     vi.mocked(getProduct).mockResolvedValue({ ...activeProduct, status: 'archived' });
     await expect(
-      prepareOrderProductSnapshots([{ productId, variantId, quantity: 1 }]),
+      prepareOrderProductSnapshots(actor, [{ productId, variantId, quantity: 1 }]),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
 
     vi.mocked(getProduct).mockResolvedValue({
@@ -85,12 +99,12 @@ describe('prepareOrderProductSnapshots', () => {
       variants: [{ ...activeProduct.variants[0]!, isActive: false }],
     });
     await expect(
-      prepareOrderProductSnapshots([{ productId, variantId, quantity: 1 }]),
+      prepareOrderProductSnapshots(actor, [{ productId, variantId, quantity: 1 }]),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
 
     vi.mocked(getProduct).mockResolvedValue({ ...activeProduct, variants: [] });
     await expect(
-      prepareOrderProductSnapshots([{ productId, variantId, quantity: 1 }]),
+      prepareOrderProductSnapshots(actor, [{ productId, variantId, quantity: 1 }]),
     ).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
   });
 
@@ -100,7 +114,7 @@ describe('prepareOrderProductSnapshots', () => {
       variants: [{ ...activeProduct.variants[0]!, currency: 'USD' }],
     });
     await expect(
-      prepareOrderProductSnapshots([{ productId, variantId, quantity: 1 }]),
+      prepareOrderProductSnapshots(actor, [{ productId, variantId, quantity: 1 }]),
     ).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
   });
 });
