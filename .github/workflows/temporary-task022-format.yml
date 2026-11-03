@@ -1,0 +1,50 @@
+name: Temporary Task 022 formatter pass
+
+on:
+  push:
+    branches:
+      - task-022-order-capture-implementation
+
+permissions:
+  contents: write
+
+jobs:
+  format-order-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 12.16.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 26.13.0
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format the two changed Order files and remove this temporary workflow
+        run: |
+          set -euo pipefail
+          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 --write \
+            apps/api/src/modules/orders/order.database.test.ts \
+            apps/api/src/modules/orders/order.postgres.repository.ts
+          rm .github/workflows/temporary-task022-format.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            apps/api/src/modules/orders/order.database.test.ts \
+            apps/api/src/modules/orders/order.postgres.repository.ts \
+            .github/workflows/temporary-task022-format.yml
+          git diff --cached --check
+          git commit -m "style: format Order location authorization changes"
+          git push origin HEAD:refs/heads/task-022-order-capture-implementation
