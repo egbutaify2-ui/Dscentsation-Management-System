@@ -20,7 +20,9 @@ describe('order request validation', () => {
   });
 
   it('requires a customer, fulfilment location and at least one item', () => {
-    expect(createOrderSchema.safeParse({ sourceChannel: 'website', items: [] }).success).toBe(false);
+    expect(
+      createOrderSchema.safeParse({ sourceChannel: 'website', items: [] }).success,
+    ).toBe(false);
     expect(
       createOrderSchema.safeParse({
         customerId,
