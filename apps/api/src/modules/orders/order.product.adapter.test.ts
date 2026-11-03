@@ -47,9 +47,7 @@ describe('prepareOrderProductSnapshots', () => {
     vi.mocked(getProduct).mockReset();
   });
 
-  it(
-    'copies the active product/variant identity and server selling price, never cost price',
-    async () => {
+  it('copies the active product/variant identity and server selling price, never cost price', async () => {
     vi.mocked(getProduct).mockResolvedValue(activeProduct);
 
     const result = await prepareOrderProductSnapshots(actor, [
@@ -68,8 +66,7 @@ describe('prepareOrderProductSnapshots', () => {
       },
     ]);
       expect(JSON.stringify(result)).not.toContain('900.00');
-    },
-  );
+  });
 
   it('loads each product once when multiple variants/items share the same product', async () => {
     vi.mocked(getProduct).mockResolvedValue(activeProduct);
