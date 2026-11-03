@@ -5,8 +5,8 @@ export const ORDER_CURRENCY = 'NGN' as const;
 export const ZERO_MINOR_UNITS = '0';
 
 const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
-const DECIMAL_AMOUNT_PATTERN = /^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$/;
-const MINOR_UNIT_PATTERN = /^(?:0|[1-9]\\d*)$/;
+const DECIMAL_AMOUNT_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
+const MINOR_UNIT_PATTERN = /^(?:0|[1-9]\d*)$/;
 
 function checkedMinorUnits(value: string): bigint {
   if (!MINOR_UNIT_PATTERN.test(value)) {
@@ -22,7 +22,9 @@ function checkedMinorUnits(value: string): bigint {
 
 export function toNgnMinorUnits(amount: string): string {
   if (!DECIMAL_AMOUNT_PATTERN.test(amount)) {
-    throw invalidOrder('Product selling prices must be non-negative NGN amounts with up to two decimals.');
+    throw invalidOrder(
+      'Product selling prices must be non-negative NGN amounts with up to two decimals.',
+    );
   }
 
   const [whole = '0', fraction = ''] = amount.split('.');
@@ -47,7 +49,7 @@ export function calculateLineTotalMinor(unitPriceMinor: string, quantity: number
 }
 
 export function calculateOrderTotals(
-  lines: readonly Pick<{ lineTotalMinor: string }, 'lineTotalMinor'>[],
+  lines: readonly { lineTotalMinor: string }[],
 ): OrderTotals {
   let subtotal = 0n;
   for (const line of lines) {
