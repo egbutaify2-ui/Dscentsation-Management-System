@@ -18,11 +18,15 @@ const suffix = randomUUID();
 const password = 'DMS-task022-test-password';
 const ownerEmail = 'task022.owner.' + suffix + '@example.invalid';
 const deniedEmail = 'task022.denied.' + suffix + '@example.invalid';
+const assignedStaffEmail = 'task022.assigned-staff.' + suffix + '@example.invalid';
+const managerEmail = 'task022.manager.' + suffix + '@example.invalid';
 const locationCode = 'T022-' + suffix.slice(0, 12).toUpperCase();
 
 let actorId = '';
 let customerId = '';
 let locationId = '';
+let otherLocationId = '';
+let inactiveLocationId = '';
 let productId = '';
 let variantId = '';
 let otherProductId = '';
@@ -111,7 +115,10 @@ function createOrderBody(productKey = productId, variantKey = variantId, quantit
   };
 }
 
-function directOrderWrite(notes: string): OrderCreateWriteModel {
+function directOrderWrite(
+  notes: string,
+  fulfilmentLocationId = locationId,
+): OrderCreateWriteModel {
   return {
     customerId,
     customerNameSnapshot: 'Captured Integration Customer',
@@ -119,7 +126,7 @@ function directOrderWrite(notes: string): OrderCreateWriteModel {
     customerEmailSnapshot: 'captured.customer@example.invalid',
     sourceChannel: 'website',
     status: 'received',
-    fulfilmentLocationId: locationId,
+    fulfilmentLocationId,
     items: [
       {
         productId,
@@ -190,10 +197,25 @@ describe('Order database persistence and authenticated API', () => {
     );
     orderPermissionGrants = grants.rows;
 
+    const additionalReadGrants = await pool.query<{ role_id: string; permission_id: string }>(
+      'INSERT INTO role_permissions(role_id, permission_id) ' +
+        'SELECT r.id, p.id FROM roles r CROSS JOIN permissions p ' +
+        "WHERE r.code = ANY($1::text[]) AND p.code = 'orders.view' " +
+        'ON CONFLICT DO NOTHING RETURNING role_id, permission_id',
+      [['MANAGER', 'STAFF']],
+    );
+    orderPermissionGrants.push(...additionalReadGrants.rows);
+
     actorId = await createUser(ownerEmail, ownerRoleId);
     const staffRole = await pool.query<{ id: string }>("SELECT id FROM roles WHERE code = 'STAFF'");
     if (!staffRole.rows[0]) throw new Error('The seeded STAFF role is missing.');
     await createUser(deniedEmail, staffRole.rows[0].id);
+    const assignedStaffId = await createUser(assignedStaffEmail, staffRole.rows[0].id);
+    const managerRole = await pool.query<{ id: string }>(
+      "SELECT id FROM roles WHERE code = 'MANAGER'",
+    );
+    if (!managerRole.rows[0]) throw new Error('The seeded MANAGER role is missing.');
+    await createUser(managerEmail, managerRole.rows[0].id);
 
     const location = await pool.query<{ id: string }>(
       'INSERT INTO locations(code, name, address) VALUES ($1, $2, $3) RETURNING id',
@@ -201,6 +223,25 @@ describe('Order database persistence and authenticated API', () => {
     );
     locationId = location.rows[0]?.id ?? '';
     if (!locationId) throw new Error('Task 022 test location was not created.');
+
+    const otherLocation = await pool.query<{ id: string }>(
+      'INSERT INTO locations(code, name, address) VALUES ($1, $2, $3) RETURNING id',
+      [locationCode + '-OTHER', 'Task 022 Other Active Location', 'Lagos, Nigeria'],
+    );
+    otherLocationId = otherLocation.rows[0]?.id ?? '';
+    if (!otherLocationId) throw new Error('Task 022 other location was not created.');
+
+    const inactiveLocation = await pool.query<{ id: string }>(
+      'INSERT INTO locations(code, name, address, is_active) VALUES ($1, $2, $3, false) RETURNING id',
+      [locationCode + '-OFF', 'Task 022 Inactive Historical Location', 'Lagos, Nigeria'],
+    );
+    inactiveLocationId = inactiveLocation.rows[0]?.id ?? '';
+    if (!inactiveLocationId) throw new Error('Task 022 inactive location was not created.');
+
+    await pool.query(
+      'INSERT INTO user_location_access(user_id, location_id, granted_by) VALUES ($1, $2, $3)',
+      [assignedStaffId, locationId, actorId],
+    );
 
     const customer = await pool.query<{ id: string }>(
       'INSERT INTO customers(full_name, phone, email, created_by, updated_by) ' +
@@ -327,6 +368,82 @@ describe('Order database persistence and authenticated API', () => {
     });
   });
 
+  it('scopes Order list and detail reads to server-derived active location access', async () => {
+    const assignedOrder = await repository.createReceivedOrder(
+      directOrderWrite('assigned-location-order'),
+      { actorId, requestId: randomUUID() },
+    );
+    const unassignedOrder = await repository.createReceivedOrder(
+      directOrderWrite('unassigned-location-order', otherLocationId),
+      { actorId, requestId: randomUUID() },
+    );
+    const inactiveHistoricalOrder = await repository.createReceivedOrder(
+      directOrderWrite('inactive-location-historical-order', inactiveLocationId),
+      { actorId, requestId: randomUUID() },
+    );
+
+    const assignedStaff = await login(assignedStaffEmail);
+    const staffList = await assignedStaff.agent.get('/api/v1/orders').expect(200);
+    const staffRows = staffList.body.data as Array<{
+      id: string;
+      fulfilmentLocationId: string;
+    }>;
+    expect(staffRows.some((row) => row.id === assignedOrder.id)).toBe(true);
+    expect(staffRows.every((row) => row.fulfilmentLocationId === locationId)).toBe(true);
+    expect(staffRows.some((row) => row.id === unassignedOrder.id)).toBe(false);
+    expect(staffRows.some((row) => row.id === inactiveHistoricalOrder.id)).toBe(false);
+
+    const clientSelectedUnassignedLocation = await assignedStaff.agent
+      .get('/api/v1/orders')
+      .query({ fulfilmentLocationId: otherLocationId })
+      .expect(200);
+    expect(clientSelectedUnassignedLocation.body.data).toEqual([]);
+    expect(clientSelectedUnassignedLocation.body.meta.total).toBe(0);
+
+    await assignedStaff.agent.get('/api/v1/orders/' + assignedOrder.id).expect(200);
+    const inaccessibleDetail = await assignedStaff.agent
+      .get('/api/v1/orders/' + unassignedOrder.id)
+      .expect(404);
+    const nonexistentDetail = await assignedStaff.agent
+      .get('/api/v1/orders/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+      .expect(404);
+    expect(inaccessibleDetail.body.error.code).toBe(nonexistentDetail.body.error.code);
+    expect(inaccessibleDetail.body.error.message).toBe(nonexistentDetail.body.error.message);
+
+    const owner = await login(ownerEmail);
+    const ownerList = await owner.agent.get('/api/v1/orders').expect(200);
+    expect(
+      ownerList.body.data.some((row: { id: string }) => row.id === assignedOrder.id),
+    ).toBe(true);
+    expect(
+      ownerList.body.data.some((row: { id: string }) => row.id === unassignedOrder.id),
+    ).toBe(true);
+    expect(
+      ownerList.body.data.some((row: { id: string }) => row.id === inactiveHistoricalOrder.id),
+    ).toBe(false);
+    await owner.agent.get('/api/v1/orders/' + unassignedOrder.id).expect(200);
+    await owner.agent.get('/api/v1/orders/' + inactiveHistoricalOrder.id).expect(404);
+
+    const manager = await login(managerEmail);
+    const managerList = await manager.agent.get('/api/v1/orders').expect(200);
+    expect(
+      managerList.body.data.some((row: { id: string }) => row.id === unassignedOrder.id),
+    ).toBe(true);
+    await manager.agent.get('/api/v1/orders/' + unassignedOrder.id).expect(200);
+    await manager.agent.get('/api/v1/orders/' + inactiveHistoricalOrder.id).expect(404);
+
+    const unassignedStaff = await login(deniedEmail);
+    const emptyAccessibleList = await unassignedStaff.agent.get('/api/v1/orders').expect(200);
+    expect(emptyAccessibleList.body.data).toEqual([]);
+    expect(emptyAccessibleList.body.meta.total).toBe(0);
+    await unassignedStaff.agent.get('/api/v1/orders/' + assignedOrder.id).expect(404);
+
+    // The existing location policy exposes only active assigned locations to Staff
+    // and all active locations to Owner/Manager. Historical orders tied to an
+    // inactive location therefore remain hidden until a separate visibility rule
+    // is approved; they are never silently included in active-location reads.
+  });
+
   it('rejects archived customers, archived products and mismatched product variants', async () => {
     const { agent, csrf } = await login(ownerEmail);
     await pool.query("UPDATE customers SET status = 'archived' WHERE id = $1", [customerId]);
@@ -342,7 +459,9 @@ describe('Order database persistence and authenticated API', () => {
 
   it('enforces permissions, CSRF, strict request validation and UUID checks', async () => {
     const denied = await login(deniedEmail);
-    await denied.agent.get('/api/v1/orders').expect(403);
+    const emptyList = await denied.agent.get('/api/v1/orders').expect(200);
+    expect(emptyList.body.data).toEqual([]);
+    expect(emptyList.body.meta.total).toBe(0);
     await postWithCsrf(denied.agent, denied.csrf, createOrderBody()).expect(403);
     await denied.agent
       .patch('/api/v1/orders/' + createdOrderId)
