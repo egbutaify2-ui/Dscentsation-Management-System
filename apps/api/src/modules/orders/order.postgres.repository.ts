@@ -114,9 +114,11 @@ function changedFields(current: OrderRecord, next: OrderAmendmentWriteModel): st
   const fields: string[] = [];
   if (current.customerId !== next.customerId) fields.push('customerId');
   if (current.sourceChannel !== next.sourceChannel) fields.push('sourceChannel');
-  if (current.fulfilmentLocationId !== next.fulfilmentLocationId) fields.push('fulfilmentLocationId');
+  if (current.fulfilmentLocationId !== next.fulfilmentLocationId)
+    fields.push('fulfilmentLocationId');
   if (JSON.stringify(current.items) !== JSON.stringify(next.items)) fields.push('items');
-  if (current.deliveryAddressSnapshot !== next.deliveryAddressSnapshot) fields.push('deliveryAddressSnapshot');
+  if (current.deliveryAddressSnapshot !== next.deliveryAddressSnapshot)
+    fields.push('deliveryAddressSnapshot');
   if (current.notes !== next.notes) fields.push('notes');
   return fields;
 }
