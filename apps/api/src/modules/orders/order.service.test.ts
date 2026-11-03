@@ -158,39 +158,36 @@ const createInput: CreateOrderInput = {
 };
 
 describe('OrderService', () => {
-  it(
-    'creates a received order using server-resolved product prices and zero fees/discounts',
-    async () => {
-      const { repository } = makeRepository();
-      const { service, customerLookup } = makeService(repository);
+  it('creates a received order using server-resolved product prices and zero fees/discounts', async () => {
+    const { repository } = makeRepository();
+    const { service, customerLookup } = makeService(repository);
 
-      const result = await service.createOrder(actor, 'request-create', createInput);
+    const result = await service.createOrder(actor, 'request-create', createInput);
 
-      expect(customerLookup).toHaveBeenCalledWith(actor, customerId);
-      expect(result.status).toBe('received');
-      expect(repository.createReceivedOrder).toHaveBeenCalledTimes(1);
-      expect(repository.createReceivedOrder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          customerId,
-          status: 'received',
-          subtotalMinor: '250000',
-          discountMinor: '0',
-          deliveryFeeMinor: '0',
-          totalMinor: '250000',
-          currency: 'NGN',
-        }),
-        { actorId: actor.id, requestId: 'request-create' },
-      );
-      expect(result.items[0]).toMatchObject({
-        productNameSnapshot: 'Synthetic Eau de Parfum',
-        variantNameSnapshot: '100 ml',
-        unitPriceMinor: '125000',
-        quantity: 2,
-        lineTotalMinor: '250000',
+    expect(customerLookup).toHaveBeenCalledWith(actor, customerId);
+    expect(result.status).toBe('received');
+    expect(repository.createReceivedOrder).toHaveBeenCalledTimes(1);
+    expect(repository.createReceivedOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerId,
+        status: 'received',
+        subtotalMinor: '250000',
         discountMinor: '0',
-      });
-    },
-  );
+        deliveryFeeMinor: '0',
+        totalMinor: '250000',
+        currency: 'NGN',
+      }),
+      { actorId: actor.id, requestId: 'request-create' },
+    );
+    expect(result.items[0]).toMatchObject({
+      productNameSnapshot: 'Synthetic Eau de Parfum',
+      variantNameSnapshot: '100 ml',
+      unitPriceMinor: '125000',
+      quantity: 2,
+      lineTotalMinor: '250000',
+      discountMinor: '0',
+    });
+  });
 
   it('rejects inaccessible locations before customer and product lookup', async () => {
     const { repository } = makeRepository();

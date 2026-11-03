@@ -9,11 +9,7 @@ import { ProductError } from '../products/product.errors.js';
 import { OrderError } from './order.errors.js';
 import { OrderService } from './order.service.js';
 import { PostgresOrderRepository } from './order.postgres.repository.js';
-import {
-  amendOrderSchema,
-  createOrderSchema,
-  listOrdersQuerySchema,
-} from './order.validation.js';
+import { amendOrderSchema, createOrderSchema, listOrdersQuerySchema } from './order.validation.js';
 
 const router = Router();
 const repository = new PostgresOrderRepository();

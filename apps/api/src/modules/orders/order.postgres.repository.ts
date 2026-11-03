@@ -254,7 +254,7 @@ export class PostgresOrderRepository implements OrderRepository {
           'customer_email_snapshot, source_channel, status, fulfilment_location_id, ' +
           'currency, subtotal_minor, discount_minor, delivery_fee_minor, total_minor, ' +
           'delivery_address_snapshot, notes, created_by, updated_by' +
-          ') VALUES ($1, $2, $3, $4, $5, \'received\', $6, $7, $8::bigint, $9::bigint, ' +
+          ") VALUES ($1, $2, $3, $4, $5, 'received', $6, $7, $8::bigint, $9::bigint, " +
           '$10::bigint, $11::bigint, $12, $13, $14, $14) RETURNING id',
         [
           order.customerId,
@@ -382,10 +382,10 @@ export class PostgresOrderRepository implements OrderRepository {
 
     const filterSql =
       ' FROM orders o WHERE ($1::text IS NULL OR ' +
-      'o.id::text ILIKE \'%\' || $1 || \'%\' OR ' +
-      'o.customer_name_snapshot ILIKE \'%\' || $1 || \'%\' OR ' +
-      'COALESCE(o.customer_phone_snapshot, \'\') ILIKE \'%\' || $1 || \'%\' OR ' +
-      'COALESCE(o.customer_email_snapshot, \'\') ILIKE \'%\' || $1 || \'%\') ' +
+      "o.id::text ILIKE '%' || $1 || '%' OR " +
+      "o.customer_name_snapshot ILIKE '%' || $1 || '%' OR " +
+      "COALESCE(o.customer_phone_snapshot, '') ILIKE '%' || $1 || '%' OR " +
+      "COALESCE(o.customer_email_snapshot, '') ILIKE '%' || $1 || '%') " +
       'AND ($2::text IS NULL OR o.status = $2) ' +
       'AND ($3::uuid IS NULL OR o.customer_id = $3) ' +
       'AND ($4::text IS NULL OR o.source_channel = $4) ' +
