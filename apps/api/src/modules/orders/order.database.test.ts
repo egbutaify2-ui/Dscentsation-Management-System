@@ -115,10 +115,7 @@ function createOrderBody(productKey = productId, variantKey = variantId, quantit
   };
 }
 
-function directOrderWrite(
-  notes: string,
-  fulfilmentLocationId = locationId,
-): OrderCreateWriteModel {
+function directOrderWrite(notes: string, fulfilmentLocationId = locationId): OrderCreateWriteModel {
   return {
     customerId,
     customerNameSnapshot: 'Captured Integration Customer',
@@ -412,12 +409,12 @@ describe('Order database persistence and authenticated API', () => {
 
     const owner = await login(ownerEmail);
     const ownerList = await owner.agent.get('/api/v1/orders').expect(200);
-    expect(
-      ownerList.body.data.some((row: { id: string }) => row.id === assignedOrder.id),
-    ).toBe(true);
-    expect(
-      ownerList.body.data.some((row: { id: string }) => row.id === unassignedOrder.id),
-    ).toBe(true);
+    expect(ownerList.body.data.some((row: { id: string }) => row.id === assignedOrder.id)).toBe(
+      true,
+    );
+    expect(ownerList.body.data.some((row: { id: string }) => row.id === unassignedOrder.id)).toBe(
+      true,
+    );
     expect(
       ownerList.body.data.some((row: { id: string }) => row.id === inactiveHistoricalOrder.id),
     ).toBe(false);
@@ -426,9 +423,9 @@ describe('Order database persistence and authenticated API', () => {
 
     const manager = await login(managerEmail);
     const managerList = await manager.agent.get('/api/v1/orders').expect(200);
-    expect(
-      managerList.body.data.some((row: { id: string }) => row.id === unassignedOrder.id),
-    ).toBe(true);
+    expect(managerList.body.data.some((row: { id: string }) => row.id === unassignedOrder.id)).toBe(
+      true,
+    );
     await manager.agent.get('/api/v1/orders/' + unassignedOrder.id).expect(200);
     await manager.agent.get('/api/v1/orders/' + inactiveHistoricalOrder.id).expect(404);
 

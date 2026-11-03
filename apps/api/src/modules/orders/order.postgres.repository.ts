@@ -374,7 +374,8 @@ export class PostgresOrderRepository implements OrderRepository {
     accessibleLocationIds: readonly string[],
   ): Promise<OrderRecord> {
     const result = await pool.query<OrderHeaderRow>(
-      'SELECT ' + orderHeaderColumns +
+      'SELECT ' +
+        orderHeaderColumns +
         ' FROM orders o WHERE o.id = $1 AND o.fulfilment_location_id = ANY($2::uuid[])',
       [orderId, accessibleLocationIds],
     );
