@@ -64,11 +64,6 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Format Task 036 test file for inspection (temporary)
-        run: |
-          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 --write apps/web/src/features/customers/CustomerManagementPage.test.tsx
-          cat apps/web/src/features/customers/CustomerManagementPage.test.tsx
-
       - name: Check formatting
         run: pnpm format:check
 
