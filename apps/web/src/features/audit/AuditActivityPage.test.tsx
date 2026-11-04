@@ -159,6 +159,28 @@ describe('AuditActivityPage', () => {
     expect(screen.getByRole('button', { name: 'Clear filters' })).toBeTruthy();
   });
 
+  it('renders system-generated activity with the System actor label', async () => {
+    mocks.get.mockResolvedValueOnce({
+      ...sampleResponse,
+      items: [
+        {
+          id: '44444444-4444-4444-8444-444444444444',
+          actorUserId: null,
+          actorDisplayName: 'System',
+          action: 'system.maintenance.completed',
+          entityType: 'system',
+          entityId: null,
+          occurredAt: '2026-11-02T12:00:00.000Z',
+        },
+      ],
+      actors: [],
+    });
+    render(<AuditActivityPage />);
+    expect(await screen.findByText('System')).toBeTruthy();
+    expect(screen.getByText('System event source')).toBeTruthy();
+    expect(screen.getByText('System Maintenance Completed')).toBeTruthy();
+  });
+
   it('shows API errors and retries the failed request', async () => {
     mocks.get.mockRejectedValueOnce(new Error('Audit history is temporarily unavailable.'));
     render(<AuditActivityPage />);
