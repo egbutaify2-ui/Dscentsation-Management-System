@@ -105,7 +105,7 @@ router.post('/login', loginLimiter, async (request, response, next) => {
     try {
       await client.query('BEGIN');
       const lockedUser = await client.query<{ password_hash: string; status: string }>(
-        'SELECT password_hash, status FROM users WHERE id = $1 FOR UPDATE',
+        'SELECT password_hash, status FROM users WHERE id = $1 FOR NO KEY UPDATE',
         [user.id],
       );
       const current = lockedUser.rows[0];
