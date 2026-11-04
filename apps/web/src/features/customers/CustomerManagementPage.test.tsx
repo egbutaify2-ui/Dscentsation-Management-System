@@ -352,6 +352,12 @@ describe('CustomerManagementPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
 
     expect(await screen.findByText('Order #ABCDEF01')).toBeTruthy();
+    const orderDate = new Intl.DateTimeFormat('en-GB', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Africa/Lagos',
+    }).format(new Date(sampleOrder.createdAt));
+    expect(screen.getByText(orderDate)).toBeTruthy();
     expect(screen.getByText('Synthetic Fragrance · 50ml')).toBeTruthy();
     expect(screen.getByText('× 2')).toBeTruthy();
     expect(screen.getByText('instagram')).toBeTruthy();
