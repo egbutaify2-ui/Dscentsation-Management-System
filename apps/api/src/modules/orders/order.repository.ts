@@ -1,4 +1,5 @@
 import type {
+  OrderActor,
   OrderAmendmentWriteModel,
   OrderCreateWriteModel,
   OrderMutationContext,
@@ -26,6 +27,7 @@ export interface OrderRepository {
    */
   amendReceivedOrder(
     orderId: string,
+    actor: Pick<OrderActor, 'id' | 'roleCode'>,
     context: OrderMutationContext,
     buildAmendment: (current: OrderRecord) => Promise<OrderAmendmentWriteModel>,
   ): Promise<OrderRecord>;

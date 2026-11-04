@@ -98,13 +98,19 @@ export class OrderService {
   ): Promise<OrderRecord> {
     const context: OrderMutationContext = { actorId: actor.id, requestId };
 
-    return this.repository.amendReceivedOrder(orderId, context, async (current) => {
+    return this.repository.amendReceivedOrder(
+      orderId,
+      { id: actor.id, roleCode: actor.roleCode },
+      context,
+      async (current) => {
       if (current.status !== 'received') {
         throw orderConflict('Only orders in the received state can be amended.');
       }
 
       const fulfilmentLocationId = input.fulfilmentLocationId ?? current.fulfilmentLocationId;
-      await this.assertLocationAccess(actor, fulfilmentLocationId);
+      if (fulfilmentLocationId !== current.fulfilmentLocationId) {
+        await this.assertLocationAccess(actor, fulfilmentLocationId);
+      }
 
       const customerId = input.customerId ?? current.customerId;
       let customerSnapshot = {

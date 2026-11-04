@@ -7,9 +7,12 @@ import { ExpenseManagementPage } from './features/expenses/ExpenseManagementPage
 import { ProductManagementPage } from './features/products/ProductManagementPage.js';
 import { SupplierManagementPage } from './features/suppliers/SupplierManagementPage.js';
 import { EmployeeManagementPage } from './features/users/EmployeeManagementPage.js';
+import { CustomerManagementPage } from './features/customers/CustomerManagementPage.js';
+import { AuditActivityPage } from './features/audit/AuditActivityPage.js';
 import { AcceptInvitationPage } from './features/users/AcceptInvitationPage.js';
 
-type Section = 'overview' | 'products' | 'employees' | 'expenses' | 'suppliers';
+type WorkspaceSection = 'overview' | 'products' | 'employees' | 'customers';
+type Section = WorkspaceSection | 'expenses' | 'suppliers' | 'activity';
 
 function invitationTokenFromLocation(): string | null {
   if (typeof window === 'undefined') return null;
@@ -27,6 +30,8 @@ export function App() {
   );
   const canViewProducts = permissions.includes('products.view');
   const canViewEmployees = permissions.includes('users.view');
+  const canViewActivity = permissions.includes('users.view');
+  const canViewCustomers = permissions.includes('customers.view');
   const canViewSuppliers = permissions.includes('suppliers.view');
   const canViewExpenses =
     permissions.includes('expenses.view') || permissions.includes('expense_categories.view');
@@ -34,9 +39,19 @@ export function App() {
   useEffect(() => {
     if (!canViewProducts && activeSection === 'products') setActiveSection('overview');
     if (!canViewEmployees && activeSection === 'employees') setActiveSection('overview');
+    if (!canViewActivity && activeSection === 'activity') setActiveSection('overview');
+    if (!canViewCustomers && activeSection === 'customers') setActiveSection('overview');
     if (!canViewSuppliers && activeSection === 'suppliers') setActiveSection('overview');
     if (!canViewExpenses && activeSection === 'expenses') setActiveSection('overview');
-  }, [activeSection, canViewProducts, canViewEmployees, canViewSuppliers, canViewExpenses]);
+  }, [
+    activeSection,
+    canViewProducts,
+    canViewEmployees,
+    canViewActivity,
+    canViewCustomers,
+    canViewSuppliers,
+    canViewExpenses,
+  ]);
 
   useEffect(() => {
     if (invitationToken && typeof window !== 'undefined') {
@@ -89,6 +104,10 @@ export function App() {
         <ProductManagementPage />
       ) : activeSection === 'employees' && canViewEmployees ? (
         <EmployeeManagementPage canManage={permissions.includes('users.manage')} />
+      ) : activeSection === 'customers' && canViewCustomers ? (
+        <CustomerManagementPage permissions={permissions} />
+      ) : activeSection === 'activity' && canViewActivity ? (
+        <AuditActivityPage />
       ) : activeSection === 'expenses' && canViewExpenses ? (
         <ExpenseManagementPage permissions={permissions} />
       ) : activeSection === 'suppliers' && canViewSuppliers ? (

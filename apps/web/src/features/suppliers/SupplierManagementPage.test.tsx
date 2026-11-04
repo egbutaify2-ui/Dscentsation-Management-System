@@ -70,9 +70,9 @@ describe('SupplierManagementPage', () => {
     render(<SupplierManagementPage permissions={fullPermissions} />);
     expect(screen.getByRole('status')).toBeTruthy();
     expect(await screen.findByRole('heading', { name: 'Supplier directory' })).toBeTruthy();
-    expect(screen.getByText('SUP-000123')).toBeTruthy();
-    expect(screen.getByText('Synthetic Fragrance Supplies Ltd')).toBeTruthy();
-    expect(screen.getByText('Page 1 of 1')).toBeTruthy();
+    expect(await screen.findByText('SUP-000123')).toBeTruthy();
+    expect(await screen.findByText('Synthetic Fragrance Supplies Ltd')).toBeTruthy();
+    expect(await screen.findByText('Page 1 of 1')).toBeTruthy();
     expect(mocks.getPage).toHaveBeenCalledWith('/suppliers?status=active&page=1&pageSize=25');
   });
 

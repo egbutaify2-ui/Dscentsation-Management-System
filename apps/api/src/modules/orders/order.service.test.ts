@@ -22,6 +22,7 @@ const actor: OrderActor = {
 };
 const customerId = '11111111-1111-4111-8111-111111111111';
 const locationId = '22222222-2222-4222-8222-222222222222';
+const destinationLocationId = '66666666-6666-4666-8666-666666666666';
 const productId = '33333333-3333-4333-8333-333333333333';
 const variantId = '44444444-4444-4444-8444-444444444444';
 
@@ -84,6 +85,7 @@ function makeRepository(initial?: OrderRecord) {
     amendReceivedOrder: vi.fn(
       async (
         _orderId: string,
+        _actor: Pick<OrderActor, 'id' | 'roleCode'>,
         _context: OrderMutationContext,
         buildAmendment: (record: OrderRecord) => Promise<OrderAmendmentWriteModel>,
       ) => {
@@ -236,25 +238,34 @@ describe('OrderService', () => {
     expect(getCurrent()?.updatedBy).toBe(actor.id);
   });
 
-  it('revalidates the current fulfilment location during amendment', async () => {
+  it('independently authorizes a changed destination after the repository scopes the original location', async () => {
     const { repository } = makeRepository(createRecord(createOrderInput()));
+    const locationAccess = vi.fn(async (_requestingActor: OrderActor, requestedLocationId: string) =>
+      requestedLocationId !== destinationLocationId,
+    );
     const service = new OrderService({
       repository,
-      customerLookup: async () => {
-        throw new Error('Customer lookup must not run for a notes-only amendment.');
-      },
+      customerLookup: async () => { throw new Error('Customer lookup is not expected.'); },
       productSnapshotLookup: async () => [],
-      locationAccess: async (_requestingActor, requestedLocationId) =>
-        requestedLocationId !== locationId,
+      locationAccess,
     });
+    await expect(service.amendOrder(actor, 'request-amend', 'order-id', {
+      fulfilmentLocationId: destinationLocationId,
+    })).rejects.toMatchObject({ status: 403, code: 'LOCATION_ACCESS_DENIED' });
+    expect(repository.amendReceivedOrder).toHaveBeenCalledWith(
+      'order-id', { id: actor.id, roleCode: actor.roleCode },
+      { actorId: actor.id, requestId: 'request-amend' }, expect.any(Function),
+    );
+    expect(locationAccess).toHaveBeenCalledWith(actor, destinationLocationId);
+  });
 
-    await expect(
-      service.amendOrder(actor, 'request-amend', 'order-id', { notes: 'Assignment revoked' }),
-    ).rejects.toMatchObject({
-      status: 403,
-      code: 'LOCATION_ACCESS_DENIED',
-    });
-    expect(repository.amendReceivedOrder).toHaveBeenCalledTimes(1);
+  it('does not repeat location lookup when the fulfilment location is unchanged', async () => {
+    const { repository } = makeRepository(createRecord(createOrderInput()));
+    const locationAccess = vi.fn(async () => false);
+    const service = new OrderService({ repository, locationAccess });
+    const updated = await service.amendOrder(actor, 'request-amend', 'order-id', { notes: 'Notes changed' });
+    expect(updated.notes).toBe('Notes changed');
+    expect(locationAccess).not.toHaveBeenCalled();
   });
 
   it('rejects amendment after an order leaves received status', async () => {

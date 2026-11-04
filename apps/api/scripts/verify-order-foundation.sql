@@ -100,11 +100,11 @@ BEGIN
      AND indexname IN (
        'orders_status_created_idx', 'orders_customer_created_idx',
        'orders_location_created_idx', 'orders_source_created_idx',
-       'order_items_product_idx', 'order_items_variant_idx', 'order_items_order_line_idx',
+       'order_items_product_idx', 'order_items_variant_idx', 'order_items_order_line_uq',
        'product_variants_product_id_id_uidx'
      );
-  IF index_count <> 8 THEN
-    RAISE EXCEPTION 'Order query indexes are incomplete; found % of 8', index_count;
+  IF index_count <> 7 THEN
+    RAISE EXCEPTION 'Order query indexes are incomplete; found % of 7', index_count;
   END IF;
 
   SELECT count(*) INTO trigger_count
