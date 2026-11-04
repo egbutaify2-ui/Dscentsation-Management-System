@@ -21,7 +21,11 @@ function routeId(value: string | string[]): string {
   const candidate = typeof value === 'string' ? value : value[0];
   const parsed = z.string().uuid().safeParse(candidate);
   if (!parsed.success) {
-    throw new PaymentError('A valid payment or order identifier is required.', 400, 'INVALID_REQUEST');
+    throw new PaymentError(
+      'A valid payment or order identifier is required.',
+      400,
+      'INVALID_REQUEST',
+    );
   }
   return parsed.data;
 }

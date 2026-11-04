@@ -30,13 +30,13 @@ A payment reference is not globally unique. The method field accepts a bounded l
 
 All routes require an authenticated DMS session and existing permission middleware.
 
-| Method | Endpoint | Permission | Purpose |
-| --- | --- | --- | --- |
-| POST | /api/v1/orders/:orderId/payments | payments.record | Record a pending payment |
-| GET | /api/v1/orders/:orderId/payments | payments.verify | Paginated payment history, including append-only events |
-| GET | /api/v1/payments/:paymentId | payments.verify | One payment and its history |
-| POST | /api/v1/payments/:paymentId/verify | payments.verify | Verify a pending payment once |
-| GET | /api/v1/orders/:orderId/payments/summary | payments.verify | Order total, verified paid, pending and outstanding amounts |
+| Method | Endpoint                                 | Permission      | Purpose                                                     |
+| ------ | ---------------------------------------- | --------------- | ----------------------------------------------------------- |
+| POST   | /api/v1/orders/:orderId/payments         | payments.record | Record a pending payment                                    |
+| GET    | /api/v1/orders/:orderId/payments         | payments.verify | Paginated payment history, including append-only events     |
+| GET    | /api/v1/payments/:paymentId              | payments.verify | One payment and its history                                 |
+| POST   | /api/v1/payments/:paymentId/verify       | payments.verify | Verify a pending payment once                               |
+| GET    | /api/v1/orders/:orderId/payments/summary | payments.verify | Order total, verified paid, pending and outstanding amounts |
 
 Record requests require an Idempotency-Key header (8–128 characters). Replaying the same key and content for the same recorder returns the original payment. Reusing that key with different order/payment content returns HTTP 409.
 

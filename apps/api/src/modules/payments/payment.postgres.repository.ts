@@ -191,7 +191,7 @@ export class PostgresPaymentRepository {
           action: 'payment.recorded',
           entityType: 'payment',
           entityId: paymentId,
-          requestId,
+          requestId: requestId ?? null,
           safeMetadata: {
             orderId,
             amountMinor: input.amountMinor,
@@ -237,11 +237,14 @@ export class PostgresPaymentRepository {
       const current = locked.rows[0];
       if (!current) throw paymentNotFound();
       if (current.status !== 'pending') {
-        throw paymentConflict('This payment has already been verified.', 'PAYMENT_ALREADY_VERIFIED');
+        throw paymentConflict(
+          'This payment has already been verified.',
+          'PAYMENT_ALREADY_VERIFIED',
+        );
       }
 
       const totals = await client.query<{ verified_minor: string }>(
-        "SELECT COALESCE(sum(amount_minor), 0)::text AS verified_minor " +
+        'SELECT COALESCE(sum(amount_minor), 0)::text AS verified_minor ' +
           "FROM payments WHERE order_id = $1 AND status = 'verified'",
         [orderId],
       );
@@ -275,7 +278,7 @@ export class PostgresPaymentRepository {
           action: 'payment.verified',
           entityType: 'payment',
           entityId: paymentId,
-          requestId,
+          requestId: requestId ?? null,
           safeMetadata: {
             orderId,
             amountMinor: current.amount_minor,
@@ -299,11 +302,7 @@ export class PostgresPaymentRepository {
     }
   }
 
-  async listOrderPayments(
-    orderId: string,
-    page: number,
-    pageSize: number,
-  ): Promise<PaymentPage> {
+  async listOrderPayments(orderId: string, page: number, pageSize: number): Promise<PaymentPage> {
     const order = await pool.query('SELECT id FROM orders WHERE id = $1', [orderId]);
     if (order.rowCount !== 1) throw paymentNotFound();
 

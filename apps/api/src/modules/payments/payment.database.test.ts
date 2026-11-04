@@ -95,8 +95,14 @@ async function createPayment(
   key = randomUUID(),
   additional: Record<string, unknown> = {},
 ): Promise<string> {
-  const response = await postPayment(staffAgent, staffCsrf, orderId, amountMinor, key, additional)
-    .expect(201);
+  const response = await postPayment(
+    staffAgent,
+    staffCsrf,
+    orderId,
+    amountMinor,
+    key,
+    additional,
+  ).expect(201);
   return response.body.data.id as string;
 }
 
@@ -121,7 +127,9 @@ describe('Payment Management API and PostgreSQL integrity', () => {
         'JOIN permissions p ON p.id = rp.permission_id ' +
         "WHERE p.code IN ('payments.record', 'payments.verify')",
     );
-    const grantSet = new Set(grants.rows.map((grant) => grant.role_code + ':' + grant.permission_code));
+    const grantSet = new Set(
+      grants.rows.map((grant) => grant.role_code + ':' + grant.permission_code),
+    );
     expect(grantSet.has('OWNER:payments.record')).toBe(true);
     expect(grantSet.has('MANAGER:payments.record')).toBe(true);
     expect(grantSet.has('STAFF:payments.record')).toBe(true);
@@ -226,22 +234,12 @@ describe('Payment Management API and PostgreSQL integrity', () => {
       ).expect(400);
       expect(response.body.error.code).toBe('INVALID_REQUEST');
     }
-    await postPayment(
-      staffAgent,
-      staffCsrf,
-      orderId,
-      '100',
-      randomUUID(),
-      { method: '   ' },
-    ).expect(400);
-    await postPayment(
-      staffAgent,
-      staffCsrf,
-      orderId,
-      '100',
-      randomUUID(),
-      { currency: 'USD' },
-    ).expect(400);
+    await postPayment(staffAgent, staffCsrf, orderId, '100', randomUUID(), {
+      method: '   ',
+    }).expect(400);
+    await postPayment(staffAgent, staffCsrf, orderId, '100', randomUUID(), {
+      currency: 'USD',
+    }).expect(400);
   });
 
   it('returns not found for an unknown order and unknown payment', async () => {
@@ -288,13 +286,15 @@ describe('Payment Management API and PostgreSQL integrity', () => {
   it('allows Manager and Owner to verify a pending payment exactly once', async () => {
     const orderId = await createOrder('100000');
     const managerPaymentId = await createPayment(orderId, '30000');
-    const managerVerified = await verifyPayment(managerAgent, managerCsrf, managerPaymentId)
-      .expect(200);
+    const managerVerified = await verifyPayment(managerAgent, managerCsrf, managerPaymentId).expect(
+      200,
+    );
     expect(managerVerified.body.data.status).toBe('verified');
     expect(managerVerified.body.data.verifiedBy).toBeTruthy();
     expect(managerVerified.body.data.verifiedAt).toBeTruthy();
-    expect(managerVerified.body.data.history.map((event: { eventType: string }) => event.eventType))
-      .toEqual(['recorded', 'verified']);
+    expect(
+      managerVerified.body.data.history.map((event: { eventType: string }) => event.eventType),
+    ).toEqual(['recorded', 'verified']);
 
     const duplicate = await verifyPayment(managerAgent, managerCsrf, managerPaymentId).expect(409);
     expect(duplicate.body.error.code).toBe('PAYMENT_ALREADY_VERIFIED');
@@ -321,8 +321,9 @@ describe('Payment Management API and PostgreSQL integrity', () => {
     expect(list.body.data.items[0].history).toHaveLength(2);
 
     const detail = await managerAgent.get('/api/v1/payments/' + paymentId).expect(200);
-    expect(detail.body.data.history.map((event: { eventType: string }) => event.eventType))
-      .toEqual(['recorded', 'verified']);
+    expect(detail.body.data.history.map((event: { eventType: string }) => event.eventType)).toEqual(
+      ['recorded', 'verified'],
+    );
     expect(detail.body.data).not.toHaveProperty('idempotencyKey');
     expect(detail.body.data).not.toHaveProperty('requestFingerprint');
   });
@@ -427,7 +428,7 @@ describe('Payment Management API and PostgreSQL integrity', () => {
       $$;
     `);
     await pool.query(
-      "CREATE TRIGGER task032_reject_payment_audit BEFORE INSERT ON audit_logs " +
+      'CREATE TRIGGER task032_reject_payment_audit BEFORE INSERT ON audit_logs ' +
         "FOR EACH ROW WHEN (NEW.action = 'payment.recorded') " +
         'EXECUTE FUNCTION task032_reject_payment_audit()',
     );
@@ -466,7 +467,9 @@ describe('Payment Management API and PostgreSQL integrity', () => {
     await expect(
       pool.query('UPDATE payments SET status = $2 WHERE id = $1', [paymentId, 'pending']),
     ).rejects.toMatchObject({ code: '23514' });
-    await expect(pool.query('DELETE FROM payments WHERE id = $1', [paymentId])).rejects.toMatchObject({
+    await expect(
+      pool.query('DELETE FROM payments WHERE id = $1', [paymentId]),
+    ).rejects.toMatchObject({
       code: '23514',
     });
     await expect(
