@@ -98,13 +98,45 @@ function readableLabel(value: string | null): string {
 
 async function fetchMetricTotal(kind: Exclude<MetricKind, 'products'>): Promise<number> {
   const path =
-    kind === 'orders' ? '/orders?page=1&pageSize=1' : '/customers?status=active&page=1&pageSize=1';
+    kind === 'orders'
+      ? '/orders?page=1&pageSize=1'
+      : '/customers?status=active&page=1&pageSize=1';
   const response = await api.getPage<unknown[], PaginationMeta>(path);
   const total = response.meta.total;
   if (!Number.isSafeInteger(total) || total < 0) {
     throw new Error('The server did not return a valid total count.');
   }
   return total;
+}
+
+function metricValue(state: MetricState): string {
+  switch (state.status) {
+    case 'success':
+      return formatCount(state.total ?? 0);
+    case 'loading':
+      return '…';
+    case 'restricted':
+      return 'No access';
+    case 'unavailable':
+      return 'Unavailable';
+    case 'error':
+      return '—';
+  }
+}
+
+function metricStatusLabel(status: ResourceStatus): string {
+  switch (status) {
+    case 'success':
+      return 'Available';
+    case 'loading':
+      return 'Loading';
+    case 'restricted':
+      return 'Restricted';
+    case 'unavailable':
+      return 'Unavailable';
+    case 'error':
+      return 'Needs attention';
+  }
 }
 
 function MetricCard({
@@ -167,37 +199,22 @@ function MetricCard({
     };
   }, [allowed, kind, retryCount]);
 
-  const value =
-    state.status === 'success'
-      ? formatCount(state.total ?? 0)
-      : state.status === 'loading'
-        ? '…'
-        : state.status === 'restricted'
-          ? 'No access'
-          : state.status === 'unavailable'
-            ? 'Unavailable'
-            : '—';
+  const value = metricValue(state);
+  const titleId = `dashboard-metric-${kind}`;
+  const iconClassName = `dashboard-metric-icon dashboard-metric-icon-${kind}`;
 
   return (
-    <article className="dashboard-metric-card" aria-labelledby={`dashboard-metric-${kind}`}>
+    <article className="dashboard-metric-card" aria-labelledby={titleId}>
       <div className="dashboard-metric-top">
-        <span className={`dashboard-metric-icon dashboard-metric-icon-${kind}`} aria-hidden="true">
+        <span className={iconClassName} aria-hidden="true">
           {icon}
         </span>
         <span className={`dashboard-metric-indicator is-${state.status}`}>
-          {state.status === 'success'
-            ? 'Available'
-            : state.status === 'loading'
-              ? 'Loading'
-              : state.status === 'restricted'
-                ? 'Restricted'
-                : state.status === 'unavailable'
-                  ? 'Unavailable'
-                  : 'Needs attention'}
+          {metricStatusLabel(state.status)}
         </span>
       </div>
       <div className="dashboard-metric-copy">
-        <p id={`dashboard-metric-${kind}`} className="dashboard-metric-title">
+        <p id={titleId} className="dashboard-metric-title">
           {title}
         </p>
         <p className="dashboard-metric-value" aria-live="polite">
