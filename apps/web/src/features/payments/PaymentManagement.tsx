@@ -168,7 +168,9 @@ export function OrderPaymentManagement({
     setHistoryError(null);
     try {
       const [nextSummary, nextPage] = await Promise.all([
-        api.get<OrderPaymentSummary>('/orders/' + encodeURIComponent(orderId) + '/payments/summary'),
+        api.get<OrderPaymentSummary>(
+          '/orders/' + encodeURIComponent(orderId) + '/payments/summary',
+        ),
         api.get<PaymentPage>(
           '/orders/' + encodeURIComponent(orderId) + '/payments?page=1&pageSize=100',
         ),
@@ -480,11 +482,7 @@ export function OrderPaymentManagement({
           ) : (
             <div className="payment-state">
               Payment summary is unavailable.
-              {historyError && (
-                <button className="payment-text-button" type="button" onClick={() => void loadPayments()}>
-                  Retry
-                </button>
-              )}
+
             </div>
           )}
         </section>
@@ -602,7 +600,11 @@ export function OrderPaymentManagement({
           {historyError && (
             <div className="payment-alert error" role="alert">
               {historyError}
-              <button className="payment-text-button" type="button" onClick={() => void loadPayments()}>
+              <button
+                className="payment-text-button"
+                type="button"
+                onClick={() => void loadPayments()}
+              >
                 Retry
               </button>
             </div>
