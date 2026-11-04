@@ -25,10 +25,17 @@ const sampleResponse = {
     {
       id: '33333333-3333-4333-8333-333333333333',
       actorUserId: employeeId,
+      actorDisplayName: 'Jane Employee',
       action: 'product.updated',
       entityType: 'product',
       entityId: recordId,
-      createdAt: '2026-10-31T23:00:00.000Z',
+      occurredAt: '2026-10-31T23:00:00.000Z',
+      safeMetadata: {
+        password: 'must-never-render',
+        sessionPayload: 'must-never-render-session',
+        authenticationToken: 'must-never-render-token',
+      },
+      requestId: 'must-never-render-request-id',
     },
   ],
   actors: [{ id: employeeId, displayName: 'Jane Employee' }],
@@ -66,6 +73,10 @@ describe('AuditActivityPage', () => {
       timeZone: 'Africa/Lagos',
     }).format(new Date('2026-10-31T23:00:00.000Z'));
     expect(screen.getByText(expectedDate)).toBeTruthy();
+    expect(screen.queryByText('must-never-render')).toBeNull();
+    expect(screen.queryByText('must-never-render-session')).toBeNull();
+    expect(screen.queryByText('must-never-render-token')).toBeNull();
+    expect(screen.queryByText('must-never-render-request-id')).toBeNull();
   });
 
   it('applies employee, action, record, UUID and date filters to the agreed query keys', async () => {
@@ -100,8 +111,8 @@ describe('AuditActivityPage', () => {
     expect(params.get('action')).toBe('product.updated');
     expect(params.get('entityType')).toBe('product');
     expect(params.get('entityId')).toBe(recordId);
-    expect(params.get('from')).toBe('2026-10-31T23:00:00.000Z');
-    expect(params.get('to')).toBe('2026-11-02T22:59:59.999Z');
+    expect(params.get('from')).toBe('2026-11-01');
+    expect(params.get('to')).toBe('2026-11-02');
     expect(params.get('page')).toBe('1');
     expect(params.get('pageSize')).toBe('25');
   });
@@ -157,6 +168,46 @@ describe('AuditActivityPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('Jane Employee')).toBeTruthy();
     expect(mocks.get).toHaveBeenCalledTimes(2);
+  });
+
+
+  it('keeps pagination scoped to the last applied filters', async () => {
+    mocks.get.mockImplementation(async (path: string) => ({
+      ...sampleResponse,
+      page: path.includes('page=2') ? 2 : 1,
+      total: 26,
+      totalPages: 2,
+    }));
+    render(<AuditActivityPage />);
+    await screen.findByText('Jane Employee');
+
+    fireEvent.change(screen.getByLabelText('Action'), {
+      target: { value: 'product.updated' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+    await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(2));
+
+    fireEvent.change(screen.getByLabelText('Action'), {
+      target: { value: 'unsaved.draft.filter' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(3));
+
+    const path = mocks.get.mock.calls[2]?.[0] as string;
+    const params = new URLSearchParams(path.split('?')[1]);
+    expect(params.get('action')).toBe('product.updated');
+    expect(params.get('page')).toBe('2');
+  });
+
+  it('rejects a malformed record UUID before sending a request', async () => {
+    render(<AuditActivityPage />);
+    await screen.findByText('Jane Employee');
+    fireEvent.change(screen.getByLabelText('Record UUID'), {
+      target: { value: 'not-a-uuid' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(mocks.get).toHaveBeenCalledTimes(1);
   });
 
   it('rejects an inverted date range before sending a filtered request', async () => {
