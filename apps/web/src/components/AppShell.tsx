@@ -2,7 +2,14 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthenticatedUser } from '../features/auth/AuthProvider.js';
 
-type Section = 'overview' | 'products' | 'employees' | 'customers' | 'expenses' | 'suppliers' | 'activity';
+type Section =
+  | 'overview'
+  | 'products'
+  | 'employees'
+  | 'customers'
+  | 'expenses'
+  | 'suppliers'
+  | 'activity';
 type NavigationItem = { label: string; section?: Section; symbol: string; enabled: boolean };
 
 export function AppShell({
@@ -81,10 +88,10 @@ export function AppShell({
           : activeSection === 'activity'
             ? 'Activity history'
             : activeSection === 'suppliers'
-            ? 'Suppliers'
-            : activeSection === 'expenses'
-              ? 'Expenses'
-              : 'Overview';
+              ? 'Suppliers'
+              : activeSection === 'expenses'
+                ? 'Expenses'
+                : 'Overview';
 
   return (
     <div className="app-shell">

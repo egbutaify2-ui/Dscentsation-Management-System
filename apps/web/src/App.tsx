@@ -11,7 +11,14 @@ import { CustomerManagementPage } from './features/customers/CustomerManagementP
 import { AuditActivityPage } from './features/audit/AuditActivityPage.js';
 import { AcceptInvitationPage } from './features/users/AcceptInvitationPage.js';
 
-type Section = 'overview' | 'products' | 'employees' | 'customers' | 'expenses' | 'suppliers' | 'activity';
+type Section =
+  | 'overview'
+  | 'products'
+  | 'employees'
+  | 'customers'
+  | 'expenses'
+  | 'suppliers'
+  | 'activity';
 
 function invitationTokenFromLocation(): string | null {
   if (typeof window === 'undefined') return null;

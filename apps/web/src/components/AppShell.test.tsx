@@ -74,7 +74,6 @@ describe('AppShell permission-aware navigation', () => {
     expect(onNavigate).toHaveBeenCalledWith('employees');
   });
 
-
   it('shows Activity only when the backend session reports users.view', () => {
     const onNavigate = vi.fn();
     const { rerender } = render(
