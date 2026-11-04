@@ -113,6 +113,7 @@ function formatTimestamp(value: string): string {
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+        timeZone: 'Africa/Lagos',
       });
 }
 
@@ -146,6 +147,12 @@ export function OrderPaymentManagement({
 
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [summary, setSummary] = useState<OrderPaymentSummary | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: 100,
+    total: 0,
+    totalPages: 0,
+  });
   const [loadingHistory, setLoadingHistory] = useState(canVerify);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -162,27 +169,41 @@ export function OrderPaymentManagement({
   const submittingRef = useRef(false);
   const verifyingRef = useRef<string | null>(null);
 
-  const loadPayments = useCallback(async () => {
-    if (!canVerify) return;
-    setLoadingHistory(true);
-    setHistoryError(null);
-    try {
-      const [nextSummary, nextPage] = await Promise.all([
-        api.get<OrderPaymentSummary>(
-          '/orders/' + encodeURIComponent(orderId) + '/payments/summary',
-        ),
-        api.get<PaymentPage>(
-          '/orders/' + encodeURIComponent(orderId) + '/payments?page=1&pageSize=100',
-        ),
-      ]);
-      setSummary(nextSummary);
-      setPayments(nextPage.items);
-    } catch (error) {
-      setHistoryError(getErrorMessage(error));
-    } finally {
-      setLoadingHistory(false);
-    }
-  }, [canVerify, orderId]);
+  const loadPayments = useCallback(
+    async (requestedPage = 1) => {
+      if (!canVerify) return;
+      setLoadingHistory(true);
+      setHistoryError(null);
+      try {
+        const [nextSummary, nextPage] = await Promise.all([
+          api.get<OrderPaymentSummary>(
+            '/orders/' + encodeURIComponent(orderId) + '/payments/summary',
+          ),
+          api.get<PaymentPage>(
+            '/orders/' +
+              encodeURIComponent(orderId) +
+              '/payments?page=' +
+              requestedPage +
+              '&pageSize=100',
+          ),
+        ]);
+        setSummary(nextSummary);
+        setPayments(nextPage.items);
+        setPagination({
+          page: nextPage.page,
+          pageSize: nextPage.pageSize,
+          total: nextPage.total,
+          totalPages: nextPage.totalPages,
+        });
+        setSelectedPayment(null);
+      } catch (error) {
+        setHistoryError(getErrorMessage(error));
+      } finally {
+        setLoadingHistory(false);
+      }
+    },
+    [canVerify, orderId],
+  );
 
   useEffect(() => {
     if (canVerify) {
@@ -190,6 +211,7 @@ export function OrderPaymentManagement({
     } else {
       setPayments([]);
       setSummary(null);
+      setPagination({ page: 1, pageSize: 100, total: 0, totalPages: 0 });
       setLoadingHistory(false);
       setSelectedPayment(null);
     }
@@ -240,7 +262,7 @@ export function OrderPaymentManagement({
       setPaymentForm(emptyPaymentForm);
       setShowPaymentForm(false);
       setNotice('Payment recorded. It is pending verification.');
-      if (canVerify) await loadPayments();
+      if (canVerify) await loadPayments(1);
     } catch (error) {
       setActionError(getErrorMessage(error));
     } finally {
@@ -267,7 +289,7 @@ export function OrderPaymentManagement({
         current?.id === paymentId ? verifiedPayment : current,
       );
       setNotice('Payment verified successfully.');
-      await loadPayments();
+      await loadPayments(pagination.page);
     } catch (error) {
       setActionError(getErrorMessage(error));
     } finally {
@@ -600,7 +622,7 @@ export function OrderPaymentManagement({
               <button
                 className="payment-text-button"
                 type="button"
-                onClick={() => void loadPayments()}
+                onClick={() => void loadPayments(pagination.page)}
               >
                 Retry
               </button>
@@ -614,16 +636,45 @@ export function OrderPaymentManagement({
               <span>Recorded payments will appear here, separated by verification status.</span>
             </div>
           ) : (
-            <div className="payment-history-groups">
-              {renderPaymentGroup(
-                'Pending payments',
-                payments.filter((payment) => payment.status === 'pending'),
+            <>
+              <div className="payment-history-groups">
+                {renderPaymentGroup(
+                  'Pending payments',
+                  payments.filter((payment) => payment.status === 'pending'),
+                )}
+                {renderPaymentGroup(
+                  'Verified payments',
+                  payments.filter((payment) => payment.status === 'verified'),
+                )}
+              </div>
+              {pagination.totalPages > 1 && (
+                <nav className="payment-pagination" aria-label="Payment history pages">
+                  <span aria-live="polite">
+                    Showing {(pagination.page - 1) * pagination.pageSize + 1}–
+                    {Math.min(pagination.page * pagination.pageSize, pagination.total)} of{' '}
+                    {pagination.total} payments · Page {pagination.page} of {pagination.totalPages}
+                  </span>
+                  <div>
+                    <button
+                      className="payment-text-button"
+                      type="button"
+                      onClick={() => void loadPayments(pagination.page - 1)}
+                      disabled={loadingHistory || pagination.page <= 1}
+                    >
+                      Previous page
+                    </button>
+                    <button
+                      className="payment-text-button"
+                      type="button"
+                      onClick={() => void loadPayments(pagination.page + 1)}
+                      disabled={loadingHistory || pagination.page >= pagination.totalPages}
+                    >
+                      Next page
+                    </button>
+                  </div>
+                </nav>
               )}
-              {renderPaymentGroup(
-                'Verified payments',
-                payments.filter((payment) => payment.status === 'verified'),
-              )}
-            </div>
+            </>
           )}
         </section>
       )}
