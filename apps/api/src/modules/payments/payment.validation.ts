@@ -1,10 +1,18 @@
 import { z } from 'zod';
 
 const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
+function isWithinPostgresBigintRange(value: string): boolean {
+  try {
+    return BigInt(value) <= MAX_POSTGRES_BIGINT;
+  } catch {
+    return true;
+  }
+}
+
 const amountMinorSchema = z
   .string()
   .regex(/^[1-9]\d*$/, 'Enter a positive integer amount in kobo.')
-  .refine((value) => !/^[1-9]\\d*$/.test(value) || BigInt(value) <= MAX_POSTGRES_BIGINT, {
+  .refine(isWithinPostgresBigintRange, {
     message: 'The amount exceeds the supported NGN minor-unit range.',
   });
 
