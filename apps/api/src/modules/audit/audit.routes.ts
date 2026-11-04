@@ -7,7 +7,6 @@ import type { AuditActivityFilters } from './audit.service.js';
 import { listAuditLogsQuerySchema } from './audit.validation.js';
 
 const router = Router();
-router.use(requireAuthentication);
 
 function validationResponse(error: ZodError) {
   return {
@@ -22,7 +21,11 @@ function validationResponse(error: ZodError) {
   };
 }
 
-router.get('/audit-logs', requirePermission('users.view'), async (request, response, next) => {
+router.get(
+  '/audit-logs',
+  requireAuthentication,
+  requirePermission('users.view'),
+  async (request, response, next) => {
   try {
     const parsed = listAuditLogsQuerySchema.safeParse(request.query);
     if (!parsed.success) {
