@@ -63,6 +63,10 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Diagnose temporary Task 025 formatting
+        run: |
+          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 apps/web/src/features/orders/OrderManagementPage.test.tsx | diff -u apps/web/src/features/orders/OrderManagementPage.test.tsx - || true
+
       - name: Check formatting
         run: pnpm format:check
 
