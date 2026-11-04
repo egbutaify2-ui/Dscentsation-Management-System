@@ -46,6 +46,7 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -101,6 +102,8 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-supplier-directory.sql
       - name: Verify Expense Foundation schema and unassigned permission definitions
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-expense-foundation.sql
+      - name: Verify Order Foundation schema and unassigned permission definitions
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-order-foundation.sql
 
       - name: Verify production migration up remains permitted
         run: NODE_ENV=production COOKIE_SECURE=true APP_ORIGIN=https://dms.example.invalid pnpm db:migrate
@@ -146,6 +149,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-customer-management.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-supplier-directory.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-expense-foundation.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-order-foundation.sql
 
       - name: Run API integration and security tests
         run: pnpm --filter @dms/api test

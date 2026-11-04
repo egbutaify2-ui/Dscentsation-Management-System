@@ -279,6 +279,7 @@ describe('DMS foundation API', () => {
       'expenses.update',
       'expenses.view',
     ];
+    const orderPermissions = ['orders.create', 'orders.update', 'orders.view'];
     const supplierPermissions = [
       'suppliers.create',
       'suppliers.manage_status',
@@ -298,6 +299,7 @@ describe('DMS foundation API', () => {
       'expenses.view',
       'inventory.transfer.pickup_warehouse_to_assigned_sheraton',
       'inventory.transfer.receive_destination_assigned',
+      ...orderPermissions,
       'payments.record',
       'payments.verify',
       ...productPermissions,
@@ -321,6 +323,11 @@ describe('DMS foundation API', () => {
       expect(staff.permissions).not.toContain(permission);
     }
     for (const permission of expensePermissions) {
+      expect(owner.permissions).not.toContain(permission);
+      expect(manager.permissions).not.toContain(permission);
+      expect(staff.permissions).not.toContain(permission);
+    }
+    for (const permission of orderPermissions) {
       expect(owner.permissions).not.toContain(permission);
       expect(manager.permissions).not.toContain(permission);
       expect(staff.permissions).not.toContain(permission);
