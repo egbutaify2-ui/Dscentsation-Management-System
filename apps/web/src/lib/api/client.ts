@@ -63,10 +63,15 @@ export const api = {
     }
     return { data: response.data, meta: response.meta };
   },
-  post: <T>(path: string, body: unknown, csrfToken: string) =>
+  post: <T>(
+    path: string,
+    body: unknown,
+    csrfToken: string,
+    additionalHeaders: Record<string, string> = {},
+  ) =>
     request<T>(path, {
       method: 'POST',
-      headers: { 'X-CSRF-Token': csrfToken },
+      headers: { ...additionalHeaders, 'X-CSRF-Token': csrfToken },
       body: JSON.stringify(body),
     }),
   patch: <T>(path: string, body: unknown, csrfToken: string) =>
