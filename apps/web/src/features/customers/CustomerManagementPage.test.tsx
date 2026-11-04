@@ -56,7 +56,11 @@ interface OrderHistoryFixture {
   createdAt: string;
   sourceChannel: 'whatsapp' | 'instagram' | 'website' | 'phone';
   status: string;
-  items: { productNameSnapshot: string; variantNameSnapshot: string; quantity: number }[];
+  items: {
+    productNameSnapshot: string;
+    variantNameSnapshot: string;
+    quantity: number;
+  }[];
 }
 const secondCustomer = {
   ...sampleCustomer,
