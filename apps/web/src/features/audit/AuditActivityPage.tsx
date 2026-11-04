@@ -101,6 +101,7 @@ export function AuditActivityPage() {
   const [loading, setLoading] = useState(true);
   const [requestedPage, setRequestedPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
   const requestSequence = useRef(0);
 
   const loadActivity = useCallback(async (nextFilters: AuditFilters, page: number) => {
@@ -109,6 +110,7 @@ export function AuditActivityPage() {
     setRequestedPage(page);
     setLoading(true);
     setError(null);
+    setCanRetry(false);
     try {
       const result = await api.get<AuditResponse>(activityPath(nextFilters, page));
       if (requestSequence.current !== requestId) return;
@@ -117,7 +119,10 @@ export function AuditActivityPage() {
       }
       setResponse(result);
     } catch (loadError) {
-      if (requestSequence.current === requestId) setError(errorMessage(loadError));
+      if (requestSequence.current === requestId) {
+        setError(errorMessage(loadError));
+        setCanRetry(true);
+      }
     } finally {
       if (requestSequence.current === requestId) setLoading(false);
     }
@@ -156,10 +161,17 @@ export function AuditActivityPage() {
     event.preventDefault();
     if (filters.from && filters.to && filters.from > filters.to) {
       setError('The start date must be on or before the end date.');
+      setCanRetry(false);
       return;
     }
-    if (filters.entityId.trim() && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.entityId.trim())) {
+    if (
+      filters.entityId.trim() &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        filters.entityId.trim(),
+      )
+    ) {
       setError('Enter a valid record UUID.');
+      setCanRetry(false);
       return;
     }
     setAppliedFilters({ ...filters });
@@ -295,14 +307,16 @@ export function AuditActivityPage() {
           <div className="audit-state audit-state-error" role="alert">
             <strong>We could not load activity history.</strong>
             <span>{error}</span>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => void loadActivity(appliedFilters, requestedPage)}
-              disabled={loading}
-            >
-              Try again
-            </button>
+            {canRetry && (
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => void loadActivity(appliedFilters, requestedPage)}
+                disabled={loading}
+              >
+                Try again
+              </button>
+            )}
           </div>
         )}
 
@@ -334,7 +348,7 @@ export function AuditActivityPage() {
                     <th scope="col">Action</th>
                     <th scope="col">Record type</th>
                     <th scope="col">Record identifier</th>
-                    <th scope="col">Date and time</th>
+                    <th scope="col">Date and time · Lagos</th>
                   </tr>
                 </thead>
                 <tbody>
