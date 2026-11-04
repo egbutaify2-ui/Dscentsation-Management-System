@@ -2,7 +2,12 @@ import type { Pool, PoolClient } from 'pg';
 import { pool } from '../../db/pool.js';
 
 export type AuditJsonValue =
-  string | number | boolean | null | AuditJsonValue[] | { [key: string]: AuditJsonValue };
+  | string
+  | number
+  | boolean
+  | null
+  | AuditJsonValue[]
+  | { [key: string]: AuditJsonValue };
 
 export interface AuditEventInput {
   actorUserId?: string | null;
