@@ -1128,6 +1128,7 @@ describe('Employee Account Administration API', () => {
     expect(last.body.error.code).toBe('PASSWORD_RESET_RATE_LIMITED');
     expect(JSON.stringify(last.body)).not.toContain('R'.repeat(43));
   });
+
   it('does not create a session from a password checked before a concurrent reset', async () => {
     const employee = await createActiveEmployee();
     const blocker = await pool.connect();
@@ -1175,5 +1176,4 @@ describe('Employee Account Administration API', () => {
       blocker.release();
     }
   });
-
 });
