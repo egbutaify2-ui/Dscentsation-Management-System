@@ -133,11 +133,7 @@ beforeEach(() => {
 
 describe('OrderManagementPage', () => {
   it('does not expose the module or order actions without orders.view', () => {
-    render(
-      <OrderManagementPage
-        permissions={['orders.create', 'orders.update']}
-      />,
-    );
+    render(<OrderManagementPage permissions={['orders.create', 'orders.update']} />);
     expect(screen.getByText('You do not have access to Order Management.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Create order' })).toBeNull();
     expect(api.getPage).not.toHaveBeenCalled();
@@ -274,6 +270,7 @@ describe('OrderManagementPage', () => {
     expect(within(orderTotal as HTMLElement).getByText('₦26,000.00')).toBeTruthy();
     expect(screen.queryByText('Estimated subtotal')).toBeNull();
   });
+
   it('validates required order fields', async () => {
     render(<OrderManagementPage permissions={permissions} />);
     openCreateForm();
