@@ -22,29 +22,18 @@ interface AuditFilters {
 }
 
 interface AuditActor {
-  id?: string;
-  userId?: string;
-  actorUserId?: string;
-  displayName?: string | null;
-  name?: string | null;
-  label?: string | null;
+  id: string;
+  displayName: string;
 }
 
 interface AuditActivity {
-  id?: string;
-  actorUserId?: string | null;
-  actorDisplayName?: string | null;
-  actorName?: string | null;
-  actor?: {
-    id?: string | null;
-    displayName?: string | null;
-    name?: string | null;
-  } | null;
+  id: string;
+  actorUserId: string | null;
+  actorDisplayName: string;
   action: string;
-  entityType?: string | null;
-  entityId?: string | null;
-  createdAt?: string | null;
-  occurredAt?: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  occurredAt: string;
 }
 
 interface AuditResponse {
@@ -81,34 +70,14 @@ function readableLabel(value: string | null | undefined): string {
     .join(' ');
 }
 
-function actorIdentifier(actor: AuditActor): string {
-  return actor.id ?? actor.userId ?? actor.actorUserId ?? '';
-}
-
-function actorName(actor: AuditActor): string {
-  return actor.displayName ?? actor.name ?? actor.label ?? '';
-}
-
 function activityActorLabel(entry: AuditActivity, actors: AuditActor[]): string {
-  const id = entry.actorUserId ?? entry.actor?.id ?? null;
-  const matchedActor = id ? actors.find((actor) => actorIdentifier(actor) === id) : undefined;
-  const label =
-    actorName(matchedActor ?? {}) ||
-    entry.actorDisplayName ||
-    entry.actorName ||
-    entry.actor?.displayName ||
-    entry.actor?.name;
-  if (label?.trim()) return label;
-  return id ? 'Employee' : 'System';
+  if (entry.actorDisplayName.trim()) return entry.actorDisplayName;
+  if (!entry.actorUserId) return 'System';
+  return actors.find((actor) => actor.id === entry.actorUserId)?.displayName || 'Employee';
 }
 
 function activityActorKind(entry: AuditActivity): string {
-  return entry.actorUserId ?? entry.actor?.id ? 'Employee' : 'System event source';
-}
-
-function dateBoundary(value: string, endOfDay: boolean): string {
-  const time = endOfDay ? '23:59:59.999' : '00:00:00.000';
-  return new Date(value + 'T' + time + '+01:00').toISOString();
+  return entry.actorUserId ? 'Employee' : 'System event source';
 }
 
 function activityPath(filters: AuditFilters, page: number): string {
@@ -117,8 +86,9 @@ function activityPath(filters: AuditFilters, page: number): string {
   if (filters.action.trim()) params.set('action', filters.action.trim());
   if (filters.entityType.trim()) params.set('entityType', filters.entityType.trim());
   if (filters.entityId.trim()) params.set('entityId', filters.entityId.trim());
-  if (filters.from) params.set('from', dateBoundary(filters.from, false));
-  if (filters.to) params.set('to', dateBoundary(filters.to, true));
+  // Task 027 accepts Lagos calendar dates and applies inclusive date boundaries server-side.
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
   params.set('page', String(page));
   params.set('pageSize', String(PAGE_SIZE));
   return '/audit-logs?' + params.toString();
@@ -126,6 +96,7 @@ function activityPath(filters: AuditFilters, page: number): string {
 
 export function AuditActivityPage() {
   const [filters, setFilters] = useState<AuditFilters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<AuditFilters>(EMPTY_FILTERS);
   const [response, setResponse] = useState<AuditResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [requestedPage, setRequestedPage] = useState(1);
@@ -158,10 +129,7 @@ export function AuditActivityPage() {
 
   const actors = response?.actors ?? [];
   const actorOptions = useMemo(
-    () =>
-      actors
-        .map((actor) => ({ id: actorIdentifier(actor), label: actorName(actor) }))
-        .filter((actor) => actor.id && actor.label),
+    () => actors.map((actor) => ({ id: actor.id, label: actor.displayName })),
     [actors],
   );
   const actionOptions = useMemo(
@@ -190,11 +158,17 @@ export function AuditActivityPage() {
       setError('The start date must be on or before the end date.');
       return;
     }
+    if (filters.entityId.trim() && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.entityId.trim())) {
+      setError('Enter a valid record UUID.');
+      return;
+    }
+    setAppliedFilters({ ...filters });
     void loadActivity(filters, 1);
   }
 
   function resetFilters() {
     setFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
     void loadActivity(EMPTY_FILTERS, 1);
   }
 
@@ -324,7 +298,7 @@ export function AuditActivityPage() {
             <button
               className="secondary-button"
               type="button"
-              onClick={() => void loadActivity(filters, requestedPage)}
+              onClick={() => void loadActivity(appliedFilters, requestedPage)}
               disabled={loading}
             >
               Try again
@@ -382,7 +356,7 @@ export function AuditActivityPage() {
                         )}
                       </td>
                       <td className="audit-date-cell">
-                        {formatDateTime(item.createdAt ?? item.occurredAt)}
+                        {formatDateTime(item.occurredAt)}
                       </td>
                     </tr>
                   ))}
@@ -398,7 +372,7 @@ export function AuditActivityPage() {
                 <button
                   className="secondary-button"
                   type="button"
-                  onClick={() => void loadActivity(filters, currentPage - 1)}
+                  onClick={() => void loadActivity(appliedFilters, currentPage - 1)}
                   disabled={loading || currentPage <= 1}
                   aria-label="Previous page"
                 >
@@ -410,7 +384,7 @@ export function AuditActivityPage() {
                 <button
                   className="secondary-button"
                   type="button"
-                  onClick={() => void loadActivity(filters, currentPage + 1)}
+                  onClick={() => void loadActivity(appliedFilters, currentPage + 1)}
                   disabled={loading || currentPage >= totalPages}
                   aria-label="Next page"
                 >
