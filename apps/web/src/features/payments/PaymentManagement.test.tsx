@@ -203,10 +203,11 @@ describe('OrderPaymentManagement', () => {
 
   it('keeps statuses separate and renders server summary amounts', async () => {
     render(<OrderPaymentManagement orderId={orderId} permissions={managerPermissions} />);
-    expect(await screen.findByText('₦5,000.00')).toBeTruthy();
-    expect(screen.getByText('₦2,000.00')).toBeTruthy();
-    expect(screen.getByText('₦250.00')).toBeTruthy();
-    expect(screen.getByText('₦3,000.00')).toBeTruthy();
+    const summaryRegion = screen.getByRole('region', { name: 'Order payment summary' });
+    expect(within(summaryRegion).getByText('₦5,000.00')).toBeTruthy();
+    expect(within(summaryRegion).getByText('₦2,000.00')).toBeTruthy();
+    expect(within(summaryRegion).getByText('₦250.00')).toBeTruthy();
+    expect(within(summaryRegion).getByText('₦3,000.00')).toBeTruthy();
 
     const pendingGroup = screen.getByRole('region', { name: 'Pending payments' });
     const verifiedGroup = screen.getByRole('region', { name: 'Verified payments' });
