@@ -5,6 +5,7 @@ import { env } from './config/env.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { sessionMiddleware } from './middleware/session.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { auditRoutes } from './modules/audit/audit.routes.js';
 import { customerRoutes } from './modules/customers/customer.routes.js';
 import { supplierRoutes } from './modules/suppliers/supplier.routes.js';
 import { expenseRoutes } from './modules/expenses/expense.routes.js';
@@ -30,6 +31,7 @@ export function createApp(): express.Express {
     response.json({ data: { status: 'ok' } });
   });
   app.use('/api/v1/auth', authRoutes);
+  app.use('/api/v1', auditRoutes);
   app.use('/api/v1/users', userAdminRoutes);
   app.use('/api/v1/customers', customerRoutes);
   app.use('/api/v1', supplierRoutes);
