@@ -18,7 +18,10 @@ vi.mock('../../lib/api/client.js', () => ({
     readonly status: number;
     readonly code: string | undefined;
     readonly requestId: string | undefined;
-    constructor(status: number, body: { error?: { code?: string; message?: string; requestId?: string } }) {
+    constructor(
+      status: number,
+      body: { error?: { code?: string; message?: string; requestId?: string } },
+    ) {
       super(body.error?.message ?? 'The request could not be completed.');
       this.status = status;
       this.code = body.error?.code;
@@ -136,7 +139,9 @@ describe('CustomerManagementPage', () => {
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'Add customer' }));
     fireEvent.change(screen.getByLabelText('Full name'), { target: { value: '  New Customer  ' } });
-    fireEvent.change(screen.getByLabelText('Phone'), { target: { value: '  +234 801 000 0000  ' } });
+    fireEvent.change(screen.getByLabelText('Phone'), {
+      target: { value: '  +234 801 000 0000  ' },
+    });
     fireEvent.change(screen.getByLabelText('Email'), {
       target: { value: 'new.customer@example.invalid' },
     });
@@ -159,7 +164,9 @@ describe('CustomerManagementPage', () => {
     expect(screen.getByText('Customer created.')).toBeTruthy();
   });
 
-  it('views customer details and formats created and updated timestamps in Africa/Lagos', async () => {
+  it(
+    'views customer details and formats created and updated timestamps in Africa/Lagos',
+    async () => {
     render(<CustomerManagementPage permissions={viewPermissions} />);
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
@@ -227,7 +234,9 @@ describe('CustomerManagementPage', () => {
     expect(screen.getByText('Customer archived. The record has been retained.')).toBeTruthy();
   });
 
-  it('displays the API validation message and keeps the form open after a rejected create', async () => {
+  it(
+    'displays the API validation message and keeps the form open after a rejected create',
+    async () => {
     mocks.post.mockRejectedValueOnce(
       new ApiError(400, {
         error: { code: 'INVALID_REQUEST', message: 'Review the supplied fields and try again.' },
@@ -245,7 +254,9 @@ describe('CustomerManagementPage', () => {
     expect(screen.getByRole('dialog', { name: 'Add a customer' })).toBeTruthy();
   });
 
-  it('hides create, edit and archive actions unless their exact permissions are present', async () => {
+  it(
+    'hides create, edit and archive actions unless their exact permissions are present',
+    async () => {
     render(<CustomerManagementPage permissions={viewPermissions} />);
     await screen.findByText('Synthetic Customer');
     expect(screen.queryByRole('button', { name: 'Add customer' })).toBeNull();

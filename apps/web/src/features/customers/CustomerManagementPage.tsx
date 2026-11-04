@@ -394,7 +394,9 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
               <p className="eyebrow">CUSTOMER RECORDS</p>
               <h2 id="customer-register-title">Customer register</h2>
             </div>
-            <span className="customer-record-count">{meta.total.toLocaleString('en-NG')} records</span>
+            <span className="customer-record-count">
+              {meta.total.toLocaleString('en-NG')} records
+            </span>
           </div>
 
           <form
@@ -422,7 +424,11 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
                 <option value="all">All customers</option>
               </select>
             </label>
-            <button type="submit" className="secondary-button customer-search-button" disabled={loading}>
+            <button
+              type="submit"
+              className="secondary-button customer-search-button"
+              disabled={loading}
+            >
               Search
             </button>
           </form>
