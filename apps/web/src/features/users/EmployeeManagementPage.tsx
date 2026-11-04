@@ -19,6 +19,12 @@ interface InvitationResult {
   expiresAt: string;
 }
 
+interface PasswordResetResult {
+  employee: Employee;
+  resetUrl: string;
+  expiresAt: string;
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   return error instanceof Error ? error.message : 'The request could not be completed.';
@@ -49,6 +55,8 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
   const [invitation, setInvitation] = useState<InvitationResult | null>(null);
   const [invitationMode, setInvitationMode] = useState<'created' | 'reissued'>('created');
   const [copied, setCopied] = useState(false);
+  const [passwordReset, setPasswordReset] = useState<PasswordResetResult | null>(null);
+  const [passwordResetCopied, setPasswordResetCopied] = useState(false);
 
   const loadEmployees = useCallback(
     async (
@@ -192,6 +200,48 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
     }
   }
 
+  async function resetEmployeePassword(employee: Employee) {
+    if (
+      !window.confirm(
+        `Generate a new one-time password-reset link for ${employee.displayName}? Any previous unused reset link will stop working. No email will be sent.`,
+      )
+    )
+      return;
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    setPasswordReset(null);
+    setPasswordResetCopied(false);
+    try {
+      const result = await api.post<PasswordResetResult>(
+        `/users/${employee.id}/password-reset`,
+        {},
+        await getCsrfToken(),
+      );
+      setPasswordReset(result);
+      setInvitation(null);
+      setNotice(
+        'A one-time password-reset link was generated. No email was sent; deliver it manually using the official Dscentsation company email identity.',
+      );
+      await loadEmployees(search, roleFilter, statusFilter);
+    } catch (resetError) {
+      setError(errorMessage(resetError));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function copyPasswordResetLink() {
+    if (!passwordReset) return;
+    try {
+      await navigator.clipboard.writeText(passwordReset.resetUrl);
+      setPasswordResetCopied(true);
+    } catch {
+      setPasswordResetCopied(false);
+      setNotice('Clipboard access is unavailable. Select and copy the password-reset link below.');
+    }
+  }
+
   async function revokeInvitation(employee: Employee) {
     if (
       !window.confirm(
@@ -299,6 +349,46 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
           </button>
           <p className="employee-warning">
             Treat this URL like a password. Do not put it in chat groups, issue trackers or logs.
+          </p>
+        </section>
+      )}
+
+      {passwordReset && (
+        <section
+          className="employee-card invitation-result"
+          aria-labelledby="password-reset-result-title"
+        >
+          <div>
+            <p className="eyebrow">ONE-TIME PASSWORD RESET LINK</p>
+            <h2 id="password-reset-result-title">
+              Reset link generated for {passwordReset.employee.displayName}
+            </h2>
+            <p>
+              Deliver this link manually and only to the employee using the official Dscentsation
+              company email identity. DMS does not send password-reset emails automatically.
+            </p>
+            <p className="employee-expiry">Expires: {dateLabel(passwordReset.expiresAt)}</p>
+          </div>
+          <label className="employee-link-field">
+            One-time password-reset URL
+            <input
+              aria-label="One-time password-reset URL"
+              readOnly
+              value={passwordReset.resetUrl}
+              onFocus={(event) => event.currentTarget.select()}
+            />
+          </label>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => void copyPasswordResetLink()}
+          >
+            {passwordResetCopied ? 'Copied' : 'Copy password-reset link'}
+          </button>
+          <p className="employee-warning">
+            Treat this URL like a password. It works once, expires automatically and replaces any
+            earlier unused reset link for this employee. Do not put it in chat groups, issue
+            trackers or logs.
           </p>
         </section>
       )}
@@ -494,14 +584,24 @@ export function EmployeeManagementPage({ canManage }: { canManage: boolean }) {
                             </>
                           )}
                           {employee.status !== 'invited' && (
-                            <button
-                              type="button"
-                              className="table-link-button"
-                              disabled={saving}
-                              onClick={() => void revokeSessions(employee)}
-                            >
-                              Revoke sessions
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                className="table-link-button"
+                                disabled={saving}
+                                onClick={() => void resetEmployeePassword(employee)}
+                              >
+                                Reset password
+                              </button>
+                              <button
+                                type="button"
+                                className="table-link-button"
+                                disabled={saving}
+                                onClick={() => void revokeSessions(employee)}
+                              >
+                                Revoke sessions
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
