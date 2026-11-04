@@ -236,7 +236,9 @@ describe('OrderPaymentManagement', () => {
     );
   });
 
-  it('loads older payment records through accessible backend pagination and supports page navigation', async () => {
+  it(
+    'loads older payment records through accessible backend pagination and supports page navigation',
+    async () => {
     mocks.get.mockImplementation(async (path: string) => {
       if (path.endsWith('/payments/summary')) return paymentSummary;
       if (path.endsWith('page=1&pageSize=100')) {
@@ -264,15 +266,21 @@ describe('OrderPaymentManagement', () => {
 
     expect(await screen.findByText('Recent payment 100')).toBeTruthy();
     expect(screen.getByText('Showing 1–100 of 101 payments · Page 1 of 2')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled();
+    expect(
+      (screen.getByRole('button', { name: 'Previous page' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
 
     expect(await screen.findByText('Older payment 101')).toBeTruthy();
     expect(screen.queryByText('Recent payment 100')).toBeNull();
     expect(screen.getByText('Showing 101–101 of 101 payments · Page 2 of 2')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Previous page' })).toBeEnabled();
+    expect(
+      (screen.getByRole('button', { name: 'Next page' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: 'Previous page' }) as HTMLButtonElement).disabled,
+    ).toBe(false);
     expect(mocks.get).toHaveBeenCalledWith(
       '/orders/' + orderId + '/payments?page=2&pageSize=100',
     );
