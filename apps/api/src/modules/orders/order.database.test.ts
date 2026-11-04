@@ -674,7 +674,7 @@ describe('Order database persistence and authenticated API', () => {
       .set('Origin', env.APP_ORIGIN)
       .set('X-CSRF-Token', denied.csrf)
       .send({ notes: 'Not allowed' })
-      .expect(403);
+      .expect(404);
 
     const { agent, csrf } = await login(ownerEmail);
     await agent

@@ -64,6 +64,23 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Temporary Task 022 Prettier formatting diagnostic
+        shell: bash
+        run: |
+          files=(
+            apps/api/src/modules/orders/order.database.test.ts
+            apps/api/src/modules/orders/order.postgres.repository.ts
+            apps/api/src/modules/orders/order.service.test.ts
+            apps/api/src/modules/orders/order.service.ts
+          )
+          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 --write "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "FORMATTED_FILE_START:$file"
+            base64 -w0 "$file"
+            echo
+            echo "FORMATTED_FILE_END:$file"
+          done
+
       - name: Check formatting
         run: pnpm format:check
 
