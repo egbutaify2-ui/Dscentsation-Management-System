@@ -860,6 +860,7 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
               <label className="order-location-select">
                 Fulfilment location
                 <select
+                  aria-label="Fulfilment location"
                   required
                   value={form.fulfilmentLocationId}
                   disabled={
