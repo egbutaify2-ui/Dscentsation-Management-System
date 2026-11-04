@@ -1,11 +1,4 @@
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-} from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import './PaymentManagement.css';
 import { ApiError, api, getCsrfToken } from '../../lib/api/client.js';
 
@@ -138,10 +131,7 @@ export interface OrderPaymentManagementProps {
  * Reusable payment workspace for an order.
  * Payment reads are deliberately never requested without payments.verify.
  */
-export function OrderPaymentManagement({
-  orderId,
-  permissions,
-}: OrderPaymentManagementProps) {
+export function OrderPaymentManagement({ orderId, permissions }: OrderPaymentManagementProps) {
   const canRecord = permissions.includes('payments.record');
   const canVerify = permissions.includes('payments.verify');
 
@@ -285,9 +275,7 @@ export function OrderPaymentManagement({
         {},
         csrfToken,
       );
-      setSelectedPayment((current) =>
-        current?.id === paymentId ? verifiedPayment : current,
-      );
+      setSelectedPayment((current) => (current?.id === paymentId ? verifiedPayment : current));
       setNotice('Payment verified successfully.');
       await loadPayments(pagination.page);
     } catch (error) {
@@ -479,7 +467,9 @@ export function OrderPaymentManagement({
             )}
           </div>
           {loadingHistory && !summary ? (
-            <div className="payment-state" role="status">Loading payment summary…</div>
+            <div className="payment-state" role="status">
+              Loading payment summary…
+            </div>
           ) : summary ? (
             <div className="payment-summary-grid">
               <article>
@@ -553,8 +543,8 @@ export function OrderPaymentManagement({
             </label>
           </div>
           <p className="payment-form-note">
-            A new record remains pending until an authorised Owner or Manager verifies it. A
-            payment method or reference is optional and accepts free text.
+            A new record remains pending until an authorised Owner or Manager verifies it. A payment
+            method or reference is optional and accepts free text.
           </p>
           <div className="payment-form-actions">
             <button
@@ -629,7 +619,9 @@ export function OrderPaymentManagement({
             </div>
           )}
           {loadingHistory ? (
-            <div className="payment-state" role="status">Loading payment history…</div>
+            <div className="payment-state" role="status">
+              Loading payment history…
+            </div>
           ) : payments.length === 0 ? (
             <div className="payment-state">
               <strong>No payments have been recorded yet.</strong>

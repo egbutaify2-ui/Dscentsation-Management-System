@@ -2,10 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  OrderPaymentManagement,
-  parseNairaToKobo,
-} from './PaymentManagement.js';
+import { OrderPaymentManagement, parseNairaToKobo } from './PaymentManagement.js';
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -233,9 +230,7 @@ describe('OrderPaymentManagement', () => {
     expect(within(pendingGroup).getByText('Pending')).toBeTruthy();
     expect(within(verifiedGroup).getByText('Verified')).toBeTruthy();
     expect(mocks.get).toHaveBeenCalledWith('/orders/' + orderId + '/payments/summary');
-    expect(mocks.get).toHaveBeenCalledWith(
-      '/orders/' + orderId + '/payments?page=1&pageSize=100',
-    );
+    expect(mocks.get).toHaveBeenCalledWith('/orders/' + orderId + '/payments?page=1&pageSize=100');
   });
 
   it('loads older records and navigates payment history pages', async () => {
@@ -276,22 +271,18 @@ describe('OrderPaymentManagement', () => {
     expect(await screen.findByText('Older payment 101')).toBeTruthy();
     expect(screen.queryByText('Recent payment 100')).toBeNull();
     expect(screen.getByText('Showing 101–101 of 101 payments · Page 2 of 2')).toBeTruthy();
-    expect(
-      (screen.getByRole('button', { name: 'Next page' }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByRole('button', { name: 'Next page' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     expect(
       (screen.getByRole('button', { name: 'Previous page' }) as HTMLButtonElement).disabled,
     ).toBe(false);
-    expect(mocks.get).toHaveBeenCalledWith(
-      '/orders/' + orderId + '/payments?page=2&pageSize=100',
-    );
+    expect(mocks.get).toHaveBeenCalledWith('/orders/' + orderId + '/payments?page=2&pageSize=100');
 
     fireEvent.click(screen.getByRole('button', { name: 'Previous page' }));
     expect(await screen.findByText('Recent payment 100')).toBeTruthy();
     expect(screen.getByText('Showing 1–100 of 101 payments · Page 1 of 2')).toBeTruthy();
-    expect(mocks.get).toHaveBeenCalledWith(
-      '/orders/' + orderId + '/payments?page=1&pageSize=100',
-    );
+    expect(mocks.get).toHaveBeenCalledWith('/orders/' + orderId + '/payments?page=1&pageSize=100');
   });
 
   it('formats UTC payment timestamps in Africa/Lagos time', async () => {
