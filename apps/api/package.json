@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js",
-    "build": "tsc -p tsconfig.build.json",
+    "dev": "node init && tsx watch src/server.ts",
+    "start": "node init && node dist/server.js",
+    "build": "node init && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --no-file-parallelism",
     "db:migrate": "tsx src/cli/migrate.ts up",
