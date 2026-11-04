@@ -92,12 +92,7 @@ const secondCustomerOrder: OrderHistoryFixture = {
   ],
 };
 const pageMeta = { page: 1, pageSize: 25, total: 1, totalPages: 1 };
-const orderHistoryMeta = {
-  page: 1,
-  pageSize: 10,
-  total: 1,
-  totalPages: 1,
-};
+const orderHistoryMeta = { page: 1, pageSize: 10, total: 1, totalPages: 1 };
 const viewPermissions = ['customers.view'];
 const fullPermissions = [
   'customers.view',
