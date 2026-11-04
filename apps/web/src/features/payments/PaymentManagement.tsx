@@ -480,10 +480,7 @@ export function OrderPaymentManagement({
               </article>
             </div>
           ) : (
-            <div className="payment-state">
-              Payment summary is unavailable.
-
-            </div>
+            <div className="payment-state">Payment summary is unavailable.</div>
           )}
         </section>
       )}

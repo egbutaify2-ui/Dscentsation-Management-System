@@ -125,9 +125,7 @@ describe('OrderPaymentManagement', () => {
     );
   });
 
-  it(
-    'allows Staff to record a payment and shows the returned record without loading restricted history',
-    async () => {
+  it('records for Staff without requesting restricted history', async () => {
     render(<OrderPaymentManagement orderId={orderId} permissions={staffPermissions} />);
     expect(screen.getByText(/Payment history and order summaries are restricted/)).toBeTruthy();
     expect(mocks.get).not.toHaveBeenCalled();
@@ -149,9 +147,7 @@ describe('OrderPaymentManagement', () => {
     expect(mocks.get).not.toHaveBeenCalled();
   });
 
-  it(
-    'submits decimal NGN amounts as exact integer kobo and sends the required idempotency header with CSRF',
-    async () => {
+  it('sends exact kobo and idempotency plus CSRF headers', async () => {
     render(<OrderPaymentManagement orderId={orderId} permissions={staffPermissions} />);
     fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
     fireEvent.change(screen.getByLabelText('Amount (NGN)'), {
@@ -205,9 +201,7 @@ describe('OrderPaymentManagement', () => {
     expect(mocks.get).not.toHaveBeenCalled();
   });
 
-  it(
-    'keeps pending and verified groups separate and displays backend summary amounts verbatim',
-    async () => {
+  it('keeps statuses separate and renders server summary amounts', async () => {
     render(<OrderPaymentManagement orderId={orderId} permissions={managerPermissions} />);
     expect(await screen.findByText('₦5,000.00')).toBeTruthy();
     expect(screen.getByText('₦2,000.00')).toBeTruthy();
