@@ -65,6 +65,17 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Diagnose Task 035 formatting
+        shell: bash
+        run: |
+          for file in \
+            apps/api/src/modules/users/user-admin.routes.test.ts \
+            apps/api/src/modules/users/user-admin.routes.ts \
+            apps/web/src/features/users/AcceptPasswordResetPage.tsx \
+            apps/web/src/features/users/EmployeeManagementPage.test.tsx; do
+            pnpm exec prettier --single-quote --trailing-comma all --print-width 100 "$file" | diff -u "$file" - || true
+          done
+
       - name: Check formatting
         run: pnpm format:check
 
