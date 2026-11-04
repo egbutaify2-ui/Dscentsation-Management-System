@@ -920,12 +920,23 @@ describe('Employee Account Administration API', () => {
       {},
     );
     const expiredToken = tokenFromPasswordResetUrl(expiredIssue.body.data.resetUrl as string);
-    await pool.query(
-      `UPDATE user_password_resets
-          SET expires_at = created_at + interval '1 microsecond'
-        WHERE user_id = $1`,
-      [expiredEmployee.id],
-    );
+    const expiryFixture = await pool.connect();
+    try {
+      await expiryFixture.query('BEGIN');
+      await expiryFixture.query('SET LOCAL session_replication_role = replica');
+      await expiryFixture.query(
+        `UPDATE user_password_resets
+            SET expires_at = now() - interval '1 second'
+          WHERE user_id = $1`,
+        [expiredEmployee.id],
+      );
+      await expiryFixture.query('COMMIT');
+    } catch (error) {
+      await expiryFixture.query('ROLLBACK');
+      throw error;
+    } finally {
+      expiryFixture.release();
+    }
     const expired = await post(request.agent(app), '/api/v1/users/password-resets/accept', {
       token: expiredToken,
       password: 'Employee-reset-password-2026',
