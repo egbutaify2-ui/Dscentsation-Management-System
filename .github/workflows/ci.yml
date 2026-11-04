@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - task-032-payment-management-api
   push:
     branches:
       - main
@@ -106,6 +107,8 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-order-foundation.sql
       - name: Verify Payment Management schema and existing permission grants
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-payment-management.sql
+      - name: Verify Employee Password Reset token and audit safeguards
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-employee-password-reset.sql
 
       - name: Verify production migration up remains permitted
         run: NODE_ENV=production COOKIE_SECURE=true APP_ORIGIN=https://dms.example.invalid pnpm db:migrate
@@ -153,6 +156,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-expense-foundation.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-order-foundation.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-payment-management.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-employee-password-reset.sql
 
       - name: Run API integration and security tests
         run: pnpm --filter @dms/api test
