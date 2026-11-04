@@ -339,74 +339,73 @@ export function AuditActivityPage() {
         )}
 
         {!error && !loading && response && response.items.length > 0 && (
-          <>
-            <div className="audit-table-wrap">
-              <table className="audit-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Employee / actor</th>
-                    <th scope="col">Action</th>
-                    <th scope="col">Record type</th>
-                    <th scope="col">Record identifier</th>
-                    <th scope="col">Date and time · Lagos</th>
+          <div className="audit-table-wrap">
+            <table className="audit-table">
+              <thead>
+                <tr>
+                  <th scope="col">Employee / actor</th>
+                  <th scope="col">Action</th>
+                  <th scope="col">Record type</th>
+                  <th scope="col">Record identifier</th>
+                  <th scope="col">Date and time · Lagos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {response.items.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <span className="audit-actor">{activityActorLabel(item, actors)}</span>
+                      <small>{activityActorKind(item)}</small>
+                    </td>
+                    <td>
+                      <span className="audit-action">{readableLabel(item.action)}</span>
+                    </td>
+                    <td>{readableLabel(item.entityType)}</td>
+                    <td>
+                      {item.entityId ? (
+                        <code className="audit-record-id">{item.entityId}</code>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="audit-date-cell">{formatDateTime(item.occurredAt)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {response.items.map((item, index) => (
-                    <tr key={item.id ?? item.entityId ?? String(index)}>
-                      <td>
-                        <span className="audit-actor">{activityActorLabel(item, actors)}</span>
-                        <small>{activityActorKind(item)}</small>
-                      </td>
-                      <td>
-                        <span className="audit-action">{readableLabel(item.action)}</span>
-                      </td>
-                      <td>{readableLabel(item.entityType)}</td>
-                      <td>
-                        {item.entityId ? (
-                          <code className="audit-record-id">{item.entityId}</code>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="audit-date-cell">
-                        {formatDateTime(item.occurredAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="audit-pagination">
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!error && !loading && response && (
+          <div className="audit-pagination">
+            <span>
+              Showing {response.items.length.toLocaleString('en-NG')} of{' '}
+              {total.toLocaleString('en-NG')} events
+            </span>
+            <div className="audit-pagination-controls">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => void loadActivity(appliedFilters, currentPage - 1)}
+                disabled={loading || currentPage <= 1}
+                aria-label="Previous page"
+              >
+                Previous
+              </button>
               <span>
-                Showing {response.items.length.toLocaleString('en-NG')} of{' '}
-                {total.toLocaleString('en-NG')} events
+                Page {currentPage} of {Math.max(totalPages, 1)}
               </span>
-              <div className="audit-pagination-controls">
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={() => void loadActivity(appliedFilters, currentPage - 1)}
-                  disabled={loading || currentPage <= 1}
-                  aria-label="Previous page"
-                >
-                  Previous
-                </button>
-                <span>
-                  Page {currentPage} of {Math.max(totalPages, 1)}
-                </span>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={() => void loadActivity(appliedFilters, currentPage + 1)}
-                  disabled={loading || currentPage >= totalPages}
-                  aria-label="Next page"
-                >
-                  Next
-                </button>
-              </div>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => void loadActivity(appliedFilters, currentPage + 1)}
+                disabled={loading || currentPage >= totalPages}
+                aria-label="Next page"
+              >
+                Next
+              </button>
             </div>
-          </>
+          </div>
         )}
       </section>
     </div>
