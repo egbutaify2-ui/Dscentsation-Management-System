@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthenticatedUser } from '../features/auth/AuthProvider.js';
 
-type Section = 'overview' | 'products' | 'employees' | 'expenses' | 'suppliers' | 'activity';
+type Section = 'overview' | 'products' | 'employees' | 'customers' | 'expenses' | 'suppliers' | 'activity';
 type NavigationItem = { label: string; section?: Section; symbol: string; enabled: boolean };
 
 export function AppShell({
@@ -25,7 +25,7 @@ export function AppShell({
   const [loggingOut, setLoggingOut] = useState(false);
   const productVisible = permissions.includes('products.view');
   const employeesVisible = permissions.includes('users.view');
-  const activityVisible = permissions.includes('users.view');
+  const customersVisible = permissions.includes('customers.view');
   const suppliersVisible = permissions.includes('suppliers.view');
   const expensesVisible =
     permissions.includes('expenses.view') || permissions.includes('expense_categories.view');
@@ -37,12 +37,14 @@ export function AppShell({
     ...(employeesVisible
       ? [{ label: 'Employees', section: 'employees' as const, symbol: '♙', enabled: true }]
       : []),
-    ...(activityVisible
-      ? [{ label: 'Activity history', section: 'activity' as const, symbol: '◷', enabled: true }]
+    ...(employeesVisible
+      ? [{ label: 'Activity', section: 'activity' as const, symbol: '◷', enabled: true }]
+      : []),
+    ...(customersVisible
+      ? [{ label: 'Customers', section: 'customers' as const, symbol: '♙', enabled: true }]
       : []),
     { label: 'Orders', symbol: '▤', enabled: false },
     { label: 'Inventory', symbol: '▥', enabled: false },
-    { label: 'Customers', symbol: '♙', enabled: false },
     ...(suppliersVisible
       ? [{ label: 'Suppliers', section: 'suppliers' as const, symbol: '▧', enabled: true }]
       : []),
@@ -74,12 +76,14 @@ export function AppShell({
       ? 'Products'
       : activeSection === 'employees'
         ? 'Employees'
-        : activeSection === 'suppliers'
-          ? 'Suppliers'
-          : activeSection === 'expenses'
-            ? 'Expenses'
-            : activeSection === 'activity'
-              ? 'Activity history'
+        : activeSection === 'customers'
+          ? 'Customers'
+          : activeSection === 'activity'
+            ? 'Activity history'
+            : activeSection === 'suppliers'
+            ? 'Suppliers'
+            : activeSection === 'expenses'
+              ? 'Expenses'
               : 'Overview';
 
   return (
