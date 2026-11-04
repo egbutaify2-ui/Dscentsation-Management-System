@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import argon2 from 'argon2';
 import { env } from '../../config/env.js';
 import { pool } from '../../db/pool.js';
-import { revokeSessionsForUser, rotateSession } from '../auth/auth.session.js';
+import { destroySession, revokeSessionsForUser, rotateSession } from '../auth/auth.session.js';
 import { appendAuditEvent } from '../audit/audit.service.js';
 import { UserAdminError } from './user-admin.errors.js';
 
@@ -191,7 +191,7 @@ export async function acceptEmployeeInvitation(
   const digest = tokenDigest(token);
   const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
   const client = await pool.connect();
-  let acceptedUserId: string;
+  let sessionRotationAttempted = false;
   try {
     await client.query('BEGIN');
     const invitation = await client.query<{
@@ -206,7 +206,8 @@ export async function acceptEmployeeInvitation(
          FROM user_invitations i
          JOIN users u ON u.id = i.user_id
         WHERE i.token_hash = $1
-        FOR UPDATE OF i, u`,
+        FOR UPDATE OF i
+        FOR NO KEY UPDATE OF u`,
       [digest],
     );
     const row = invitation.rows[0];
@@ -253,18 +254,282 @@ export async function acceptEmployeeInvitation(
       );
     }
 
-    acceptedUserId = row.user_id;
     await appendAuditEvent(
       {
-        actorUserId: acceptedUserId,
+        actorUserId: row.user_id,
         action: 'user.invitation.accepted',
         entityType: 'user',
-        entityId: acceptedUserId,
+        entityId: row.user_id,
         requestId,
         safeMetadata: {
           before: { status: 'invited', passwordConfigured: false },
           after: { status: 'active', passwordConfigured: true },
           actorType: 'invited_employee',
+        },
+      },
+      client,
+    );
+
+    // Keep session creation inside the employee-row lock. Owner password-reset issuance
+    // locks the same row, so it cannot revoke sessions and then miss this in-flight login.
+    sessionRotationAttempted = true;
+    await rotateSession(request, row.user_id);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (sessionRotationAttempted) {
+      await destroySession(request);
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function createEmployeePasswordReset(
+  actorUserId: string,
+  requestId: string,
+  userId: string,
+): Promise<{ employee: EmployeeRecord; resetUrl: string; expiresAt: string }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const actor = await client.query<{ role_code: string }>(
+      `SELECT r.code AS role_code
+         FROM users u
+         JOIN roles r ON r.id = u.role_id
+        WHERE u.id = $1
+        FOR SHARE OF u`,
+      [actorUserId],
+    );
+    if (actor.rows[0]?.role_code !== 'OWNER') {
+      throw new UserAdminError(
+        'Only an Owner can generate employee password-reset links.',
+        403,
+        'OWNER_REQUIRED',
+      );
+    }
+
+    const target = await client.query<EmployeeRow>(
+      `SELECT u.id, u.email_normalized AS email, u.display_name,
+              r.code AS role_code, r.name AS role_name, u.status,
+              u.created_at, u.last_login_at
+         FROM users u
+         JOIN roles r ON r.id = u.role_id
+        WHERE u.id = $1
+        FOR UPDATE OF u`,
+      [userId],
+    );
+    const employee = target.rows[0];
+    if (!employee) {
+      throw new UserAdminError('Employee account was not found.', 404, 'USER_NOT_FOUND');
+    }
+    if (userId === actorUserId) {
+      throw new UserAdminError(
+        'You cannot reset your own password through employee administration.',
+        409,
+        'SELF_PASSWORD_RESET',
+      );
+    }
+    if (employee.role_code !== 'MANAGER' && employee.role_code !== 'STAFF') {
+      throw new UserAdminError(
+        'Owner accounts cannot be reset through employee administration.',
+        409,
+        'OWNER_ACCOUNT_PROTECTED',
+      );
+    }
+    if (employee.status === 'invited') {
+      throw new UserAdminError(
+        'Pending invitations must be accepted before an employee password can be reset.',
+        409,
+        'EMPLOYEE_INVITATION_PENDING',
+      );
+    }
+
+    // Expired unused rows still occupy the partial unique index; revoke all unused links
+    // before inserting the replacement, including links whose expiry has already passed.
+    const previous = await client.query(
+      `UPDATE user_password_resets
+          SET revoked_at = now()
+        WHERE user_id = $1
+          AND revoked_at IS NULL
+          AND consumed_at IS NULL`,
+      [userId],
+    );
+
+    const token = randomBytes(32).toString('base64url');
+    const tokenHash = tokenDigest(token);
+    const inserted = await client.query<{
+      created_at: Date | string;
+      expires_at: Date | string;
+    }>(
+      `INSERT INTO user_password_resets(user_id, token_hash, expires_at, created_by)
+       VALUES ($1, $2, now() + ($3::int * interval '1 hour'), $4)
+       RETURNING created_at, expires_at`,
+      [userId, tokenHash, env.INVITATION_EXPIRY_HOURS, actorUserId],
+    );
+    const issuedAt = new Date(inserted.rows[0]!.created_at).toISOString();
+    const expiresAt = new Date(inserted.rows[0]!.expires_at).toISOString();
+
+    await appendAuditEvent(
+      {
+        actorUserId,
+        action: 'user.password_reset.issued',
+        entityType: 'user',
+        entityId: userId,
+        requestId,
+        safeMetadata: {
+          employee: {
+            displayName: employee.display_name,
+            email: employee.email,
+            role: employee.role_code,
+            status: employee.status,
+          },
+          issuedAt,
+          expiresAt,
+          revokedPreviousTokenCount: previous.rowCount ?? 0,
+          delivery: 'manual_company_email',
+        },
+      },
+      client,
+    );
+    await client.query('COMMIT');
+
+    const resetUrl = `${env.APP_ORIGIN.replace(/\/$/, '')}/#/password-reset/accept?token=${encodeURIComponent(token)}`;
+    return { employee: mapEmployee(employee), resetUrl, expiresAt };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function acceptEmployeePasswordReset(
+  token: string,
+  password: string,
+  requestId: string,
+): Promise<void> {
+  const digest = tokenDigest(token);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Lock the employee first, matching the Owner issuance lock order. This prevents
+    // issuance and acceptance from taking the employee/token locks in opposite order.
+    const tokenOwner = await client.query<{ user_id: string }>(
+      'SELECT user_id FROM user_password_resets WHERE token_hash = $1',
+      [digest],
+    );
+    const userId = tokenOwner.rows[0]?.user_id;
+    if (!userId) {
+      throw new UserAdminError(
+        'This password-reset link is invalid, expired or no longer available.',
+        400,
+        'PASSWORD_RESET_INVALID',
+      );
+    }
+
+    const employeeResult = await client.query<{
+      status: EmployeeStatus;
+      role_code: string;
+    }>(
+      `SELECT u.status, r.code AS role_code
+         FROM users u
+         JOIN roles r ON r.id = u.role_id
+        WHERE u.id = $1
+        FOR UPDATE OF u`,
+      [userId],
+    );
+    const employee = employeeResult.rows[0];
+    if (
+      !employee ||
+      employee.status === 'invited' ||
+      (employee.role_code !== 'MANAGER' && employee.role_code !== 'STAFF')
+    ) {
+      throw new UserAdminError(
+        'This password-reset link is invalid, expired or no longer available.',
+        400,
+        'PASSWORD_RESET_INVALID',
+      );
+    }
+
+    const selected = await client.query<{
+      id: string;
+      user_id: string;
+      created_by: string;
+      created_at: Date | string;
+      expires_at: Date | string;
+      revoked_at: Date | string | null;
+      consumed_at: Date | string | null;
+      expired: boolean;
+    }>(
+      `SELECT id, user_id, created_by, created_at, expires_at,
+              revoked_at, consumed_at, (expires_at <= now()) AS expired
+         FROM user_password_resets
+        WHERE token_hash = $1 AND user_id = $2
+        FOR UPDATE`,
+      [digest, userId],
+    );
+    const reset = selected.rows[0];
+    if (!reset || reset.revoked_at || reset.consumed_at || reset.expired) {
+      throw new UserAdminError(
+        'This password-reset link is invalid, expired or no longer available.',
+        400,
+        'PASSWORD_RESET_INVALID',
+      );
+    }
+
+    const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
+    const updated = await client.query(
+      `UPDATE users
+          SET password_hash = $2, updated_at = now()
+        WHERE id = $1
+        RETURNING id`,
+      [reset.user_id, passwordHash],
+    );
+    if (updated.rowCount !== 1) {
+      throw new UserAdminError(
+        'This password-reset link is invalid, expired or no longer available.',
+        400,
+        'PASSWORD_RESET_INVALID',
+      );
+    }
+
+    const consumed = await client.query<{ consumed_at: Date | string }>(
+      `UPDATE user_password_resets
+          SET consumed_at = now()
+        WHERE id = $1
+          AND consumed_at IS NULL
+          AND revoked_at IS NULL
+          AND expires_at > now()
+        RETURNING consumed_at`,
+      [reset.id],
+    );
+    if (consumed.rowCount !== 1 || !consumed.rows[0]) {
+      throw new UserAdminError(
+        'This password-reset link is invalid, expired or no longer available.',
+        400,
+        'PASSWORD_RESET_INVALID',
+      );
+    }
+
+    const sessionsRevoked = await revokeSessionsForUser(reset.user_id, client);
+    const consumedAt = new Date(consumed.rows[0].consumed_at).toISOString();
+    const issuedAt = new Date(reset.created_at).toISOString();
+    await appendAuditEvent(
+      {
+        actorUserId: reset.user_id,
+        action: 'user.password_reset.consumed',
+        entityType: 'user',
+        entityId: reset.user_id,
+        requestId,
+        safeMetadata: {
+          requestedByOwnerId: reset.created_by,
+          issuedAt,
+          consumedAt,
+          accountStatusPreserved: employee.status,
+          revokedSessionCount: sessionsRevoked,
         },
       },
       client,
@@ -276,8 +541,6 @@ export async function acceptEmployeeInvitation(
   } finally {
     client.release();
   }
-
-  await rotateSession(request, acceptedUserId);
 }
 
 export async function setEmployeeStatus(

@@ -8,7 +8,9 @@ import { requireAuthentication } from '../../middleware/authentication.js';
 import { requirePermission } from '../../middleware/authorization.js';
 import {
   acceptEmployeeInvitation,
+  acceptEmployeePasswordReset,
   createEmployeeInvitation,
+  createEmployeePasswordReset,
   listEmployees,
   reissueEmployeeInvitation,
   revokeEmployeeInvitation,
@@ -56,6 +58,31 @@ const acceptanceLimiter = rateLimit({
     });
   },
 });
+
+const passwordResetAcceptanceLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  // Production remains limited to ten attempts; integration tests exercise the full flow.
+  limit: env.NODE_ENV === 'test' ? 50 : 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: (_request, response) => {
+    response.status(429).json({
+      error: {
+        code: 'PASSWORD_RESET_RATE_LIMITED',
+        message: 'Too many password-reset attempts. Try again later.',
+      },
+    });
+  },
+});
+
+const passwordResetAcceptanceSchema = z
+  .object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    password: z.string().min(12).max(1024),
+  })
+  .strict();
+
+const emptyActionSchema = z.object({}).strict();
 
 function routeId(value: string | string[]): string {
   const candidate = typeof value === 'string' ? value : value[0];
@@ -106,6 +133,25 @@ router.post('/invitations/accept', acceptanceLimiter, async (request, response, 
     next(error);
   }
 });
+
+// The token is accepted only in the POST body. It is never read from a query string.
+router.post(
+  '/password-resets/accept',
+  passwordResetAcceptanceLimiter,
+  async (request, response, next) => {
+    try {
+      const parsed = passwordResetAcceptanceSchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      await acceptEmployeePasswordReset(parsed.data.token, parsed.data.password, request.requestId);
+      response.json({ data: { reset: true } });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 router.use(requireAuthentication);
 
@@ -178,6 +224,29 @@ router.post('/invitations', requirePermission('users.manage'), async (request, r
     next(error);
   }
 });
+
+router.post(
+  '/:userId/password-reset',
+  requirePermission('users.manage'),
+  async (request, response, next) => {
+    try {
+      const parsed = emptyActionSchema.safeParse(request.body);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+      response.status(201).json({
+        data: await createEmployeePasswordReset(
+          actorId(request),
+          request.requestId,
+          routeId(request.params.userId!),
+        ),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 router.patch(
   '/:userId/status',

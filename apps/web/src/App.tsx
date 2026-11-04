@@ -8,6 +8,7 @@ import { ProductManagementPage } from './features/products/ProductManagementPage
 import { SupplierManagementPage } from './features/suppliers/SupplierManagementPage.js';
 import { EmployeeManagementPage } from './features/users/EmployeeManagementPage.js';
 import { AcceptInvitationPage } from './features/users/AcceptInvitationPage.js';
+import { AcceptPasswordResetPage } from './features/users/AcceptPasswordResetPage.js';
 
 type Section = 'overview' | 'products' | 'employees' | 'expenses' | 'suppliers';
 
@@ -19,11 +20,22 @@ function invitationTokenFromLocation(): string | null {
   return token && /^[A-Za-z0-9_-]{43}$/.test(token) ? token : null;
 }
 
+function passwordResetTokenFromLocation(): string | null {
+  if (typeof window === 'undefined') return null;
+  const hash = window.location.hash;
+  if (!hash.startsWith('#/password-reset/accept?')) return null;
+  const token = new URLSearchParams(hash.slice(hash.indexOf('?') + 1)).get('token');
+  return token && /^[A-Za-z0-9_-]{43}$/.test(token) ? token : null;
+}
+
 export function App() {
   const { status, user, permissions, error, login, logout, refresh } = useAuth();
   const [activeSection, setActiveSection] = useState<Section>('overview');
   const [invitationToken, setInvitationToken] = useState<string | null>(
     invitationTokenFromLocation,
+  );
+  const [passwordResetToken, setPasswordResetToken] = useState<string | null>(
+    passwordResetTokenFromLocation,
   );
   const canViewProducts = permissions.includes('products.view');
   const canViewEmployees = permissions.includes('users.view');
@@ -39,10 +51,22 @@ export function App() {
   }, [activeSection, canViewProducts, canViewEmployees, canViewSuppliers, canViewExpenses]);
 
   useEffect(() => {
-    if (invitationToken && typeof window !== 'undefined') {
+    if ((invitationToken || passwordResetToken) && typeof window !== 'undefined') {
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
-  }, [invitationToken]);
+  }, [invitationToken, passwordResetToken]);
+
+  if (passwordResetToken) {
+    return (
+      <AcceptPasswordResetPage
+        token={passwordResetToken}
+        onResetComplete={async () => {
+          setPasswordResetToken(null);
+          await refresh();
+        }}
+      />
+    );
+  }
 
   if (invitationToken) {
     return (
