@@ -4,7 +4,7 @@ const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
 const amountMinorSchema = z
   .string()
   .regex(/^[1-9]\d*$/, 'Enter a positive integer amount in kobo.')
-  .refine((value) => BigInt(value) <= MAX_POSTGRES_BIGINT, {
+  .refine((value) => !/^[1-9]\\d*$/.test(value) || BigInt(value) <= MAX_POSTGRES_BIGINT, {
     message: 'The amount exceeds the supported NGN minor-unit range.',
   });
 
