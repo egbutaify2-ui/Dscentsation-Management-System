@@ -815,10 +815,9 @@ describe('Employee Account Administration API', () => {
     expect(account.rows[0]?.status).toBe('active');
     expect(await argon2.verify(account.rows[0]!.password_hash, newPassword)).toBe(true);
 
-    const sessions = await pool.query(
-      'SELECT 1 FROM user_sessions WHERE user_id = $1',
-      [employee.id],
-    );
+    const sessions = await pool.query('SELECT 1 FROM user_sessions WHERE user_id = $1', [
+      employee.id,
+    ]);
     expect(sessions.rowCount).toBe(0);
     expect((await firstAgent.get('/api/v1/auth/capabilities')).status).toBe(401);
     expect((await secondAgent.get('/api/v1/auth/capabilities')).status).toBe(401);
@@ -875,9 +874,9 @@ describe('Employee Account Administration API', () => {
       [employee.id],
     );
     expect(account.rows[0]?.status).toBe('suspended');
-    expect(await argon2.verify(account.rows[0]!.password_hash, 'Employee-suspended-reset-2026')).toBe(
-      true,
-    );
+    expect(
+      await argon2.verify(account.rows[0]!.password_hash, 'Employee-suspended-reset-2026'),
+    ).toBe(true);
     expect(
       (await pool.query('SELECT 1 FROM user_sessions WHERE user_id = $1', [employee.id])).rowCount,
     ).toBe(0);
@@ -989,7 +988,9 @@ describe('Employee Account Administration API', () => {
       [employee.id],
     );
     const matches = await Promise.all(
-      passwords.map((passwordValue) => argon2.verify(account.rows[0]!.password_hash, passwordValue)),
+      passwords.map((passwordValue) =>
+        argon2.verify(account.rows[0]!.password_hash, passwordValue),
+      ),
     );
     expect(matches.filter(Boolean)).toHaveLength(1);
     expect(matches[winnerIndex]).toBe(true);
@@ -1083,10 +1084,9 @@ describe('Employee Account Administration API', () => {
       const rows = await pool.query<{
         revoked_at: Date | null;
         consumed_at: Date | null;
-      }>(
-        `SELECT revoked_at, consumed_at FROM user_password_resets WHERE user_id = $1`,
-        [employee.id],
-      );
+      }>(`SELECT revoked_at, consumed_at FROM user_password_resets WHERE user_id = $1`, [
+        employee.id,
+      ]);
       expect(rows.rows).toHaveLength(1);
       expect(rows.rows[0]?.revoked_at).toBeNull();
       expect(rows.rows[0]?.consumed_at).toBeNull();
@@ -1117,6 +1117,4 @@ describe('Employee Account Administration API', () => {
     expect(last.body.error.code).toBe('PASSWORD_RESET_RATE_LIMITED');
     expect(JSON.stringify(last.body)).not.toContain('R'.repeat(43));
   });
-
-
 });
