@@ -8,7 +8,7 @@
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run --no-file-parallelism",
     "db:migrate": "tsx src/cli/migrate.ts up",
     "db:rollback": "tsx src/cli/migrate.ts down",
     "owner:create": "tsx src/cli/create-owner.ts"
