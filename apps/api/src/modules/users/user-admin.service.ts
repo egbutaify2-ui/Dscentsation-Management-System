@@ -191,7 +191,7 @@ export async function acceptEmployeeInvitation(
   const digest = tokenDigest(token);
   const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
   const client = await pool.connect();
-  let sessionRotationAttempted = false;
+  let acceptedUserId: string | null = null;
   try {
     await client.query('BEGIN');
     const invitation = await client.query<{
@@ -206,8 +206,7 @@ export async function acceptEmployeeInvitation(
          FROM user_invitations i
          JOIN users u ON u.id = i.user_id
         WHERE i.token_hash = $1
-        FOR UPDATE OF i
-        FOR NO KEY UPDATE OF u`,
+        FOR UPDATE OF i, u`,
       [digest],
     );
     const row = invitation.rows[0];
@@ -270,19 +269,42 @@ export async function acceptEmployeeInvitation(
       client,
     );
 
-    // Keep session creation inside the employee-row lock. Owner password-reset issuance
-    // locks the same row, so it cannot revoke sessions and then miss this in-flight login.
-    sessionRotationAttempted = true;
-    await rotateSession(request, row.user_id);
+    acceptedUserId = row.user_id;
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
-    if (sessionRotationAttempted) {
-      await destroySession(request);
-    }
     throw error;
   } finally {
     client.release();
+  }
+
+  // Persist the session after releasing the invitation transaction's DB client. Then
+  // recheck the exact password hash under a row lock so a concurrent reset either wins
+  // before session creation (and this session is rejected) or follows and revokes it.
+  try {
+    await rotateSession(request, acceptedUserId!);
+    const current = await pool.query<{ password_hash: string; status: string }>(
+      'SELECT password_hash, status FROM users WHERE id = $1 FOR UPDATE',
+      [acceptedUserId],
+    );
+    if (
+      !current.rows[0] ||
+      current.rows[0].status !== 'active' ||
+      current.rows[0].password_hash !== passwordHash
+    ) {
+      throw new UserAdminError(
+        'This invitation is invalid, expired or no longer available.',
+        400,
+        'INVITATION_INVALID',
+      );
+    }
+  } catch (error) {
+    try {
+      await destroySession(request);
+    } catch {
+      // Preserve the original acceptance/session-verification failure.
+    }
+    throw error;
   }
 }
 
