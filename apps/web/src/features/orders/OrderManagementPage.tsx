@@ -79,6 +79,7 @@ interface Product {
 
 export interface OrderLocationOption {
   id: string;
+  code: string;
   name: string;
   isActive: boolean;
 }
@@ -201,13 +202,7 @@ function validateOrderForm(form: OrderFormState): string | null {
   return null;
 }
 
-export function OrderManagementPage({
-  permissions,
-  locations = [],
-}: {
-  permissions: string[];
-  locations?: OrderLocationOption[];
-}) {
+export function OrderManagementPage({ permissions }: { permissions: string[] }) {
   const canViewOrders = permissions.includes('orders.view');
   const canCreateOrders = permissions.includes('orders.create');
   const canUpdateOrders = permissions.includes('orders.update');
@@ -223,6 +218,9 @@ export function OrderManagementPage({
   });
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [locations, setLocations] = useState<OrderLocationOption[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingReferences, setLoadingReferences] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -250,6 +248,31 @@ export function OrderManagementPage({
         .filter((product) => product.variants.length > 0),
     [products],
   );
+
+  const loadLocations = useCallback(async () => {
+    setLoadingLocations(true);
+    setLocationError(null);
+    try {
+      const result = await api.get<OrderLocationOption[]>('/locations');
+      if (!Array.isArray(result)) {
+        throw new Error('The location service returned an invalid response.');
+      }
+      const accessibleLocations = result.filter(
+        (location) =>
+          location !== null &&
+          typeof location.id === 'string' &&
+          typeof location.code === 'string' &&
+          typeof location.name === 'string' &&
+          location.isActive === true,
+      );
+      setLocations(accessibleLocations);
+    } catch (loadError) {
+      setLocations([]);
+      setLocationError(errorMessage(loadError));
+    } finally {
+      setLoadingLocations(false);
+    }
+  }, []);
 
   const loadOrders = useCallback(
     async (
@@ -308,6 +331,11 @@ export function OrderManagementPage({
   }, [canViewOrders, loadOrders]);
 
   useEffect(() => {
+    if (canViewOrders) void loadLocations();
+    else setLoadingLocations(false);
+  }, [canViewOrders, loadLocations]);
+
+  useEffect(() => {
     if (canCreateOrders || canUpdateOrders) void loadReferenceData();
   }, [canCreateOrders, canUpdateOrders, loadReferenceData]);
 
@@ -338,10 +366,7 @@ export function OrderManagementPage({
 
   function beginCreate(): void {
     setSelectedOrder(null);
-    setForm({
-      ...emptyForm,
-      fulfilmentLocationId: locations.filter((location) => location.isActive)[0]?.id ?? '',
-    });
+    setForm({ ...emptyForm });
     setProductChoice('');
     setQuantityChoice('1');
     setError(null);
@@ -436,19 +461,27 @@ export function OrderManagementPage({
       setError(validation);
       return;
     }
-    if (locations.filter((location) => location.isActive).length === 0) {
-      if (view === 'create') {
-        setError(
-          'Order creation is blocked because no supported location-list API is available to select an active fulfilment location.',
-        );
-        return;
-      }
-      if (selectedOrder?.fulfilmentLocationId !== form.fulfilmentLocationId) {
-        setError(
-          'A fulfilment location cannot be changed until available locations can be listed.',
-        );
-        return;
-      }
+    const chosenLocationIsAccessible = activeLocations.some(
+      (location) => location.id === form.fulfilmentLocationId,
+    );
+    if (
+      view === 'create' &&
+      (loadingLocations || Boolean(locationError) || !chosenLocationIsAccessible)
+    ) {
+      setError(
+        'Select an active fulfilment location returned for your account before creating the order.',
+      );
+      return;
+    }
+    if (
+      view === 'edit' &&
+      selectedOrder?.fulfilmentLocationId !== form.fulfilmentLocationId &&
+      !chosenLocationIsAccessible
+    ) {
+      setError(
+        'Choose an active accessible fulfilment location before changing the order location.',
+      );
+      return;
     }
 
     const fullPayload = {
@@ -567,6 +600,19 @@ export function OrderManagementPage({
               Retry
             </button>
           )}
+        </div>
+      )}
+      {locationError && (
+        <div className="order-alert error" role="alert">
+          <span>Accessible fulfilment locations could not be loaded. {locationError}</span>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => void loadLocations()}
+            disabled={loadingLocations}
+          >
+            Retry locations
+          </button>
         </div>
       )}
       {notice && (
@@ -816,27 +862,43 @@ export function OrderManagementPage({
                 <select
                   required
                   value={form.fulfilmentLocationId}
-                  disabled={activeLocations.length === 0}
+                  disabled={
+                    loadingLocations || Boolean(locationError) || activeLocations.length === 0
+                  }
                   onChange={(event) =>
                     setForm({ ...form, fulfilmentLocationId: event.target.value })
                   }
                 >
                   <option value="">Choose an available location</option>
+                  {view === 'edit' &&
+                    selectedOrder &&
+                    !activeLocations.some(
+                      (location) => location.id === selectedOrder.fulfilmentLocationId,
+                    ) && (
+                      <option value={selectedOrder.fulfilmentLocationId} disabled>
+                        Current location (not available for reassignment)
+                      </option>
+                    )}
                   {activeLocations.map((location) => (
                     <option key={location.id} value={location.id}>
                       {location.name}
                     </option>
                   ))}
-                  {view === 'edit' && selectedOrder && activeLocations.length === 0 && (
-                    <option value={selectedOrder.fulfilmentLocationId}>
-                      Current fulfilment location
-                    </option>
-                  )}
                 </select>
-                {activeLocations.length === 0 && (
+                {loadingLocations ? (
+                  <small className="order-field-warning">Loading accessible locations…</small>
+                ) : locationError ? (
                   <small className="order-field-warning">
-                    The baseline has no authenticated location-list API. New orders and location
-                    changes stay blocked until that contract is supplied.
+                    Location lookup failed. Use Retry locations above before creating an order.
+                  </small>
+                ) : activeLocations.length === 0 ? (
+                  <small className="order-field-warning">
+                    No active fulfilment locations are available to your account. Order creation
+                    remains unavailable until an accessible location is assigned.
+                  </small>
+                ) : (
+                  <small className="order-helper">
+                    Choose one of the active fulfilment locations available to your account.
                   </small>
                 )}
               </label>
@@ -998,7 +1060,12 @@ export function OrderManagementPage({
                     !canViewCustomers ||
                     !canViewProducts ||
                     (view === 'create' &&
-                      (!canCreateWithDependencies || activeLocations.length === 0))
+                      (!canCreateWithDependencies ||
+                        loadingLocations ||
+                        Boolean(locationError) ||
+                        !activeLocations.some(
+                          (location) => location.id === form.fulfilmentLocationId,
+                        )))
                   }
                 >
                   {saving ? 'Saving…' : view === 'create' ? 'Create order' : 'Save amendment'}

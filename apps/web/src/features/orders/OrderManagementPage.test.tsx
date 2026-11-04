@@ -98,7 +98,7 @@ const permissions = [
   'products.view',
 ];
 const locations: OrderLocationOption[] = [
-  { id: locationId, name: 'Sheraton Stock', isActive: true },
+  { id: locationId, code: 'SHERATON', name: 'Sheraton Store (SHERATON)', isActive: true },
 ];
 
 function mockReferenceCalls() {
@@ -109,6 +109,7 @@ function mockReferenceCalls() {
     return Promise.resolve({ data: [sampleOrder], meta: pageMeta } as never);
   });
   vi.mocked(api.get).mockImplementation((path) => {
+    if (path === '/locations') return Promise.resolve(locations as never);
     if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
     if (path.startsWith('/orders/')) return Promise.resolve(sampleOrder as never);
     return Promise.reject(new Error('Unexpected API GET ' + path));
@@ -135,29 +136,30 @@ describe('OrderManagementPage', () => {
     render(
       <OrderManagementPage
         permissions={['orders.create', 'orders.update']}
-        locations={locations}
       />,
     );
     expect(screen.getByText('You do not have access to Order Management.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Create order' })).toBeNull();
     expect(api.getPage).not.toHaveBeenCalled();
+    expect(api.get).not.toHaveBeenCalled();
   });
 
   it('renders the order register with customer, source, location, total, status and date', async () => {
-    render(<OrderManagementPage permissions={['orders.view']} locations={locations} />);
+    render(<OrderManagementPage permissions={['orders.view']} />);
 
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/locations'));
     const orderTable = await screen.findByRole('table');
     const orderRow = within(orderTable).getByRole('row', {
       name: /ORD-555555555555/,
     });
     expect(within(orderRow).getByText('Synthetic Customer')).toBeTruthy();
     expect(within(orderRow).getByText('WhatsApp')).toBeTruthy();
-    expect(within(orderRow).getByText('Sheraton Stock')).toBeTruthy();
+    expect(within(orderRow).getByText('Sheraton Store (SHERATON)')).toBeTruthy();
     expect(within(orderRow).getByText('₦25,000.00')).toBeTruthy();
     expect(within(orderRow).getByText('Received')).toBeTruthy();
   });
   it('hides create and amendment actions without their specific permissions', async () => {
-    render(<OrderManagementPage permissions={['orders.view']} locations={locations} />);
+    render(<OrderManagementPage permissions={['orders.view']} />);
     await screen.findByText('Synthetic Customer');
     expect(screen.queryByRole('button', { name: 'Create order' })).toBeNull();
 
@@ -209,6 +211,7 @@ describe('OrderManagementPage', () => {
       totalMinor: '2600000',
     } as never);
     vi.mocked(api.get).mockImplementation((path) => {
+      if (path === '/locations') return Promise.resolve(locations as never);
       if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
       if (path.startsWith('/orders/')) {
         return Promise.resolve({
@@ -219,7 +222,7 @@ describe('OrderManagementPage', () => {
       }
       return Promise.reject(new Error('Unexpected API GET ' + path));
     });
-    render(<OrderManagementPage permissions={permissions} locations={locations} />);
+    render(<OrderManagementPage permissions={permissions} />);
     openCreateForm();
 
     await waitFor(() =>
@@ -272,7 +275,7 @@ describe('OrderManagementPage', () => {
     expect(screen.queryByText('Estimated subtotal')).toBeNull();
   });
   it('validates that an order contains a customer, channel, location and at least one item', async () => {
-    render(<OrderManagementPage permissions={permissions} locations={locations} />);
+    render(<OrderManagementPage permissions={permissions} />);
     openCreateForm();
     fireEvent.submit(
       screen
@@ -287,7 +290,7 @@ describe('OrderManagementPage', () => {
   });
 
   it('only shows amendment controls for received orders', async () => {
-    render(<OrderManagementPage permissions={permissions} locations={locations} />);
+    render(<OrderManagementPage permissions={permissions} />);
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
     expect(await screen.findByRole('button', { name: 'Amend order' })).toBeTruthy();
@@ -313,6 +316,7 @@ describe('OrderManagementPage', () => {
     vi.mocked(api.patch).mockResolvedValue(amended as never);
     let orderDetailFetches = 0;
     vi.mocked(api.get).mockImplementation((path) => {
+      if (path === '/locations') return Promise.resolve(locations as never);
       if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
       if (path.startsWith('/orders/')) {
         orderDetailFetches += 1;
@@ -336,14 +340,23 @@ describe('OrderManagementPage', () => {
       { notes: 'Updated note' },
       'synthetic-csrf',
     );
-    expect(api.get).toHaveBeenCalledTimes(3);
+    expect(api.get).toHaveBeenCalledTimes(4);
+    expect(api.get).toHaveBeenCalledWith('/locations');
     expect(api.get).toHaveBeenLastCalledWith('/orders/' + orderId);
   });
 
   it('recovers from an order detail API failure using the detail retry action', async () => {
-    vi.mocked(api.get)
-      .mockRejectedValueOnce(new Error('Order detail service unavailable.'))
-      .mockResolvedValueOnce(sampleOrder as never);
+    let detailAttempts = 0;
+    vi.mocked(api.get).mockImplementation((path) => {
+      if (path === '/locations') return Promise.resolve(locations as never);
+      if (path.startsWith('/orders/')) {
+        detailAttempts += 1;
+        return detailAttempts === 1
+          ? Promise.reject(new Error('Order detail service unavailable.'))
+          : Promise.resolve(sampleOrder as never);
+      }
+      return Promise.reject(new Error('Unexpected API GET ' + path));
+    });
     render(<OrderManagementPage permissions={['orders.view']} />);
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
@@ -355,13 +368,48 @@ describe('OrderManagementPage', () => {
     expect(await screen.findByRole('heading', { name: 'ORD-555555555555' })).toBeTruthy();
   });
 
-  it('blocks order creation when the location list contract is unavailable', async () => {
+  it('shows the empty accessible-location state and prevents order creation without a selection', async () => {
+    vi.mocked(api.get).mockImplementation((path) => {
+      if (path === '/locations') return Promise.resolve([] as never);
+      if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
+      return Promise.reject(new Error('Unexpected API GET ' + path));
+    });
     render(<OrderManagementPage permissions={permissions} />);
     openCreateForm();
-    expect(screen.getByText(/no authenticated location-list API/i)).toBeTruthy();
+
+    expect(
+      await screen.findByText(/No active fulfilment locations are available to your account/i),
+    ).toBeTruthy();
+    expect((screen.getByLabelText('Fulfilment location') as HTMLSelectElement).disabled).toBe(
+      true,
+    );
     expect(
       (screen.getByRole('button', { name: 'Create order' }) as HTMLButtonElement).disabled,
     ).toBe(true);
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('shows a location API error and retries the authenticated lookup', async () => {
+    let locationAttempts = 0;
+    vi.mocked(api.get).mockImplementation((path) => {
+      if (path === '/locations') {
+        locationAttempts += 1;
+        return locationAttempts === 1
+          ? Promise.reject(new Error('Location service unavailable.'))
+          : Promise.resolve(locations as never);
+      }
+      if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
+      return Promise.reject(new Error('Unexpected API GET ' + path));
+    });
+    render(<OrderManagementPage permissions={permissions} />);
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Location service unavailable.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retry locations' }));
+    await waitFor(() => expect(locationAttempts).toBe(2));
+    openCreateForm();
+    expect(screen.getByRole('option', { name: 'Sheraton Store (SHERATON)' })).toBeTruthy();
   });
 
   it('shows API failures and supports retry', async () => {
