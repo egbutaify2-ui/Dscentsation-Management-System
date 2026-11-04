@@ -98,9 +98,7 @@ function readableLabel(value: string | null): string {
 
 async function fetchMetricTotal(kind: Exclude<MetricKind, 'products'>): Promise<number> {
   const path =
-    kind === 'orders'
-      ? '/orders?page=1&pageSize=1'
-      : '/customers?status=active&page=1&pageSize=1';
+    kind === 'orders' ? '/orders?page=1&pageSize=1' : '/customers?status=active&page=1&pageSize=1';
   const response = await api.getPage<unknown[], PaginationMeta>(path);
   const total = response.meta.total;
   if (!Number.isSafeInteger(total) || total < 0) {
@@ -236,9 +234,7 @@ function MetricCard({
       {state.status === 'restricted' && (
         <p className="dashboard-metric-note">Your account does not have {permission} access.</p>
       )}
-      {state.status === 'unavailable' && (
-        <p className="dashboard-metric-note">{state.message}</p>
-      )}
+      {state.status === 'unavailable' && <p className="dashboard-metric-note">{state.message}</p>}
       {state.status === 'error' && (
         <div className="dashboard-metric-error" role="alert">
           <span>{state.message}</span>
