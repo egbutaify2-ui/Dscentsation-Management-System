@@ -26,28 +26,29 @@ router.get(
   requireAuthentication,
   requirePermission('users.view'),
   async (request, response, next) => {
-  try {
-    const parsed = listAuditLogsQuerySchema.safeParse(request.query);
-    if (!parsed.success) {
-      response.status(400).json(validationResponse(parsed.error));
-      return;
+    try {
+      const parsed = listAuditLogsQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        response.status(400).json(validationResponse(parsed.error));
+        return;
+      }
+
+      const filters: AuditActivityFilters = {
+        ...(parsed.data.actorUserId === undefined ? {} : { actorUserId: parsed.data.actorUserId }),
+        ...(parsed.data.action === undefined ? {} : { action: parsed.data.action }),
+        ...(parsed.data.entityType === undefined ? {} : { entityType: parsed.data.entityType }),
+        ...(parsed.data.entityId === undefined ? {} : { entityId: parsed.data.entityId }),
+        ...(parsed.data.from === undefined ? {} : { from: parsed.data.from }),
+        ...(parsed.data.to === undefined ? {} : { to: parsed.data.to }),
+        page: parsed.data.page ?? 1,
+        pageSize: parsed.data.pageSize ?? 25,
+      };
+
+      response.json({ data: await listAuditActivity(filters) });
+    } catch (error) {
+      next(error);
     }
-
-    const filters: AuditActivityFilters = {
-      ...(parsed.data.actorUserId === undefined ? {} : { actorUserId: parsed.data.actorUserId }),
-      ...(parsed.data.action === undefined ? {} : { action: parsed.data.action }),
-      ...(parsed.data.entityType === undefined ? {} : { entityType: parsed.data.entityType }),
-      ...(parsed.data.entityId === undefined ? {} : { entityId: parsed.data.entityId }),
-      ...(parsed.data.from === undefined ? {} : { from: parsed.data.from }),
-      ...(parsed.data.to === undefined ? {} : { to: parsed.data.to }),
-      page: parsed.data.page ?? 1,
-      pageSize: parsed.data.pageSize ?? 25,
-    };
-
-    response.json({ data: await listAuditActivity(filters) });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
 export const auditRoutes: Router = router;
