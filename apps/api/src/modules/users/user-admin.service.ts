@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import argon2 from 'argon2';
 import { env } from '../../config/env.js';
 import { pool } from '../../db/pool.js';
-import { revokeSessionsForUser, rotateSession } from '../auth/auth.session.js';
+import { destroySession, revokeSessionsForUser, rotateSession } from '../auth/auth.session.js';
 import { appendAuditEvent } from '../audit/audit.service.js';
 import { UserAdminError } from './user-admin.errors.js';
 
@@ -191,7 +191,7 @@ export async function acceptEmployeeInvitation(
   const digest = tokenDigest(token);
   const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
   const client = await pool.connect();
-  let acceptedUserId: string;
+  let sessionRotationAttempted = false;
   try {
     await client.query('BEGIN');
     const invitation = await client.query<{
@@ -253,13 +253,12 @@ export async function acceptEmployeeInvitation(
       );
     }
 
-    acceptedUserId = row.user_id;
     await appendAuditEvent(
       {
-        actorUserId: acceptedUserId,
+        actorUserId: row.user_id,
         action: 'user.invitation.accepted',
         entityType: 'user',
-        entityId: acceptedUserId,
+        entityId: row.user_id,
         requestId,
         safeMetadata: {
           before: { status: 'invited', passwordConfigured: false },
@@ -269,15 +268,21 @@ export async function acceptEmployeeInvitation(
       },
       client,
     );
+
+    // Keep session creation inside the employee-row lock. Owner password-reset issuance
+    // locks the same row, so it cannot revoke sessions and then miss this in-flight login.
+    sessionRotationAttempted = true;
+    await rotateSession(request, row.user_id);
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
+    if (sessionRotationAttempted) {
+      await destroySession(request);
+    }
     throw error;
   } finally {
     client.release();
   }
-
-  await rotateSession(request, acceptedUserId);
 }
 
 export async function createEmployeePasswordReset(
