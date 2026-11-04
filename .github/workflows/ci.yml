@@ -154,6 +154,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-order-foundation.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/scripts/verify-payment-management.sql
 
+      # API integration files share disposable PostgreSQL fixtures; the API test script runs files sequentially.
       - name: Run API integration and security tests
         run: pnpm --filter @dms/api test
 
