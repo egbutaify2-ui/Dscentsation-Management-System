@@ -377,9 +377,7 @@ describe('OrderManagementPage', () => {
     expect(
       await screen.findByText(/No active fulfilment locations are available to your account/i),
     ).toBeTruthy();
-    expect((screen.getByLabelText('Fulfilment location') as HTMLSelectElement).disabled).toBe(
-      true,
-    );
+    expect((screen.getByLabelText('Fulfilment location') as HTMLSelectElement).disabled).toBe(true);
     expect(
       (screen.getByRole('button', { name: 'Create order' }) as HTMLButtonElement).disabled,
     ).toBe(true);
