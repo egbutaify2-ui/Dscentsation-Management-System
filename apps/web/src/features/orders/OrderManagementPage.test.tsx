@@ -144,7 +144,7 @@ describe('OrderManagementPage', () => {
     expect(api.get).not.toHaveBeenCalled();
   });
 
-  it('renders the order register with customer, source, location, total, status and date', async () => {
+  it('renders the order register with key order fields', async () => {
     render(<OrderManagementPage permissions={['orders.view']} />);
 
     await waitFor(() => expect(api.get).toHaveBeenCalledWith('/locations'));
@@ -204,7 +204,7 @@ describe('OrderManagementPage', () => {
     expect(screen.getByText('Page 2 of 3')).toBeTruthy();
   });
 
-  it('selects a customer and product variant, creates the order and displays server totals', async () => {
+  it('creates an order and displays server totals', async () => {
     vi.mocked(api.post).mockResolvedValue({
       ...sampleOrder,
       subtotalMinor: '2600000',
@@ -274,7 +274,7 @@ describe('OrderManagementPage', () => {
     expect(within(orderTotal as HTMLElement).getByText('₦26,000.00')).toBeTruthy();
     expect(screen.queryByText('Estimated subtotal')).toBeNull();
   });
-  it('validates that an order contains a customer, channel, location and at least one item', async () => {
+  it('validates required order fields', async () => {
     render(<OrderManagementPage permissions={permissions} />);
     openCreateForm();
     fireEvent.submit(
@@ -368,7 +368,7 @@ describe('OrderManagementPage', () => {
     expect(await screen.findByRole('heading', { name: 'ORD-555555555555' })).toBeTruthy();
   });
 
-  it('shows the empty accessible-location state and prevents order creation without a selection', async () => {
+  it('blocks order creation when no accessible locations exist', async () => {
     vi.mocked(api.get).mockImplementation((path) => {
       if (path === '/locations') return Promise.resolve([] as never);
       if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
