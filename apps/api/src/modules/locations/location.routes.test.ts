@@ -118,29 +118,20 @@ describe('authenticated fulfilment Location API and Order location enforcement',
     manager = await createUser(`task022g.manager.${suffix}@example.invalid`, 'MANAGER');
     staff = await createUser(`task022g.staff.${suffix}@example.invalid`, 'STAFF');
 
-    const restrictedRoleCode = 'T022G_DENIED_' + suffix.replace(/-/g, '').slice(0, 8).toUpperCase();
-    const roleResult = await pool.query<{ id: string }>(
-      'INSERT INTO roles(code, name, description) VALUES ($1, $2, $3) RETURNING id',
-      [
-        restrictedRoleCode,
-        'Synthetic restricted order test role',
-        'Temporary automated-test role; not a production role.',
-      ],
+    const staffRoleResult = await pool.query<{ id: string }>(
+      "SELECT id FROM roles WHERE code = 'STAFF'",
     );
-    const restrictedRoleId = roleResult.rows[0]?.id;
-    if (!restrictedRoleId) throw new Error('Restricted synthetic role was not created.');
+    const staffRoleId = staffRoleResult.rows[0]?.id;
+    if (!staffRoleId) throw new Error('Seeded STAFF role was not created.');
 
     const permissionResult = await pool.query<{ role_id: string; permission_id: string }>(
       'INSERT INTO role_permissions(role_id, permission_id) ' +
         'SELECT $1, id FROM permissions WHERE code = ANY($2::text[]) ' +
         'ON CONFLICT DO NOTHING RETURNING role_id, permission_id',
-      [restrictedRoleId, ['orders.create', 'orders.update']],
+      [staffRoleId, ['orders.create', 'orders.update']],
     );
     restrictedPermissionGrants = permissionResult.rows;
-    restricted = await createUserWithRole(
-      `task022g.restricted.${suffix}@example.invalid`,
-      restrictedRoleId,
-    );
+    restricted = staff;
 
     const codeSuffix = suffix.replace(/-/g, '').slice(0, 8).toUpperCase();
     sheratonLocation = await createLocation(
