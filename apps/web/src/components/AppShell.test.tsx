@@ -74,6 +74,35 @@ describe('AppShell permission-aware navigation', () => {
     expect(onNavigate).toHaveBeenCalledWith('employees');
   });
 
+  it('shows Activity History only when the backend session reports users.view', () => {
+    const onNavigate = vi.fn();
+    const { rerender } = render(
+      <AppShell
+        user={user}
+        permissions={[]}
+        activeSection="overview"
+        onNavigate={onNavigate}
+        onLogout={async () => undefined}
+      >
+        <p>Overview content</p>
+      </AppShell>,
+    );
+    expect(screen.queryByRole('button', { name: 'Activity history' })).toBeNull();
+    rerender(
+      <AppShell
+        user={user}
+        permissions={['users.view']}
+        activeSection="overview"
+        onNavigate={onNavigate}
+        onLogout={async () => undefined}
+      >
+        <p>Overview content</p>
+      </AppShell>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Activity history' }));
+    expect(onNavigate).toHaveBeenCalledWith('activity');
+  });
+
   it('shows Suppliers only when the backend session reports suppliers.view', () => {
     const onNavigate = vi.fn();
     const { rerender } = render(
