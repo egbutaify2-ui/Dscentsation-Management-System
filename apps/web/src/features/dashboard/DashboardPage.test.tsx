@@ -90,7 +90,8 @@ describe('DashboardPage', () => {
     expect(screen.getAllByText('No access').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(0);
     await waitFor(() =>
-      expect(mocks.getPage).toHaveBeenCalledExactlyOnceWith('/orders?page=1&pageSize=1'),
+      expect(mocks.getPage).toHaveBeenCalledTimes(1);
+      expect(mocks.getPage).toHaveBeenCalledWith('/orders?page=1&pageSize=1'),
     );
     expect(mocks.get).not.toHaveBeenCalled();
   });
@@ -162,7 +163,8 @@ describe('DashboardPage', () => {
       timeZone: 'Africa/Lagos',
     }).format(new Date(activityResponse.items[0]!.occurredAt));
     expect(screen.getByText(expectedTime)).toBeTruthy();
-    expect(mocks.get).toHaveBeenCalledExactlyOnceWith('/audit-logs?page=1&pageSize=5');
+    expect(mocks.get).toHaveBeenCalledTimes(1);
+    expect(mocks.get).toHaveBeenCalledWith('/audit-logs?page=1&pageSize=5');
     expect(mocks.getPage).not.toHaveBeenCalled();
   });
 
@@ -178,8 +180,9 @@ describe('DashboardPage', () => {
   });
 
   it('shows loading state while a permitted summary request is pending', () => {
-    mocks.permissions = ['orders.view'];
+    mocks.permissions = ['orders.view', 'users.view'];
     mocks.getPage.mockImplementation(() => new Promise(() => undefined));
+    mocks.get.mockImplementation(() => new Promise(() => undefined));
     render(<DashboardPage user={user} />);
 
     expect(screen.getByText('Loading from the server…')).toBeTruthy();

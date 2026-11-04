@@ -342,7 +342,7 @@ export function DashboardPage({ user }: { user: AuthenticatedUser }) {
   const firstName = user.displayName.trim().split(/\s+/)[0] || 'there';
 
   return (
-    <main className="dashboard-page">
+    <div className="dashboard-page">
       <header className="dashboard-page-heading">
         <div>
           <p className="eyebrow">OPERATIONS</p>
@@ -368,6 +368,6 @@ export function DashboardPage({ user }: { user: AuthenticatedUser }) {
         Operational counts are provided by the server. Restricted or unavailable data is never
         displayed as zero.
       </footer>
-    </main>
+    </div>
   );
 }
