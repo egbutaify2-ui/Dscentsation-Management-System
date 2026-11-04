@@ -87,6 +87,15 @@ function tokenFromSetupUrl(setupUrl: string): string {
   return token;
 }
 
+function tokenFromPasswordResetUrl(resetUrl: string): string {
+  const url = new URL(resetUrl);
+  expect(url.search).toBe('');
+  expect(url.hash).toContain('/password-reset/accept?token=');
+  const token = new URLSearchParams(url.hash.slice(url.hash.indexOf('?') + 1)).get('token');
+  if (!token) throw new Error('Password-reset URL did not contain its fragment token.');
+  return token;
+}
+
 describe('Employee Account Administration API', () => {
   let manager: TestAccount;
   let staff: TestAccount;
@@ -697,4 +706,417 @@ describe('Employee Account Administration API', () => {
       await pool.query('DROP FUNCTION IF EXISTS test_fail_user_suspension_audit()');
     }
   });
+  it('generates an Owner-authorised reset link and persists only its SHA-256 digest', async () => {
+    const employee = await createActiveEmployee();
+    const response = await post(ownerAgent, `/api/v1/users/${employee.id}/password-reset`, {});
+    expect(response.status).toBe(201);
+    const result = response.body.data as {
+      employee: { id: string; roleCode: string; status: string };
+      resetUrl: string;
+      expiresAt: string;
+    };
+    expect(result.employee).toMatchObject({ id: employee.id, roleCode: 'STAFF', status: 'active' });
+    expect(result.employee).not.toHaveProperty('passwordHash');
+    const token = tokenFromPasswordResetUrl(result.resetUrl);
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(new Date(result.expiresAt).getTime()).toBeGreaterThan(Date.now());
+
+    const stored = await pool.query<{
+      token_hash: string;
+      created_by: string;
+      created_at: Date | string;
+      expires_at: Date | string;
+      revoked_at: Date | null;
+      consumed_at: Date | null;
+    }>(
+      `SELECT token_hash, created_by, created_at, expires_at, revoked_at, consumed_at
+         FROM user_password_resets WHERE user_id = $1`,
+      [employee.id],
+    );
+    expect(stored.rows).toHaveLength(1);
+    expect(stored.rows[0]?.token_hash.trim()).toBe(
+      createHash('sha256').update(token).digest('hex'),
+    );
+    expect(stored.rows[0]?.token_hash).not.toContain(token);
+    expect(stored.rows[0]?.created_by).toBe(owner.id);
+    expect(stored.rows[0]?.revoked_at).toBeNull();
+    expect(stored.rows[0]?.consumed_at).toBeNull();
+
+    const audit = await pool.query<{
+      actor_user_id: string;
+      request_id: string;
+      safe_metadata: object;
+    }>(
+      `SELECT actor_user_id, request_id, safe_metadata
+         FROM audit_logs
+        WHERE action = 'user.password_reset.issued' AND entity_id = $1`,
+      [employee.id],
+    );
+    expect(audit.rows).toHaveLength(1);
+    expect(audit.rows[0]?.actor_user_id).toBe(owner.id);
+    expect(audit.rows[0]?.request_id).toBe(response.headers['x-request-id']);
+    expect(JSON.stringify(audit.rows[0]?.safe_metadata)).not.toContain(token);
+    expect(JSON.stringify(audit.rows[0]?.safe_metadata)).not.toContain(result.resetUrl);
+  });
+
+  it('denies Manager and Staff reset generation and protects Owner and self accounts', async () => {
+    const employee = await createActiveEmployee();
+    for (const account of [manager, staff]) {
+      const agent = request.agent(app);
+      expect((await signIn(agent, account.email)).status).toBe(200);
+      const denied = await post(agent, `/api/v1/users/${employee.id}/password-reset`, {});
+      expect(denied.status).toBe(403);
+    }
+
+    const self = await post(ownerAgent, `/api/v1/users/${owner.id}/password-reset`, {});
+    expect(self.status).toBe(409);
+    expect(self.body.error.code).toBe('SELF_PASSWORD_RESET');
+
+    const secondOwner = await createAccount('OWNER');
+    const protectedOwner = await post(
+      ownerAgent,
+      `/api/v1/users/${secondOwner.id}/password-reset`,
+      {},
+    );
+    expect(protectedOwner.status).toBe(409);
+    expect(protectedOwner.body.error.code).toBe('OWNER_ACCOUNT_PROTECTED');
+  });
+
+  it('resets an employee password once, preserves status and revokes every active session', async () => {
+    const employee = await createActiveEmployee();
+    const firstAgent = request.agent(app);
+    const secondAgent = request.agent(app);
+    expect((await signIn(firstAgent, employee.email)).status).toBe(200);
+    expect((await signIn(secondAgent, employee.email)).status).toBe(200);
+    const before = await pool.query<{ count: string }>(
+      'SELECT count(*)::text AS count FROM user_sessions WHERE user_id = $1',
+      [employee.id],
+    );
+    expect(before.rows[0]?.count).toBe('2');
+
+    const issued = await post(ownerAgent, `/api/v1/users/${employee.id}/password-reset`, {});
+    expect(issued.status).toBe(201);
+    const resetUrl = issued.body.data.resetUrl as string;
+    const token = tokenFromPasswordResetUrl(resetUrl);
+    const newPassword = 'Employee-reset-password-2026';
+    const accepted = await post(request.agent(app), '/api/v1/users/password-resets/accept', {
+      token,
+      password: newPassword,
+    });
+    expect(accepted.status).toBe(200);
+    expect(accepted.body.data).toEqual({ reset: true });
+    expect(JSON.stringify(accepted.body)).not.toContain(newPassword);
+    expect(JSON.stringify(accepted.body)).not.toContain(token);
+
+    const account = await pool.query<{ status: string; password_hash: string }>(
+      'SELECT status, password_hash FROM users WHERE id = $1',
+      [employee.id],
+    );
+    expect(account.rows[0]?.status).toBe('active');
+    expect(await argon2.verify(account.rows[0]!.password_hash, newPassword)).toBe(true);
+
+    const sessions = await pool.query(
+      'SELECT 1 FROM user_sessions WHERE user_id = $1',
+      [employee.id],
+    );
+    expect(sessions.rowCount).toBe(0);
+    expect((await firstAgent.get('/api/v1/auth/capabilities')).status).toBe(401);
+    expect((await secondAgent.get('/api/v1/auth/capabilities')).status).toBe(401);
+
+    const tokenRow = await pool.query<{ created_by: string; consumed_at: Date | null }>(
+      `SELECT created_by, consumed_at FROM user_password_resets WHERE user_id = $1`,
+      [employee.id],
+    );
+    expect(tokenRow.rows).toHaveLength(1);
+    expect(tokenRow.rows[0]?.created_by).toBe(owner.id);
+    expect(tokenRow.rows[0]?.consumed_at).toBeTruthy();
+
+    const audit = await pool.query<{
+      action: string;
+      actor_user_id: string;
+      safe_metadata: object;
+    }>(
+      `SELECT action, actor_user_id, safe_metadata FROM audit_logs
+        WHERE entity_id = $1 AND action IN (
+          'user.password_reset.issued', 'user.password_reset.consumed'
+        )
+        ORDER BY occurred_at`,
+      [employee.id],
+    );
+    expect(audit.rows.map((row) => row.action)).toEqual([
+      'user.password_reset.issued',
+      'user.password_reset.consumed',
+    ]);
+    expect(audit.rows[0]?.actor_user_id).toBe(owner.id);
+    expect(audit.rows[1]?.actor_user_id).toBe(employee.id);
+    expect(JSON.stringify(audit.rows)).not.toContain(token);
+    expect(JSON.stringify(audit.rows)).not.toContain(resetUrl);
+    expect(JSON.stringify(audit.rows)).not.toContain(newPassword);
+    expect(audit.rows[1]?.safe_metadata).toMatchObject({ requestedByOwnerId: owner.id });
+  });
+
+  it('preserves a suspended employee status and keeps the account unable to sign in', async () => {
+    const employee = await createActiveEmployee();
+    const existingSession = request.agent(app);
+    expect((await signIn(existingSession, employee.email)).status).toBe(200);
+    await pool.query("UPDATE users SET status = 'suspended' WHERE id = $1", [employee.id]);
+
+    const issued = await post(ownerAgent, `/api/v1/users/${employee.id}/password-reset`, {});
+    expect(issued.status).toBe(201);
+    const token = tokenFromPasswordResetUrl(issued.body.data.resetUrl as string);
+    const accepted = await post(request.agent(app), '/api/v1/users/password-resets/accept', {
+      token,
+      password: 'Employee-suspended-reset-2026',
+    });
+    expect(accepted.status).toBe(200);
+
+    const account = await pool.query<{ status: string; password_hash: string }>(
+      'SELECT status, password_hash FROM users WHERE id = $1',
+      [employee.id],
+    );
+    expect(account.rows[0]?.status).toBe('suspended');
+    expect(await argon2.verify(account.rows[0]!.password_hash, 'Employee-suspended-reset-2026')).toBe(
+      true,
+    );
+    expect(
+      (await pool.query('SELECT 1 FROM user_sessions WHERE user_id = $1', [employee.id])).rowCount,
+    ).toBe(0);
+    expect((await existingSession.get('/api/v1/auth/capabilities')).status).toBe(401);
+    expect((await signIn(request.agent(app), employee.email)).status).toBe(401);
+  });
+
+  it('rejects short passwords and refuses tokens supplied only in the URL', async () => {
+    const employee = await createActiveEmployee();
+    const issued = await post(ownerAgent, `/api/v1/users/${employee.id}/password-reset`, {});
+    expect(issued.status).toBe(201);
+    const token = tokenFromPasswordResetUrl(issued.body.data.resetUrl as string);
+
+    const shortPassword = await post(request.agent(app), '/api/v1/users/password-resets/accept', {
+      token,
+      password: 'too-short',
+    });
+    expect(shortPassword.status).toBe(400);
+    expect(shortPassword.body.error.code).toBe('INVALID_REQUEST');
+
+    const bodyWithoutToken = await post(
+      request.agent(app),
+      `/api/v1/users/password-resets/accept?token=${encodeURIComponent(token)}`,
+      { password: 'Employee-reset-password-2026' },
+    );
+    expect(bodyWithoutToken.status).toBe(400);
+    expect(JSON.stringify(bodyWithoutToken.body)).not.toContain(token);
+
+    const row = await pool.query<{ consumed_at: Date | null }>(
+      'SELECT consumed_at FROM user_password_resets WHERE user_id = $1',
+      [employee.id],
+    );
+    expect(row.rows[0]?.consumed_at).toBeNull();
+  });
+
+  it('rejects expired and previously revoked reset tokens and permits only the replacement', async () => {
+    const expiredEmployee = await createActiveEmployee();
+    const expiredIssue = await post(
+      ownerAgent,
+      `/api/v1/users/${expiredEmployee.id}/password-reset`,
+      {},
+    );
+    const expiredToken = tokenFromPasswordResetUrl(expiredIssue.body.data.resetUrl as string);
+    await pool.query(
+      `UPDATE user_password_resets
+          SET expires_at = created_at + interval '1 microsecond'
+        WHERE user_id = $1`,
+      [expiredEmployee.id],
+    );
+    const expired = await post(request.agent(app), '/api/v1/users/password-resets/accept', {
+      token: expiredToken,
+      password: 'Employee-reset-password-2026',
+    });
+    expect(expired.status).toBe(400);
+
+    const employee = await createActiveEmployee();
+    const first = await post(ownerAgent, `/api/v1/users/${employee.id}/password-reset`, {});
+    const firstToken = tokenFromPasswordResetUrl(first.body.data.resetUrl as string);
+    const second = await post(ownerAgent, `/api/v1/users/${employee.id}/password-reset`, {});
+    const secondToken = tokenFromPasswordResetUrl(second.body.data.resetUrl as string);
+    expect(secondToken).not.toBe(firstToken);
+
+    const oldLink = await post(request.agent(app), '/api/v1/users/password-resets/accept', {
+      token: firstToken,
+      password: 'Employee-reset-password-2026',
+    });
+    expect(oldLink.status).toBe(400);
+    const currentLink = await post(request.agent(app), '/api/v1/users/password-resets/accept', {
+      token: secondToken,
+      password: 'Employee-reset-password-2026',
+    });
+    expect(currentLink.status).toBe(200);
+    const reused = await post(request.agent(app), '/api/v1/users/password-resets/accept', {
+      token: secondToken,
+      password: 'Employee-reset-password-2026',
+    });
+    expect(reused.status).toBe(400);
+
+    const rows = await pool.query<{ revoked_at: Date | null; consumed_at: Date | null }>(
+      `SELECT revoked_at, consumed_at FROM user_password_resets
+        WHERE user_id = $1 ORDER BY created_at, id`,
+      [employee.id],
+    );
+    expect(rows.rows).toHaveLength(2);
+    expect(rows.rows[0]?.revoked_at).toBeTruthy();
+    expect(rows.rows[0]?.consumed_at).toBeNull();
+    expect(rows.rows[1]?.revoked_at).toBeNull();
+    expect(rows.rows[1]?.consumed_at).toBeTruthy();
+  });
+
+  it('serialises concurrent reset-token consumption to exactly one successful password change', async () => {
+    const employee = await createActiveEmployee();
+    const issued = await post(ownerAgent, `/api/v1/users/${employee.id}/password-reset`, {});
+    const token = tokenFromPasswordResetUrl(issued.body.data.resetUrl as string);
+    const passwords = ['Concurrent-reset-password-2026-A', 'Concurrent-reset-password-2026-B'];
+    const attempts = await Promise.all(
+      passwords.map((passwordValue) =>
+        post(request.agent(app), '/api/v1/users/password-resets/accept', {
+          token,
+          password: passwordValue,
+        }),
+      ),
+    );
+    expect(attempts.map((response) => response.status).sort()).toEqual([200, 400]);
+
+    const winnerIndex = attempts.findIndex((response) => response.status === 200);
+    const account = await pool.query<{ password_hash: string }>(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [employee.id],
+    );
+    const matches = await Promise.all(
+      passwords.map((passwordValue) => argon2.verify(account.rows[0]!.password_hash, passwordValue)),
+    );
+    expect(matches.filter(Boolean)).toHaveLength(1);
+    expect(matches[winnerIndex]).toBe(true);
+    const consumedAudit = await pool.query(
+      `SELECT 1 FROM audit_logs
+        WHERE action = 'user.password_reset.consumed' AND entity_id = $1`,
+      [employee.id],
+    );
+    expect(consumedAudit.rowCount).toBe(1);
+  });
+
+  it('rolls back password, token consumption and session deletion if consumed audit fails', async () => {
+    const employee = await createActiveEmployee();
+    const employeeAgent = request.agent(app);
+    expect((await signIn(employeeAgent, employee.email)).status).toBe(200);
+    const before = await pool.query<{ password_hash: string }>(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [employee.id],
+    );
+    const issued = await post(ownerAgent, `/api/v1/users/${employee.id}/password-reset`, {});
+    const token = tokenFromPasswordResetUrl(issued.body.data.resetUrl as string);
+    await pool.query(`
+      CREATE FUNCTION test_fail_employee_password_reset_audit() RETURNS trigger
+      LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.action = 'user.password_reset.consumed' THEN
+          RAISE EXCEPTION 'Synthetic password reset audit failure';
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+    `);
+    await pool.query(`
+      CREATE TRIGGER test_fail_employee_password_reset_audit
+      BEFORE INSERT ON audit_logs
+      FOR EACH ROW EXECUTE FUNCTION test_fail_employee_password_reset_audit();
+    `);
+    try {
+      const failed = await post(request.agent(app), '/api/v1/users/password-resets/accept', {
+        token,
+        password: 'Employee-reset-password-2026',
+      });
+      expect(failed.status).toBe(500);
+      const state = await pool.query<{ status: string; password_hash: string; sessions: string }>(
+        `SELECT u.status, u.password_hash, count(s.sid)::text AS sessions
+           FROM users u LEFT JOIN user_sessions s ON s.user_id = u.id
+          WHERE u.id = $1 GROUP BY u.id`,
+        [employee.id],
+      );
+      expect(state.rows[0]).toEqual({
+        status: 'active',
+        password_hash: before.rows[0]?.password_hash,
+        sessions: '1',
+      });
+      const tokenRow = await pool.query<{ consumed_at: Date | null }>(
+        'SELECT consumed_at FROM user_password_resets WHERE token_hash = $1',
+        [createHash('sha256').update(token).digest('hex')],
+      );
+      expect(tokenRow.rows[0]?.consumed_at).toBeNull();
+    } finally {
+      await pool.query(
+        'DROP TRIGGER IF EXISTS test_fail_employee_password_reset_audit ON audit_logs',
+      );
+      await pool.query('DROP FUNCTION IF EXISTS test_fail_employee_password_reset_audit()');
+    }
+  });
+
+  it('rolls back reset issuance and token revocation when issued audit fails', async () => {
+    const employee = await createActiveEmployee();
+    const prior = await post(ownerAgent, `/api/v1/users/${employee.id}/password-reset`, {});
+    expect(prior.status).toBe(201);
+    await pool.query(`
+      CREATE FUNCTION test_fail_employee_password_reset_issued_audit() RETURNS trigger
+      LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.action = 'user.password_reset.issued' THEN
+          RAISE EXCEPTION 'Synthetic password reset issue audit failure';
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+    `);
+    await pool.query(`
+      CREATE TRIGGER test_fail_employee_password_reset_issued_audit
+      BEFORE INSERT ON audit_logs
+      FOR EACH ROW EXECUTE FUNCTION test_fail_employee_password_reset_issued_audit();
+    `);
+    try {
+      const failed = await post(ownerAgent, `/api/v1/users/${employee.id}/password-reset`, {});
+      expect(failed.status).toBe(500);
+      const rows = await pool.query<{
+        revoked_at: Date | null;
+        consumed_at: Date | null;
+      }>(
+        `SELECT revoked_at, consumed_at FROM user_password_resets WHERE user_id = $1`,
+        [employee.id],
+      );
+      expect(rows.rows).toHaveLength(1);
+      expect(rows.rows[0]?.revoked_at).toBeNull();
+      expect(rows.rows[0]?.consumed_at).toBeNull();
+    } finally {
+      await pool.query(
+        'DROP TRIGGER IF EXISTS test_fail_employee_password_reset_issued_audit ON audit_logs',
+      );
+      await pool.query('DROP FUNCTION IF EXISTS test_fail_employee_password_reset_issued_audit()');
+    }
+  });
+
+  it('rate limits unauthenticated password-reset acceptance attempts', async () => {
+    const agent = request.agent(app);
+    const csrfToken = await csrf(agent);
+    let last = await agent
+      .post('/api/v1/users/password-resets/accept')
+      .set('Origin', env.APP_ORIGIN)
+      .set('X-CSRF-Token', csrfToken)
+      .send({ token: 'R'.repeat(43), password: 'Employee-reset-password-2026' });
+    for (let attempt = 1; attempt < 51; attempt += 1) {
+      last = await agent
+        .post('/api/v1/users/password-resets/accept')
+        .set('Origin', env.APP_ORIGIN)
+        .set('X-CSRF-Token', csrfToken)
+        .send({ token: 'R'.repeat(43), password: 'Employee-reset-password-2026' });
+    }
+    expect(last.status).toBe(429);
+    expect(last.body.error.code).toBe('PASSWORD_RESET_RATE_LIMITED');
+    expect(JSON.stringify(last.body)).not.toContain('R'.repeat(43));
+  });
+
+
 });
