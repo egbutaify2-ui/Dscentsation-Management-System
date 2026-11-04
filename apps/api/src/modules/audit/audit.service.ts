@@ -2,12 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import { pool } from '../../db/pool.js';
 
 export type AuditJsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | AuditJsonValue[]
-  | { [key: string]: AuditJsonValue };
+  string | number | boolean | null | AuditJsonValue[] | { [key: string]: AuditJsonValue };
 
 export interface AuditEventInput {
   actorUserId?: string | null;
@@ -135,9 +130,7 @@ export async function appendAuditEvent(
   );
 }
 
-export async function listAuditActivity(
-  filters: AuditActivityFilters,
-): Promise<AuditActivityPage> {
+export async function listAuditActivity(filters: AuditActivityFilters): Promise<AuditActivityPage> {
   const client = await pool.connect();
   let transactionStarted = false;
 

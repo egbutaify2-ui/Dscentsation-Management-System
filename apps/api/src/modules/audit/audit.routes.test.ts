@@ -301,9 +301,9 @@ describe('Audit activity history API', () => {
       ...sameTimeIds,
     ]);
     expect(secondPage.body.data.items[0].id).toBe(pageEventIds[0]);
-    expect(
-      firstPage.body.data.items[0].occurredAt >= firstPage.body.data.items[1].occurredAt,
-    ).toBe(true);
+    expect(firstPage.body.data.items[0].occurredAt >= firstPage.body.data.items[1].occurredAt).toBe(
+      true,
+    );
   });
 
   it('labels system-generated events without an actor', async () => {
@@ -319,46 +319,43 @@ describe('Audit activity history API', () => {
     });
   });
 
-  it(
-    'returns only approved activity fields and never returns metadata or session data',
-    async () => {
-      const response = await ownerAgent
-        .get('/api/v1/audit-logs')
-        .query({ entityType: actorEventType })
-        .expect(200);
-      const body = response.body as {
-        data: {
-          items: Array<Record<string, unknown>>;
-          actors: Array<Record<string, unknown>>;
-        };
+  it('returns only approved activity fields and never returns metadata or session data', async () => {
+    const response = await ownerAgent
+      .get('/api/v1/audit-logs')
+      .query({ entityType: actorEventType })
+      .expect(200);
+    const body = response.body as {
+      data: {
+        items: Array<Record<string, unknown>>;
+        actors: Array<Record<string, unknown>>;
       };
+    };
 
-      expect(Object.keys(body.data.items[0]!).sort()).toEqual(
-        [
-          'id',
-          'actorUserId',
-          'actorDisplayName',
-          'action',
-          'entityType',
-          'entityId',
-          'occurredAt',
-        ].sort(),
-      );
-      expect(
-        body.data.actors.every((actor) => Object.keys(actor).sort().join(',') === 'displayName,id'),
-      ).toBe(true);
-      const actorIds = body.data.actors.map((actor) => actor.id);
-      expect(new Set(actorIds).size).toBe(actorIds.length);
+    expect(Object.keys(body.data.items[0]!).sort()).toEqual(
+      [
+        'id',
+        'actorUserId',
+        'actorDisplayName',
+        'action',
+        'entityType',
+        'entityId',
+        'occurredAt',
+      ].sort(),
+    );
+    expect(
+      body.data.actors.every((actor) => Object.keys(actor).sort().join(',') === 'displayName,id'),
+    ).toBe(true);
+    const actorIds = body.data.actors.map((actor) => actor.id);
+    expect(new Set(actorIds).size).toBe(actorIds.length);
 
-      const serialized = JSON.stringify(response.body);
-      expect(serialized).not.toContain('safeMetadata');
-      expect(serialized).not.toContain('must-not-be-returned');
-      expect(serialized).not.toContain('synthetic-password-must-not-leak');
-      expect(serialized).not.toContain('synthetic-session-must-not-leak');
-      expect(serialized).not.toContain('synthetic-token-must-not-leak');
-      expect(serialized).not.toMatch(/passwordHash|sessionId|accessToken|cookie|requestId/i);
-    },
-  );
+    const serialized = JSON.stringify(response.body);
+    expect(serialized).not.toContain('safeMetadata');
+    expect(serialized).not.toContain('must-not-be-returned');
+    expect(serialized).not.toContain('synthetic-password-must-not-leak');
+    expect(serialized).not.toContain('synthetic-session-must-not-leak');
+    expect(serialized).not.toContain('synthetic-token-must-not-leak');
+    expect(serialized).not.toMatch(/passwordHash|sessionId|accessToken|cookie|requestId/i);
+  });
 
   it('rejects malformed UUIDs, dates, invalid ranges and unknown query parameters', async () => {
     const invalidQueries = [
@@ -391,9 +388,7 @@ describe('Audit activity history API', () => {
         method === 'post'
           ? ownerAgent.post('/api/v1/audit-logs').send({ action: 'tamper' })
           : ownerAgent.delete('/api/v1/audit-logs');
-      return call
-        .set('Origin', env.APP_ORIGIN)
-        .set('X-CSRF-Token', csrf.body.data.token as string);
+      return call.set('Origin', env.APP_ORIGIN).set('X-CSRF-Token', csrf.body.data.token as string);
     };
 
     await mutation('post').expect(404);
