@@ -2,14 +2,8 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthenticatedUser } from '../features/auth/AuthProvider.js';
 
-type Section =
-  | 'overview'
-  | 'products'
-  | 'employees'
-  | 'customers'
-  | 'expenses'
-  | 'suppliers'
-  | 'activity';
+type WorkspaceSection = 'overview' | 'products' | 'employees' | 'customers';
+type Section = WorkspaceSection | 'expenses' | 'suppliers' | 'activity';
 type NavigationItem = { label: string; section?: Section; symbol: string; enabled: boolean };
 
 export function AppShell({
@@ -78,20 +72,16 @@ export function AppShell({
     setMenuOpen(false);
   }
 
-  const activeLabel =
-    activeSection === 'products'
-      ? 'Products'
-      : activeSection === 'employees'
-        ? 'Employees'
-        : activeSection === 'customers'
-          ? 'Customers'
-          : activeSection === 'activity'
-            ? 'Activity history'
-            : activeSection === 'suppliers'
-              ? 'Suppliers'
-              : activeSection === 'expenses'
-                ? 'Expenses'
-                : 'Overview';
+  const activeLabels: Record<Section, string> = {
+    overview: 'Overview',
+    products: 'Products',
+    employees: 'Employees',
+    customers: 'Customers',
+    expenses: 'Expenses',
+    suppliers: 'Suppliers',
+    activity: 'Activity history',
+  };
+  const activeLabel = activeLabels[activeSection];
 
   return (
     <div className="app-shell">
