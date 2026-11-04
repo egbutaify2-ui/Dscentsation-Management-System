@@ -102,6 +102,10 @@ function activityActorLabel(entry: AuditActivity, actors: AuditActor[]): string 
   return id ? 'Employee' : 'System';
 }
 
+function activityActorKind(entry: AuditActivity): string {
+  return entry.actorUserId ?? entry.actor?.id ? 'Employee' : 'System event source';
+}
+
 function dateBoundary(value: string, endOfDay: boolean): string {
   const time = endOfDay ? '23:59:59.999' : '00:00:00.000';
   return new Date(value + 'T' + time + '+01:00').toISOString();
@@ -364,7 +368,7 @@ export function AuditActivityPage() {
                     <tr key={item.id ?? item.entityId ?? String(index)}>
                       <td>
                         <span className="audit-actor">{activityActorLabel(item, actors)}</span>
-                        <small>{item.actorUserId ? 'Employee' : 'System event source'}</small>
+                        <small>{activityActorKind(item)}</small>
                       </td>
                       <td>
                         <span className="audit-action">{readableLabel(item.action)}</span>
