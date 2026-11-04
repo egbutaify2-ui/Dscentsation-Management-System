@@ -218,7 +218,7 @@ describe('OrderPaymentManagement', () => {
   it('keeps statuses separate and renders server summary amounts', async () => {
     render(<OrderPaymentManagement orderId={orderId} permissions={managerPermissions} />);
     const summaryRegion = screen.getByRole('region', { name: 'Order payment summary' });
-    expect(within(summaryRegion).getByText('₦5,000.00')).toBeTruthy();
+    expect(await within(summaryRegion).findByText('₦5,000.00')).toBeTruthy();
     expect(within(summaryRegion).getByText('₦2,000.00')).toBeTruthy();
     expect(within(summaryRegion).getByText('₦250.00')).toBeTruthy();
     expect(within(summaryRegion).getByText('₦3,000.00')).toBeTruthy();
@@ -297,34 +297,32 @@ describe('OrderPaymentManagement', () => {
     fireEvent.click(within(pendingGroup).getByRole('button', { name: 'Details' }));
     expect(await screen.findByText('Payment activity')).toBeTruthy();
     expect(mocks.get).toHaveBeenCalledWith('/payments/' + pendingPaymentId);
-    expect(screen.getByText('Recorded')).toBeTruthy();
+    const detailPanel = screen.getByText('Payment activity').closest('.payment-detail-panel');
+    expect(detailPanel).not.toBeNull();
+    expect(within(detailPanel as HTMLElement).getByText('Recorded')).toBeTruthy();
   });
 
-  it('shows loading, an empty state, and a retry path after a history error', async () => {
-    let resolveSummary: ((value: typeof paymentSummary) => void) | undefined;
-    let resolvePage: ((value: typeof paymentPage) => void) | undefined;
-    mocks.get.mockImplementation(
-      (path: string) =>
-        new Promise((resolve) => {
-          if (path.endsWith('/payments/summary')) {
-            resolveSummary = resolve as (value: typeof paymentSummary) => void;
-          } else {
-            resolvePage = resolve as (value: typeof paymentPage) => void;
-          }
-        }),
-    );
+  it('shows loading, a retry path after a history error, and an empty state after retry', async () => {
+    mocks.get.mockImplementation(async (path: string) => {
+      if (path.endsWith('/payments/summary')) return paymentSummary;
+      throw new Error('Payment service unavailable.');
+    });
+
     render(<OrderPaymentManagement orderId={orderId} permissions={managerPermissions} />);
     expect(screen.getByText('Loading payment history…')).toBeTruthy();
-    resolveSummary?.(paymentSummary);
-    resolvePage?.({ ...paymentPage, items: [], total: 0, totalPages: 0 });
-    expect(await screen.findByText('No payments have been recorded yet.')).toBeTruthy();
 
-    mocks.get.mockRejectedValueOnce(new Error('Payment service unavailable.'));
+    const historyAlert = await screen.findByRole('alert');
+    expect(historyAlert.textContent).toContain('Payment service unavailable.');
+
+    mocks.get.mockImplementation(async (path: string) => {
+      if (path.endsWith('/payments/summary')) return paymentSummary;
+      if (path.includes('/payments?page=')) {
+        return { ...paymentPage, items: [], total: 0, totalPages: 0 };
+      }
+      throw new Error('Unexpected payment GET: ' + path);
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    expect((await screen.findByRole('alert')).textContent).toContain(
-      'Payment service unavailable.',
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
     expect(await screen.findByText('No payments have been recorded yet.')).toBeTruthy();
   });
 
