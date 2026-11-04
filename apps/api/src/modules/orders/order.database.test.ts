@@ -19,6 +19,7 @@ const password = 'DMS-task022-test-password';
 const ownerEmail = 'task022.owner.' + suffix + '@example.invalid';
 const deniedEmail = 'task022.denied.' + suffix + '@example.invalid';
 const assignedStaffEmail = 'task022.assigned-staff.' + suffix + '@example.invalid';
+const multiLocationStaffEmail = 'task022.multi-location-staff.' + suffix + '@example.invalid';
 const managerEmail = 'task022.manager.' + suffix + '@example.invalid';
 const locationCode = 'T022-' + suffix.slice(0, 12).toUpperCase();
 
@@ -26,6 +27,10 @@ let actorId = '';
 let customerId = '';
 let locationId = '';
 let otherLocationId = '';
+let warehouseLocationId = '';
+let secondAssignedLocationId = '';
+let multiLocationStaffId = '';
+let otherVariantId = '';
 let inactiveLocationId = '';
 let productId = '';
 let variantId = '';
@@ -173,6 +178,48 @@ function amendmentFrom(
   };
 }
 
+function createReadBarrier(expected: 'detail' | 'list') {
+  let signalReached!: () => void;
+  let resumeRead!: () => void;
+  const reached = new Promise<void>((resolve) => {
+    signalReached = resolve;
+  });
+  const resume = new Promise<void>((resolve) => {
+    resumeRead = resolve;
+  });
+  return {
+    reached,
+    release: resumeRead,
+    afterHeaderRead: async (kind: 'detail' | 'list') => {
+      if (kind === expected) {
+        signalReached();
+        await resume;
+      }
+    },
+  };
+}
+
+function snapshotV2(current: OrderRecord, updatedBy: string): OrderAmendmentWriteModel {
+  const item = current.items[0];
+  if (!item) throw new Error('Snapshot concurrency test requires an order item.');
+  return {
+    ...amendmentFrom(current, updatedBy, 'snapshot-version-two'),
+    items: [
+      {
+        ...item,
+        productId: otherProductId,
+        productVariantId: otherVariantId,
+        productNameSnapshot: 'Other Fixture Product',
+        skuSnapshot: 'T022-PROD-B',
+        unitPriceMinor: '99000',
+        lineTotalMinor: '99000',
+      },
+    ],
+    subtotalMinor: '99000',
+    totalMinor: '99000',
+  };
+}
+
 describe('Order database persistence and authenticated API', () => {
   beforeAll(async () => {
     await pool.query('SELECT 1');
@@ -202,12 +249,20 @@ describe('Order database persistence and authenticated API', () => {
       [['MANAGER', 'STAFF']],
     );
     orderPermissionGrants.push(...additionalReadGrants.rows);
+    const staffUpdateGrants = await pool.query<{ role_id: string; permission_id: string }>(
+      'INSERT INTO role_permissions(role_id, permission_id) ' +
+        'SELECT r.id, p.id FROM roles r CROSS JOIN permissions p ' +
+        "WHERE r.code = 'STAFF' AND p.code = 'orders.update' " +
+        'ON CONFLICT DO NOTHING RETURNING role_id, permission_id',
+    );
+    orderPermissionGrants.push(...staffUpdateGrants.rows);
 
     actorId = await createUser(ownerEmail, ownerRoleId);
     const staffRole = await pool.query<{ id: string }>("SELECT id FROM roles WHERE code = 'STAFF'");
     if (!staffRole.rows[0]) throw new Error('The seeded STAFF role is missing.');
     await createUser(deniedEmail, staffRole.rows[0].id);
     const assignedStaffId = await createUser(assignedStaffEmail, staffRole.rows[0].id);
+    multiLocationStaffId = await createUser(multiLocationStaffEmail, staffRole.rows[0].id);
     const managerRole = await pool.query<{ id: string }>(
       "SELECT id FROM roles WHERE code = 'MANAGER'",
     );
@@ -228,6 +283,21 @@ describe('Order database persistence and authenticated API', () => {
     otherLocationId = otherLocation.rows[0]?.id ?? '';
     if (!otherLocationId) throw new Error('Task 022 other location was not created.');
 
+    const warehouseLocation = await pool.query<{ id: string }>(
+      'INSERT INTO locations(code, name, address) VALUES ($1, $2, $3) RETURNING id',
+      [locationCode + '-WH', 'Task 022 Warehouse Test Location', 'Lagos, Nigeria'],
+    );
+    warehouseLocationId = warehouseLocation.rows[0]?.id ?? '';
+    if (!warehouseLocationId) throw new Error('Task 022 Warehouse location was not created.');
+
+    const secondAssignedLocation = await pool.query<{ id: string }>(
+      'INSERT INTO locations(code, name, address) VALUES ($1, $2, $3) RETURNING id',
+      [locationCode + '-S2', 'Task 022 Second Assigned Location', 'Lagos, Nigeria'],
+    );
+    secondAssignedLocationId = secondAssignedLocation.rows[0]?.id ?? '';
+    if (!secondAssignedLocationId)
+      throw new Error('Task 022 second assigned location was not created.');
+
     const inactiveLocation = await pool.query<{ id: string }>(
       'INSERT INTO locations(code, name, address, is_active) VALUES ($1, $2, $3, false) RETURNING id',
       [locationCode + '-OFF', 'Task 022 Inactive Historical Location', 'Lagos, Nigeria'],
@@ -238,6 +308,10 @@ describe('Order database persistence and authenticated API', () => {
     await pool.query(
       'INSERT INTO user_location_access(user_id, location_id, granted_by) VALUES ($1, $2, $3)',
       [assignedStaffId, locationId, actorId],
+    );
+    await pool.query(
+      'INSERT INTO user_location_access(user_id, location_id, granted_by) VALUES ($1, $2, $3), ($1, $4, $3)',
+      [multiLocationStaffId, locationId, actorId, secondAssignedLocationId],
     );
 
     const customer = await pool.query<{ id: string }>(
@@ -253,6 +327,7 @@ describe('Order database persistence and authenticated API', () => {
     variantId = product.variantId;
     const other = await createProduct('Other Fixture Product', 'T022-PROD-B', '99000');
     otherProductId = other.productId;
+    otherVariantId = other.variantId;
   });
 
   afterAll(async () => {
@@ -441,6 +516,170 @@ describe('Order database persistence and authenticated API', () => {
     // is approved; they are never silently included in active-location reads.
   });
 
+  it('returns the same 404 for an unauthorized original Warehouse order and leaves every record unchanged', async () => {
+    const order = await repository.createReceivedOrder(
+      directOrderWrite('warehouse-original-location', warehouseLocationId),
+      { actorId, requestId: randomUUID() },
+    );
+    const staff = await login(assignedStaffEmail);
+    const beforeHeader = await pool.query('SELECT * FROM orders WHERE id = $1', [order.id]);
+    const beforeItems = await pool.query(
+      'SELECT * FROM order_items WHERE order_id = $1 ORDER BY line_number',
+      [order.id],
+    );
+    const beforeAudit = await pool.query(
+      "SELECT id, request_id, action, safe_metadata FROM audit_logs WHERE entity_type = 'order' AND entity_id = $1 ORDER BY occurred_at, id",
+      [order.id],
+    );
+
+    const rejected = await staff.agent
+      .patch('/api/v1/orders/' + order.id)
+      .set('Origin', env.APP_ORIGIN)
+      .set('X-CSRF-Token', staff.csrf)
+      .send({ fulfilmentLocationId: locationId, notes: 'unauthorized destination change' })
+      .expect(404);
+    const missingId = randomUUID();
+    const nonexistent = await staff.agent
+      .patch('/api/v1/orders/' + missingId)
+      .set('Origin', env.APP_ORIGIN)
+      .set('X-CSRF-Token', staff.csrf)
+      .send({ fulfilmentLocationId: locationId, notes: 'same request body' })
+      .expect(404);
+
+    expect(rejected.body.error.code).toBe(nonexistent.body.error.code);
+    expect(rejected.body.error.message).toBe(nonexistent.body.error.message);
+    expect(rejected.body.data).toBeUndefined();
+    expect((await pool.query('SELECT * FROM orders WHERE id = $1', [order.id])).rows).toEqual(
+      beforeHeader.rows,
+    );
+    expect(
+      (
+        await pool.query('SELECT * FROM order_items WHERE order_id = $1 ORDER BY line_number', [
+          order.id,
+        ])
+      ).rows,
+    ).toEqual(beforeItems.rows);
+    expect(
+      (
+        await pool.query(
+          "SELECT id, request_id, action, safe_metadata FROM audit_logs WHERE entity_type = 'order' AND entity_id = $1 ORDER BY occurred_at, id",
+          [order.id],
+        )
+      ).rows,
+    ).toEqual(beforeAudit.rows);
+  });
+
+  it('allows Staff to amend an order at their assigned original fulfilment location', async () => {
+    const order = await repository.createReceivedOrder(
+      directOrderWrite('assigned-original-location'),
+      { actorId, requestId: randomUUID() },
+    );
+    const staff = await login(assignedStaffEmail);
+    const response = await staff.agent
+      .patch('/api/v1/orders/' + order.id)
+      .set('Origin', env.APP_ORIGIN)
+      .set('X-CSRF-Token', staff.csrf)
+      .send({ notes: 'assigned-location amendment' })
+      .expect(200);
+    expect(response.body.data.fulfilmentLocationId).toBe(locationId);
+    expect(response.body.data.notes).toBe('assigned-location amendment');
+  });
+
+  it('allows a location change only when Staff are assigned to both original and destination', async () => {
+    const order = await repository.createReceivedOrder(directOrderWrite('two-location-original'), {
+      actorId,
+      requestId: randomUUID(),
+    });
+    const staff = await login(multiLocationStaffEmail);
+    const response = await staff.agent
+      .patch('/api/v1/orders/' + order.id)
+      .set('Origin', env.APP_ORIGIN)
+      .set('X-CSRF-Token', staff.csrf)
+      .send({ fulfilmentLocationId: secondAssignedLocationId, notes: 'authorized location move' })
+      .expect(200);
+    expect(response.body.data.fulfilmentLocationId).toBe(secondAssignedLocationId);
+    expect(response.body.data.notes).toBe('authorized location move');
+  });
+
+  it('keeps detail header and items on one snapshot during a concurrent amendment', async () => {
+    const order = await repository.createReceivedOrder(
+      directOrderWrite('detail-snapshot-version-one'),
+      { actorId, requestId: randomUUID() },
+    );
+    const barrier = createReadBarrier('detail');
+    const reader = new PostgresOrderRepository(pool, { afterHeaderRead: barrier.afterHeaderRead });
+    const pendingRead = reader.getOrderForActor(order.id, actorId, 'OWNER');
+    await barrier.reached;
+    await repository.amendReceivedOrder(
+      order.id,
+      { id: actorId, roleCode: 'OWNER' },
+      { actorId, requestId: randomUUID() },
+      async (current) => snapshotV2(current, actorId),
+    );
+    barrier.release();
+    const snapshot = await pendingRead;
+    expect(snapshot.notes).toBe('detail-snapshot-version-one');
+    expect(snapshot.totalMinor).toBe('150000');
+    expect(snapshot.items[0]).toMatchObject({
+      productId,
+      unitPriceMinor: '150000',
+      lineTotalMinor: '150000',
+    });
+    const latest = await repository.getOrder(order.id);
+    expect(latest.notes).toBe('snapshot-version-two');
+    expect(latest.totalMinor).toBe('99000');
+    expect(latest.items[0]).toMatchObject({ productId: otherProductId, unitPriceMinor: '99000' });
+  });
+
+  it('keeps list count, page headers and items on one snapshot during a concurrent amendment', async () => {
+    const order = await repository.createReceivedOrder(
+      directOrderWrite('list-snapshot-version-one'),
+      { actorId, requestId: randomUUID() },
+    );
+    const barrier = createReadBarrier('list');
+    const reader = new PostgresOrderRepository(pool, { afterHeaderRead: barrier.afterHeaderRead });
+    const pendingRead = reader.listOrders({
+      actorId,
+      actorRoleCode: 'OWNER',
+      page: 1,
+      pageSize: 100,
+    });
+    await barrier.reached;
+    await repository.amendReceivedOrder(
+      order.id,
+      { id: actorId, roleCode: 'OWNER' },
+      { actorId, requestId: randomUUID() },
+      async (current) => snapshotV2(current, actorId),
+    );
+    barrier.release();
+    const page = await pendingRead;
+    const snapshot = page.items.find((item) => item.id === order.id);
+    expect(snapshot).toBeDefined();
+    expect(snapshot?.notes).toBe('list-snapshot-version-one');
+    expect(snapshot?.totalMinor).toBe('150000');
+    expect(snapshot?.items[0]).toMatchObject({ productId, unitPriceMinor: '150000' });
+    expect(page.total).toBeGreaterThan(0);
+    const latest = await repository.getOrder(order.id);
+    expect(latest.notes).toBe('snapshot-version-two');
+    expect(latest.totalMinor).toBe('99000');
+  });
+
+  it('rolls back and releases a read snapshot transaction after a read failure', async () => {
+    const order = await repository.createReceivedOrder(directOrderWrite('read-error-release'), {
+      actorId,
+      requestId: randomUUID(),
+    });
+    const reader = new PostgresOrderRepository(pool, {
+      afterHeaderRead: async () => {
+        throw new Error('controlled read checkpoint failure');
+      },
+    });
+    await expect(reader.getOrderForActor(order.id, actorId, 'OWNER')).rejects.toThrow(
+      'controlled read checkpoint failure',
+    );
+    expect((await repository.getOrderForActor(order.id, actorId, 'OWNER')).id).toBe(order.id);
+  });
+
   it('rejects archived customers, archived products and mismatched product variants', async () => {
     const { agent, csrf } = await login(ownerEmail);
     await pool.query("UPDATE customers SET status = 'archived' WHERE id = $1", [customerId]);
@@ -465,7 +704,7 @@ describe('Order database persistence and authenticated API', () => {
       .set('Origin', env.APP_ORIGIN)
       .set('X-CSRF-Token', denied.csrf)
       .send({ notes: 'Not allowed' })
-      .expect(403);
+      .expect(404);
 
     const { agent, csrf } = await login(ownerEmail);
     await agent
@@ -554,6 +793,7 @@ describe('Order database persistence and authenticated API', () => {
       await expect(
         repository.amendReceivedOrder(
           amendOrder.id,
+          { id: actorId, roleCode: 'OWNER' },
           { actorId, requestId: amendRequestId },
           async (current) => amendmentFrom(current, actorId, 'amend-audit-after'),
         ),
@@ -594,6 +834,7 @@ describe('Order database persistence and authenticated API', () => {
 
     const first = repository.amendReceivedOrder(
       order.id,
+      { id: actorId, roleCode: 'OWNER' },
       { actorId, requestId: randomUUID() },
       async (current) => {
         enteredFirst();
@@ -607,6 +848,7 @@ describe('Order database persistence and authenticated API', () => {
     let secondSawNotes: string | null = null;
     const second = repository.amendReceivedOrder(
       order.id,
+      { id: actorId, roleCode: 'OWNER' },
       { actorId, requestId: randomUUID() },
       async (current) => {
         secondCallbackRan = true;
@@ -643,10 +885,15 @@ describe('Order database persistence and authenticated API', () => {
 
     let amendmentCallbackRan = false;
     await expect(
-      repository.amendReceivedOrder(order.id, { actorId, requestId: randomUUID() }, async (row) => {
-        amendmentCallbackRan = true;
-        return amendmentFrom(row, actorId, 'must-not-save');
-      }),
+      repository.amendReceivedOrder(
+        order.id,
+        { id: actorId, roleCode: 'OWNER' },
+        { actorId, requestId: randomUUID() },
+        async (row) => {
+          amendmentCallbackRan = true;
+          return amendmentFrom(row, actorId, 'must-not-save');
+        },
+      ),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
     expect(amendmentCallbackRan).toBe(false);
     const final = await repository.getOrder(order.id);

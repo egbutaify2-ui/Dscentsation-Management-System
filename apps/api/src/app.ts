@@ -5,12 +5,13 @@ import { env } from './config/env.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { sessionMiddleware } from './middleware/session.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { auditRoutes } from './modules/audit/audit.routes.js';
 import { customerRoutes } from './modules/customers/customer.routes.js';
 import { supplierRoutes } from './modules/suppliers/supplier.routes.js';
 import { expenseRoutes } from './modules/expenses/expense.routes.js';
 import { productRoutes } from './modules/products/product.routes.js';
-import { orderRoutes } from './modules/orders/order.routes.js';
 import { locationRoutes } from './modules/locations/location.routes.js';
+import { orderRoutes } from './modules/orders/order.routes.js';
 import { paymentRoutes } from './modules/payments/payment.routes.js';
 import { userAdminRoutes } from './modules/users/user-admin.routes.js';
 
@@ -33,6 +34,7 @@ export function createApp(): express.Express {
     response.json({ data: { status: 'ok' } });
   });
   app.use('/api/v1/auth', authRoutes);
+  app.use('/api/v1', auditRoutes);
   app.use('/api/v1/users', userAdminRoutes);
   app.use('/api/v1/customers', customerRoutes);
   app.use('/api/v1', supplierRoutes);

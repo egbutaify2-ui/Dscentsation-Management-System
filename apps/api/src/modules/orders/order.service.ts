@@ -98,49 +98,56 @@ export class OrderService {
   ): Promise<OrderRecord> {
     const context: OrderMutationContext = { actorId: actor.id, requestId };
 
-    return this.repository.amendReceivedOrder(orderId, context, async (current) => {
-      if (current.status !== 'received') {
-        throw orderConflict('Only orders in the received state can be amended.');
-      }
+    return this.repository.amendReceivedOrder(
+      orderId,
+      { id: actor.id, roleCode: actor.roleCode },
+      context,
+      async (current) => {
+        if (current.status !== 'received') {
+          throw orderConflict('Only orders in the received state can be amended.');
+        }
 
-      const fulfilmentLocationId = input.fulfilmentLocationId ?? current.fulfilmentLocationId;
-      await this.assertLocationAccess(actor, fulfilmentLocationId);
+        const fulfilmentLocationId = input.fulfilmentLocationId ?? current.fulfilmentLocationId;
+        if (fulfilmentLocationId !== current.fulfilmentLocationId) {
+          await this.assertLocationAccess(actor, fulfilmentLocationId);
+        }
 
-      const customerId = input.customerId ?? current.customerId;
-      let customerSnapshot = {
-        customerNameSnapshot: current.customerNameSnapshot,
-        customerPhoneSnapshot: current.customerPhoneSnapshot,
-        customerEmailSnapshot: current.customerEmailSnapshot,
-      };
-      if (input.customerId !== undefined && input.customerId !== current.customerId) {
-        const customer = await this.customerLookup(actor, customerId);
-        customerSnapshot = {
-          customerNameSnapshot: customer.fullName,
-          customerPhoneSnapshot: customer.phone,
-          customerEmailSnapshot: customer.email,
+        const customerId = input.customerId ?? current.customerId;
+        let customerSnapshot = {
+          customerNameSnapshot: current.customerNameSnapshot,
+          customerPhoneSnapshot: current.customerPhoneSnapshot,
+          customerEmailSnapshot: current.customerEmailSnapshot,
         };
-      }
+        if (input.customerId !== undefined && input.customerId !== current.customerId) {
+          const customer = await this.customerLookup(actor, customerId);
+          customerSnapshot = {
+            customerNameSnapshot: customer.fullName,
+            customerPhoneSnapshot: customer.phone,
+            customerEmailSnapshot: customer.email,
+          };
+        }
 
-      const items =
-        input.items === undefined ? current.items : await this.buildItems(actor, input.items);
-      const totals = calculateOrderTotals(items);
+        const items =
+          input.items === undefined ? current.items : await this.buildItems(actor, input.items);
+        const totals = calculateOrderTotals(items);
 
-      return {
-        customerId,
-        ...customerSnapshot,
-        sourceChannel: input.sourceChannel ?? current.sourceChannel,
-        fulfilmentLocationId,
-        items,
-        currency: ORDER_CURRENCY,
-        deliveryAddressSnapshot:
-          input.deliveryAddress === undefined
-            ? current.deliveryAddressSnapshot
-            : input.deliveryAddress,
-        notes: input.notes === undefined ? current.notes : input.notes,
-        updatedBy: actor.id,
-        ...totals,
-      };
-    });
+        return {
+          customerId,
+          ...customerSnapshot,
+          sourceChannel: input.sourceChannel ?? current.sourceChannel,
+          fulfilmentLocationId,
+          items,
+          currency: ORDER_CURRENCY,
+          deliveryAddressSnapshot:
+            input.deliveryAddress === undefined
+              ? current.deliveryAddressSnapshot
+              : input.deliveryAddress,
+          notes: input.notes === undefined ? current.notes : input.notes,
+          updatedBy: actor.id,
+          ...totals,
+        };
+      },
+    );
   }
 
   private async buildItems(

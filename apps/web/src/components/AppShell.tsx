@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthenticatedUser } from '../features/auth/AuthProvider.js';
 
-type Section = 'overview' | 'products' | 'employees' | 'expenses' | 'suppliers';
+type WorkspaceSection = 'overview' | 'products' | 'employees' | 'customers';
+type Section = WorkspaceSection | 'expenses' | 'suppliers' | 'activity';
 type NavigationItem = { label: string; section?: Section; symbol: string; enabled: boolean };
 
 export function AppShell({
@@ -25,6 +26,7 @@ export function AppShell({
   const [loggingOut, setLoggingOut] = useState(false);
   const productVisible = permissions.includes('products.view');
   const employeesVisible = permissions.includes('users.view');
+  const customersVisible = permissions.includes('customers.view');
   const suppliersVisible = permissions.includes('suppliers.view');
   const expensesVisible =
     permissions.includes('expenses.view') || permissions.includes('expense_categories.view');
@@ -36,9 +38,14 @@ export function AppShell({
     ...(employeesVisible
       ? [{ label: 'Employees', section: 'employees' as const, symbol: '♙', enabled: true }]
       : []),
+    ...(employeesVisible
+      ? [{ label: 'Activity', section: 'activity' as const, symbol: '◷', enabled: true }]
+      : []),
+    ...(customersVisible
+      ? [{ label: 'Customers', section: 'customers' as const, symbol: '♙', enabled: true }]
+      : []),
     { label: 'Orders', symbol: '▤', enabled: false },
     { label: 'Inventory', symbol: '▥', enabled: false },
-    { label: 'Customers', symbol: '♙', enabled: false },
     ...(suppliersVisible
       ? [{ label: 'Suppliers', section: 'suppliers' as const, symbol: '▧', enabled: true }]
       : []),
@@ -65,16 +72,16 @@ export function AppShell({
     setMenuOpen(false);
   }
 
-  const activeLabel =
-    activeSection === 'products'
-      ? 'Products'
-      : activeSection === 'employees'
-        ? 'Employees'
-        : activeSection === 'suppliers'
-          ? 'Suppliers'
-          : activeSection === 'expenses'
-            ? 'Expenses'
-            : 'Overview';
+  const activeLabels: Record<Section, string> = {
+    overview: 'Overview',
+    products: 'Products',
+    employees: 'Employees',
+    customers: 'Customers',
+    expenses: 'Expenses',
+    suppliers: 'Suppliers',
+    activity: 'Activity history',
+  };
+  const activeLabel = activeLabels[activeSection];
 
   return (
     <div className="app-shell">

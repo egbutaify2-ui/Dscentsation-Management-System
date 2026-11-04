@@ -3,6 +3,7 @@ import { pool } from '../../db/pool.js';
 import { appendAuditEvent, type AuditJsonValue } from '../audit/audit.service.js';
 import { orderConflict, orderNotFound } from './order.errors.js';
 import type {
+  OrderActor,
   OrderAmendmentWriteModel,
   OrderCreateWriteModel,
   OrderItemSnapshot,
@@ -14,6 +15,11 @@ import type {
 import type { OrderRepository } from './order.repository.js';
 
 type Database = Pool | PoolClient;
+type OrderReadKind = 'detail' | 'list';
+
+export interface OrderReadSynchronization {
+  afterHeaderRead?: (kind: OrderReadKind) => Promise<void>;
+}
 
 interface OrderHeaderRow extends QueryResultRow {
   id: string;
@@ -229,15 +235,54 @@ async function insertItems(
   }
 }
 
-async function withTransaction<T>(operation: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
+async function withTransaction<T>(
+  database: Pool,
+  operation: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await database.connect();
+  let transactionStarted = false;
   try {
     await client.query('BEGIN');
+    transactionStarted = true;
     const result = await operation(client);
     await client.query('COMMIT');
+    transactionStarted = false;
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (transactionStarted) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* Keep the original failure. */
+      }
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function withReadSnapshot<T>(
+  database: Pool,
+  operation: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await database.connect();
+  let transactionStarted = false;
+  try {
+    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    transactionStarted = true;
+    const result = await operation(client);
+    await client.query('COMMIT');
+    transactionStarted = false;
+    return result;
+  } catch (error) {
+    if (transactionStarted) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* Keep the original failure. */
+      }
+    }
     throw error;
   } finally {
     client.release();
@@ -245,11 +290,16 @@ async function withTransaction<T>(operation: (client: PoolClient) => Promise<T>)
 }
 
 export class PostgresOrderRepository implements OrderRepository {
+  constructor(
+    private readonly database: Pool = pool,
+    private readonly readSynchronization: OrderReadSynchronization = {},
+  ) {}
+
   async createReceivedOrder(
     order: OrderCreateWriteModel,
     context: OrderMutationContext,
   ): Promise<OrderRecord> {
-    return withTransaction(async (client) => {
+    return withTransaction(this.database, async (client) => {
       const inserted = await client.query<{ id: string }>(
         'INSERT INTO orders (' +
           'customer_id, customer_name_snapshot, customer_phone_snapshot, ' +
@@ -300,13 +350,19 @@ export class PostgresOrderRepository implements OrderRepository {
 
   async amendReceivedOrder(
     orderId: string,
+    actor: Pick<OrderActor, 'id' | 'roleCode'>,
     context: OrderMutationContext,
     buildAmendment: (current: OrderRecord) => Promise<OrderAmendmentWriteModel>,
   ): Promise<OrderRecord> {
-    return withTransaction(async (client) => {
+    return withTransaction(this.database, async (client) => {
+      // Authorize and lock the original active fulfilment location before snapshots load.
       const locked = await client.query<{ status: OrderStatus }>(
-        'SELECT status FROM orders WHERE id = $1 FOR UPDATE',
-        [orderId],
+        'SELECT o.status FROM orders o WHERE o.id = $1 AND EXISTS (' +
+          'SELECT 1 FROM locations l WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
+          "AND ($2::text IN ('OWNER', 'MANAGER') OR ($2::text = 'STAFF' AND EXISTS (" +
+          'SELECT 1 FROM user_location_access ula WHERE ula.user_id = $3::uuid AND ula.location_id = l.id' +
+          ')))) FOR UPDATE OF o',
+        [orderId, actor.roleCode, actor.id],
       );
       const status = locked.rows[0]?.status;
       if (!status) throw orderNotFound();
@@ -367,7 +423,7 @@ export class PostgresOrderRepository implements OrderRepository {
   }
 
   async getOrder(orderId: string): Promise<OrderRecord> {
-    return loadOrder(pool, orderId);
+    return withReadSnapshot(this.database, (client) => loadOrder(client, orderId));
   }
 
   async getOrderForActor(
@@ -375,97 +431,85 @@ export class PostgresOrderRepository implements OrderRepository {
     actorId: string,
     actorRoleCode: string,
   ): Promise<OrderRecord> {
-    const result = await pool.query<OrderHeaderRow>(
-      'SELECT ' +
-        orderHeaderColumns +
-        ' FROM orders o WHERE o.id = $1 AND EXISTS (' +
-        'SELECT 1 FROM locations l ' +
-        'WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
-        "AND ($2::text IN ('OWNER', 'MANAGER') OR (" +
-        "$2::text = 'STAFF' AND EXISTS (" +
-        'SELECT 1 FROM user_location_access ula ' +
-        'WHERE ula.user_id = $3::uuid AND ula.location_id = l.id' +
-        '))))',
-      [orderId, actorRoleCode, actorId],
-    );
-    const header = result.rows[0];
-    if (!header) throw orderNotFound();
-    return mapOrder(header, await loadItems(pool, orderId));
+    return withReadSnapshot(this.database, async (client) => {
+      const result = await client.query<OrderHeaderRow>(
+        'SELECT ' +
+          orderHeaderColumns +
+          ' FROM orders o WHERE o.id = $1 AND EXISTS (' +
+          'SELECT 1 FROM locations l WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
+          "AND ($2::text IN ('OWNER', 'MANAGER') OR ($2::text = 'STAFF' AND EXISTS (" +
+          'SELECT 1 FROM user_location_access ula WHERE ula.user_id = $3::uuid AND ula.location_id = l.id' +
+          '))))',
+        [orderId, actorRoleCode, actorId],
+      );
+      const header = result.rows[0];
+      if (!header) throw orderNotFound();
+      await this.readSynchronization.afterHeaderRead?.('detail');
+      return mapOrder(header, await loadItems(client, orderId));
+    });
   }
 
   async listOrders(filters: OrderListFilters): Promise<OrderPage> {
-    const query = filters.query?.trim() || null;
-    const status = !filters.status || filters.status === 'all' ? null : filters.status;
-    const offset = (filters.page - 1) * filters.pageSize;
-    const params = [
-      query,
-      status,
-      filters.customerId ?? null,
-      filters.sourceChannel ?? null,
-      filters.fulfilmentLocationId ?? null,
-      filters.actorRoleCode,
-      filters.actorId,
-    ];
-
-    const filterSql =
-      ' FROM orders o WHERE ($1::text IS NULL OR ' +
-      "o.id::text ILIKE '%' || $1 || '%' OR " +
-      "o.customer_name_snapshot ILIKE '%' || $1 || '%' OR " +
-      "COALESCE(o.customer_phone_snapshot, '') ILIKE '%' || $1 || '%' OR " +
-      "COALESCE(o.customer_email_snapshot, '') ILIKE '%' || $1 || '%') " +
-      'AND ($2::text IS NULL OR o.status = $2) ' +
-      'AND ($3::uuid IS NULL OR o.customer_id = $3) ' +
-      'AND ($4::text IS NULL OR o.source_channel = $4) ' +
-      'AND ($5::uuid IS NULL OR o.fulfilment_location_id = $5) ' +
-      'AND EXISTS (' +
-      'SELECT 1 FROM locations l ' +
-      'WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
-      "AND ($6::text IN ('OWNER', 'MANAGER') OR (" +
-      "$6::text = 'STAFF' AND EXISTS (" +
-      'SELECT 1 FROM user_location_access ula ' +
-      'WHERE ula.user_id = $7::uuid AND ula.location_id = l.id' +
-      '))))';
-
-    const count = await pool.query<{ total: string }>(
-      'SELECT count(*)::text AS total' + filterSql,
-      params,
-    );
-    const result = await pool.query<OrderHeaderRow>(
-      'SELECT ' +
-        orderHeaderColumns +
-        filterSql +
-        ' ORDER BY o.created_at DESC, o.id DESC LIMIT $8 OFFSET $9',
-      [...params, filters.pageSize, offset],
-    );
-
-    const ids = result.rows.map((row) => row.id);
-    let itemRows: OrderItemRow[] = [];
-    if (ids.length > 0) {
-      const itemResult = await pool.query<OrderItemRow>(
-        'SELECT oi.order_id, ' +
-          itemColumns +
-          ' FROM order_items oi WHERE oi.order_id = ANY($1::uuid[]) ' +
-          'ORDER BY oi.order_id, oi.line_number',
-        [ids],
+    return withReadSnapshot(this.database, async (client) => {
+      const query = filters.query?.trim() || null;
+      const status = !filters.status || filters.status === 'all' ? null : filters.status;
+      const offset = (filters.page - 1) * filters.pageSize;
+      const params = [
+        query,
+        status,
+        filters.customerId ?? null,
+        filters.sourceChannel ?? null,
+        filters.fulfilmentLocationId ?? null,
+        filters.actorRoleCode,
+        filters.actorId,
+      ];
+      const filterSql =
+        ' FROM orders o WHERE ($1::text IS NULL OR ' +
+        "o.id::text ILIKE '%' || $1 || '%' OR o.customer_name_snapshot ILIKE '%' || $1 || '%' OR " +
+        "COALESCE(o.customer_phone_snapshot, '') ILIKE '%' || $1 || '%' OR COALESCE(o.customer_email_snapshot, '') ILIKE '%' || $1 || '%') " +
+        'AND ($2::text IS NULL OR o.status = $2) AND ($3::uuid IS NULL OR o.customer_id = $3) ' +
+        'AND ($4::text IS NULL OR o.source_channel = $4) AND ($5::uuid IS NULL OR o.fulfilment_location_id = $5) ' +
+        'AND EXISTS (SELECT 1 FROM locations l WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
+        "AND ($6::text IN ('OWNER', 'MANAGER') OR ($6::text = 'STAFF' AND EXISTS (" +
+        'SELECT 1 FROM user_location_access ula WHERE ula.user_id = $7::uuid AND ula.location_id = l.id))))';
+      const count = await client.query<{ total: string }>(
+        'SELECT count(*)::text AS total' + filterSql,
+        params,
       );
-      itemRows = itemResult.rows;
-    }
-
-    const itemsByOrder = new Map<string, OrderItemSnapshot[]>();
-    for (const row of itemRows) {
-      if (!row.order_id) continue;
-      const current = itemsByOrder.get(row.order_id) ?? [];
-      current.push(...mapItems([row]));
-      itemsByOrder.set(row.order_id, current);
-    }
-
-    const total = Number(count.rows[0]?.total ?? 0);
-    return {
-      items: result.rows.map((row) => mapOrder(row, itemsByOrder.get(row.id) ?? [])),
-      page: filters.page,
-      pageSize: filters.pageSize,
-      total,
-      totalPages: Math.ceil(total / filters.pageSize),
-    };
+      const result = await client.query<OrderHeaderRow>(
+        'SELECT ' +
+          orderHeaderColumns +
+          filterSql +
+          ' ORDER BY o.created_at DESC, o.id DESC LIMIT $8 OFFSET $9',
+        [...params, filters.pageSize, offset],
+      );
+      await this.readSynchronization.afterHeaderRead?.('list');
+      const ids = result.rows.map((row) => row.id);
+      let itemRows: OrderItemRow[] = [];
+      if (ids.length > 0) {
+        const itemResult = await client.query<OrderItemRow>(
+          'SELECT oi.order_id, ' +
+            itemColumns +
+            ' FROM order_items oi WHERE oi.order_id = ANY($1::uuid[]) ORDER BY oi.order_id, oi.line_number',
+          [ids],
+        );
+        itemRows = itemResult.rows;
+      }
+      const itemsByOrder = new Map<string, OrderItemSnapshot[]>();
+      for (const row of itemRows) {
+        if (!row.order_id) continue;
+        const current = itemsByOrder.get(row.order_id) ?? [];
+        current.push(...mapItems([row]));
+        itemsByOrder.set(row.order_id, current);
+      }
+      const total = Number(count.rows[0]?.total ?? 0);
+      return {
+        items: result.rows.map((row) => mapOrder(row, itemsByOrder.get(row.id) ?? [])),
+        page: filters.page,
+        pageSize: filters.pageSize,
+        total,
+        totalPages: Math.ceil(total / filters.pageSize),
+      };
+    });
   }
 }

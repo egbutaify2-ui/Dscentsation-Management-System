@@ -91,7 +91,6 @@ export async function up(pgm) {
 
     CREATE INDEX order_items_product_idx ON order_items(product_id);
     CREATE INDEX order_items_variant_idx ON order_items(product_variant_id);
-    CREATE INDEX order_items_order_line_idx ON order_items(order_id, line_number);
 
     CREATE FUNCTION prevent_order_hard_delete() RETURNS trigger
     LANGUAGE plpgsql AS $$
