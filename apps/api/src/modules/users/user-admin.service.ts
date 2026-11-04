@@ -206,7 +206,8 @@ export async function acceptEmployeeInvitation(
          FROM user_invitations i
          JOIN users u ON u.id = i.user_id
         WHERE i.token_hash = $1
-        FOR UPDATE OF i, u`,
+        FOR UPDATE OF i
+        FOR NO KEY UPDATE OF u`,
       [digest],
     );
     const row = invitation.rows[0];
