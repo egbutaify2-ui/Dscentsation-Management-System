@@ -77,7 +77,9 @@ describe('AuditActivityPage', () => {
   it('renders actor, action, record details and Lagos-local date and time', async () => {
     render(<AuditActivityPage />);
 
-    expect(within(await findActorCell('Jane Employee')).getByText('Jane Employee')).toBeTruthy();
+    expect(
+      within(await findActorCell('Jane Employee')).getByText('Jane Employee'),
+    ).toBeTruthy();
     expect(screen.getByText('Product Updated')).toBeTruthy();
     expect(screen.getByText('Product')).toBeTruthy();
     expect(screen.getByText(recordId)).toBeTruthy();
@@ -94,7 +96,7 @@ describe('AuditActivityPage', () => {
     expect(screen.queryByText('must-never-render-request-id')).toBeNull();
   });
 
-  it('applies employee, action, record, UUID and date filters to the agreed query keys', async () => {
+  it('applies employee, action, record, UUID and date filters to the API query', async () => {
     render(<AuditActivityPage />);
     await screen.findByRole('table');
 
