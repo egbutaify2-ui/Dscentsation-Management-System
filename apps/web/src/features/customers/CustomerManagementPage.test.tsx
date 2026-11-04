@@ -51,12 +51,6 @@ const sampleCustomer = {
   updatedAt: '2026-10-02T10:30:00.000Z',
 };
 const archivedCustomer = { ...sampleCustomer, status: 'archived' as const };
-interface OrderHistoryPageMetaFixture {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-}
 interface OrderHistoryFixture {
   id: string;
   createdAt: string;
@@ -461,11 +455,11 @@ describe('CustomerManagementPage', () => {
   it('clears previous customer history and ignores a stale response after switching profiles', async () => {
     let resolveFirstHistory!: (value: {
       data: OrderHistoryFixture[];
-      meta: OrderHistoryPageMetaFixture;
+      meta: typeof orderHistoryMeta;
     }) => void;
     const firstHistoryPending = new Promise<{
       data: OrderHistoryFixture[];
-      meta: OrderHistoryPageMetaFixture;
+      meta: typeof orderHistoryMeta;
     }>((resolve) => {
       resolveFirstHistory = resolve;
     });
