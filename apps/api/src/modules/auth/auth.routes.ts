@@ -73,15 +73,12 @@ router.post('/login', loginLimiter, async (request, response, next) => {
     }
 
     const user = await findUserForLogin(parsed.data.email);
-    const hash = user?.passwordHash ?? (await dummyPasswordHash);
-    let passwordMatches = false;
-    try {
-      passwordMatches = await argon2.verify(hash, parsed.data.password);
-    } catch {
-      passwordMatches = false;
-    }
-
-    if (!user || user.status !== 'active' || !passwordMatches) {
+    if (!user) {
+      try {
+        await argon2.verify(await dummyPasswordHash, parsed.data.password);
+      } catch {
+        // Keep unknown-account failures indistinguishable from invalid credentials.
+      }
       await appendAuditEvent({
         actorUserId: null,
         action: 'auth.login.failed',
@@ -98,68 +95,40 @@ router.post('/login', loginLimiter, async (request, response, next) => {
       return;
     }
 
-    // Save the session before taking the final user-row lock. The session store uses a
-    // separate pool connection and checks the user foreign key; persisting it first avoids
-    // holding a pool client/row lock while the store obtains its own connection. The final
-    // locked hash check serializes this login with password resets: a reset that wins first
-    // makes this login fail, while a reset that follows deletes the already-saved session.
+    // Serialize session creation with password changes. A reset locks this same user row
+    // before replacing the password and deleting sessions. Re-read and verify the current
+    // hash while holding the lock, then persist the session before releasing it. Therefore
+    // a login using the pre-reset password either completes first and is revoked by reset,
+    // or waits for reset and fails against the replacement hash.
+    const client = await pool.connect();
     let sessionRotationAttempted = false;
     try {
-      sessionRotationAttempted = true;
-      await rotateSession(request, user.id);
-
-      const client = await pool.connect();
-      let credentialsStillCurrent = false;
-      try {
-        await client.query('BEGIN');
-        const lockedUser = await client.query<{ password_hash: string; status: string }>(
-          'SELECT password_hash, status FROM users WHERE id = $1 FOR UPDATE',
-          [user.id],
-        );
-        const current = lockedUser.rows[0];
-        if (
-          current &&
-          current.status === 'active' &&
-          current.password_hash === user.passwordHash
-        ) {
-          await client.query(
-            "UPDATE users SET last_login_at = now(), updated_at = now() WHERE id = $1 AND status = 'active'",
-            [user.id],
-          );
-          await appendAuditEvent(
-            {
-              actorUserId: user.id,
-              action: 'auth.login.succeeded',
-              entityType: 'user',
-              entityId: user.id,
-              requestId: request.requestId,
-              safeMetadata: { outcome: 'success' },
-            },
-            client,
-          );
-          credentialsStillCurrent = true;
-        } else {
-          await appendAuditEvent(
-            {
-              actorUserId: null,
-              action: 'auth.login.failed',
-              requestId: request.requestId,
-              safeMetadata: { outcome: 'invalid_credentials' },
-            },
-            client,
-          );
+      await client.query('BEGIN');
+      const lockedUser = await client.query<{ password_hash: string; status: string }>(
+        'SELECT password_hash, status FROM users WHERE id = $1 FOR NO KEY UPDATE',
+        [user.id],
+      );
+      const current = lockedUser.rows[0];
+      let passwordMatches = false;
+      if (current) {
+        try {
+          passwordMatches = await argon2.verify(current.password_hash, parsed.data.password);
+        } catch {
+          passwordMatches = false;
         }
-        await client.query('COMMIT');
-      } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
       }
 
-      if (!credentialsStillCurrent) {
-        await destroySession(request);
-        clearSessionCookie(response);
+      if (!current || current.status !== 'active' || !passwordMatches) {
+        await appendAuditEvent(
+          {
+            actorUserId: null,
+            action: 'auth.login.failed',
+            requestId: request.requestId,
+            safeMetadata: { outcome: 'invalid_credentials' },
+          },
+          client,
+        );
+        await client.query('COMMIT');
         response.status(401).json({
           error: {
             code: 'INVALID_CREDENTIALS',
@@ -170,20 +139,26 @@ router.post('/login', loginLimiter, async (request, response, next) => {
         return;
       }
 
-      response.json({
-        data: {
-          authenticated: true,
-          user: {
-            id: user.id,
-            email: user.email,
-            displayName: user.displayName,
-            roleCode: user.roleCode,
-            roleName: user.roleName,
-          },
-          permissions: user.permissions,
+      sessionRotationAttempted = true;
+      await rotateSession(request, user.id);
+      await client.query(
+        "UPDATE users SET last_login_at = now(), updated_at = now() WHERE id = $1 AND status = 'active'",
+        [user.id],
+      );
+      await appendAuditEvent(
+        {
+          actorUserId: user.id,
+          action: 'auth.login.succeeded',
+          entityType: 'user',
+          entityId: user.id,
+          requestId: request.requestId,
+          safeMetadata: { outcome: 'success' },
         },
-      });
+        client,
+      );
+      await client.query('COMMIT');
     } catch (error) {
+      await client.query('ROLLBACK');
       if (sessionRotationAttempted) {
         try {
           await destroySession(request);
@@ -192,7 +167,23 @@ router.post('/login', loginLimiter, async (request, response, next) => {
         }
       }
       throw error;
+    } finally {
+      client.release();
     }
+
+    response.json({
+      data: {
+        authenticated: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          roleCode: user.roleCode,
+          roleName: user.roleName,
+        },
+        permissions: user.permissions,
+      },
+    });
   } catch (error) {
     next(error);
   }
