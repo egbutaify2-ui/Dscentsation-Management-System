@@ -926,7 +926,7 @@ describe('Employee Account Administration API', () => {
       await expiryFixture.query('SET LOCAL session_replication_role = replica');
       await expiryFixture.query(
         `UPDATE user_password_resets
-            SET expires_at = now() - interval '1 second'
+            SET expires_at = created_at + interval '1 microsecond'
           WHERE user_id = $1`,
         [expiredEmployee.id],
       );
