@@ -1,0 +1,88 @@
+# DMS staging only. This Blueprint is intentionally pinned to main.
+# Review the PR and approve the Blueprint in Render before provisioning anything.
+services:
+  - type: web
+    name: dms-staging-api
+    runtime: node
+    plan: 0.5c-512mb
+    region: frankfurt
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: >-
+      npm install --global pnpm@12.16.1 &&
+      NODE_ENV=development pnpm install --frozen-lockfile &&
+      pnpm --filter @dms/api build
+    preDeployCommand: >-
+      npm install --global pnpm@12.16.1 &&
+      NODE_ENV=development pnpm install --frozen-lockfile &&
+      pnpm db:migrate
+    startCommand: pnpm --filter @dms/api start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "26.13.0"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dms-staging-db
+          property: connectionString
+      - key: DATABASE_SSL
+        value: "false"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SESSION_IDLE_TIMEOUT_MINUTES
+        value: "30"
+      - key: SESSION_ABSOLUTE_TIMEOUT_HOURS
+        value: "12"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: APP_ORIGIN
+        sync: false
+      - key: INVITATION_EXPIRY_HOURS
+        value: "24"
+
+  - type: web
+    name: dms-staging-web
+    runtime: static
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: >-
+      npm install --global pnpm@12.16.1 &&
+      NODE_ENV=development pnpm install --frozen-lockfile &&
+      pnpm --filter @dms/web build
+    envVars:
+      - key: NODE_VERSION
+        value: "26.13.0"
+    staticPublishPath: apps/web/dist
+    headers:
+      - path: /api/*
+        name: Cache-Control
+        value: no-store
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+    routes:
+      # Keep browser requests same-origin so the existing CSRF Origin check and
+      # secure session cookie work without adding CORS or frontend API config.
+      - type: rewrite
+        source: /api/*
+        destination: https://dms-staging-api.onrender.com/api/*
+      # React/Vite SPA fallback must remain after the API rewrite.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+databases:
+  - name: dms-staging-db
+    plan: 0.1c-256mb
+    region: frankfurt
+    databaseName: dms_staging
+    user: dms_staging_user
+    diskSizeGB: 1
+    postgresMajorVersion: "17"
+    # DMS connects through Render's private DATABASE_URL reference only.
+    # No external database client access is required for staging.
+    ipAllowList: []
