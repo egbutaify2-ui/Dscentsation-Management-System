@@ -240,21 +240,28 @@ describe('OrderService', () => {
 
   it('independently authorizes a changed destination after the repository scopes the original location', async () => {
     const { repository } = makeRepository(createRecord(createOrderInput()));
-    const locationAccess = vi.fn(async (_requestingActor: OrderActor, requestedLocationId: string) =>
-      requestedLocationId !== destinationLocationId,
+    const locationAccess = vi.fn(
+      async (_requestingActor: OrderActor, requestedLocationId: string) =>
+        requestedLocationId !== destinationLocationId,
     );
     const service = new OrderService({
       repository,
-      customerLookup: async () => { throw new Error('Customer lookup is not expected.'); },
+      customerLookup: async () => {
+        throw new Error('Customer lookup is not expected.');
+      },
       productSnapshotLookup: async () => [],
       locationAccess,
     });
-    await expect(service.amendOrder(actor, 'request-amend', 'order-id', {
-      fulfilmentLocationId: destinationLocationId,
-    })).rejects.toMatchObject({ status: 403, code: 'LOCATION_ACCESS_DENIED' });
+    await expect(
+      service.amendOrder(actor, 'request-amend', 'order-id', {
+        fulfilmentLocationId: destinationLocationId,
+      }),
+    ).rejects.toMatchObject({ status: 403, code: 'LOCATION_ACCESS_DENIED' });
     expect(repository.amendReceivedOrder).toHaveBeenCalledWith(
-      'order-id', { id: actor.id, roleCode: actor.roleCode },
-      { actorId: actor.id, requestId: 'request-amend' }, expect.any(Function),
+      'order-id',
+      { id: actor.id, roleCode: actor.roleCode },
+      { actorId: actor.id, requestId: 'request-amend' },
+      expect.any(Function),
     );
     expect(locationAccess).toHaveBeenCalledWith(actor, destinationLocationId);
   });
@@ -263,7 +270,9 @@ describe('OrderService', () => {
     const { repository } = makeRepository(createRecord(createOrderInput()));
     const locationAccess = vi.fn(async () => false);
     const service = new OrderService({ repository, locationAccess });
-    const updated = await service.amendOrder(actor, 'request-amend', 'order-id', { notes: 'Notes changed' });
+    const updated = await service.amendOrder(actor, 'request-amend', 'order-id', {
+      notes: 'Notes changed',
+    });
     expect(updated.notes).toBe('Notes changed');
     expect(locationAccess).not.toHaveBeenCalled();
   });

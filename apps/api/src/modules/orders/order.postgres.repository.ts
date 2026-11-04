@@ -250,7 +250,11 @@ async function withTransaction<T>(
     return result;
   } catch (error) {
     if (transactionStarted) {
-      try { await client.query('ROLLBACK'); } catch { /* Keep the original failure. */ }
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* Keep the original failure. */
+      }
     }
     throw error;
   } finally {
@@ -273,7 +277,11 @@ async function withReadSnapshot<T>(
     return result;
   } catch (error) {
     if (transactionStarted) {
-      try { await client.query('ROLLBACK'); } catch { /* Keep the original failure. */ }
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* Keep the original failure. */
+      }
     }
     throw error;
   } finally {
@@ -418,15 +426,20 @@ export class PostgresOrderRepository implements OrderRepository {
     return withReadSnapshot(this.database, (client) => loadOrder(client, orderId));
   }
 
-  async getOrderForActor(orderId: string, actorId: string, actorRoleCode: string): Promise<OrderRecord> {
+  async getOrderForActor(
+    orderId: string,
+    actorId: string,
+    actorRoleCode: string,
+  ): Promise<OrderRecord> {
     return withReadSnapshot(this.database, async (client) => {
       const result = await client.query<OrderHeaderRow>(
-        'SELECT ' + orderHeaderColumns +
-        ' FROM orders o WHERE o.id = $1 AND EXISTS (' +
-        'SELECT 1 FROM locations l WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
-        "AND ($2::text IN ('OWNER', 'MANAGER') OR ($2::text = 'STAFF' AND EXISTS (" +
-        'SELECT 1 FROM user_location_access ula WHERE ula.user_id = $3::uuid AND ula.location_id = l.id' +
-        '))))',
+        'SELECT ' +
+          orderHeaderColumns +
+          ' FROM orders o WHERE o.id = $1 AND EXISTS (' +
+          'SELECT 1 FROM locations l WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
+          "AND ($2::text IN ('OWNER', 'MANAGER') OR ($2::text = 'STAFF' AND EXISTS (" +
+          'SELECT 1 FROM user_location_access ula WHERE ula.user_id = $3::uuid AND ula.location_id = l.id' +
+          '))))',
         [orderId, actorRoleCode, actorId],
       );
       const header = result.rows[0];
@@ -441,8 +454,15 @@ export class PostgresOrderRepository implements OrderRepository {
       const query = filters.query?.trim() || null;
       const status = !filters.status || filters.status === 'all' ? null : filters.status;
       const offset = (filters.page - 1) * filters.pageSize;
-      const params = [query, status, filters.customerId ?? null, filters.sourceChannel ?? null,
-        filters.fulfilmentLocationId ?? null, filters.actorRoleCode, filters.actorId];
+      const params = [
+        query,
+        status,
+        filters.customerId ?? null,
+        filters.sourceChannel ?? null,
+        filters.fulfilmentLocationId ?? null,
+        filters.actorRoleCode,
+        filters.actorId,
+      ];
       const filterSql =
         ' FROM orders o WHERE ($1::text IS NULL OR ' +
         "o.id::text ILIKE '%' || $1 || '%' OR o.customer_name_snapshot ILIKE '%' || $1 || '%' OR " +
@@ -452,10 +472,15 @@ export class PostgresOrderRepository implements OrderRepository {
         'AND EXISTS (SELECT 1 FROM locations l WHERE l.id = o.fulfilment_location_id AND l.is_active = true ' +
         "AND ($6::text IN ('OWNER', 'MANAGER') OR ($6::text = 'STAFF' AND EXISTS (" +
         'SELECT 1 FROM user_location_access ula WHERE ula.user_id = $7::uuid AND ula.location_id = l.id))))';
-      const count = await client.query<{ total: string }>('SELECT count(*)::text AS total' + filterSql, params);
+      const count = await client.query<{ total: string }>(
+        'SELECT count(*)::text AS total' + filterSql,
+        params,
+      );
       const result = await client.query<OrderHeaderRow>(
-        'SELECT ' + orderHeaderColumns + filterSql +
-        ' ORDER BY o.created_at DESC, o.id DESC LIMIT $8 OFFSET $9',
+        'SELECT ' +
+          orderHeaderColumns +
+          filterSql +
+          ' ORDER BY o.created_at DESC, o.id DESC LIMIT $8 OFFSET $9',
         [...params, filters.pageSize, offset],
       );
       await this.readSynchronization.afterHeaderRead?.('list');
@@ -463,8 +488,9 @@ export class PostgresOrderRepository implements OrderRepository {
       let itemRows: OrderItemRow[] = [];
       if (ids.length > 0) {
         const itemResult = await client.query<OrderItemRow>(
-          'SELECT oi.order_id, ' + itemColumns +
-          ' FROM order_items oi WHERE oi.order_id = ANY($1::uuid[]) ORDER BY oi.order_id, oi.line_number',
+          'SELECT oi.order_id, ' +
+            itemColumns +
+            ' FROM order_items oi WHERE oi.order_id = ANY($1::uuid[]) ORDER BY oi.order_id, oi.line_number',
           [ids],
         );
         itemRows = itemResult.rows;
@@ -479,7 +505,9 @@ export class PostgresOrderRepository implements OrderRepository {
       const total = Number(count.rows[0]?.total ?? 0);
       return {
         items: result.rows.map((row) => mapOrder(row, itemsByOrder.get(row.id) ?? [])),
-        page: filters.page, pageSize: filters.pageSize, total,
+        page: filters.page,
+        pageSize: filters.pageSize,
+        total,
         totalPages: Math.ceil(total / filters.pageSize),
       };
     });
