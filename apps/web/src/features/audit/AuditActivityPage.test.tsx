@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuditActivityPage } from './AuditActivityPage.js';
 
@@ -45,6 +45,21 @@ const sampleResponse = {
   totalPages: 1,
 };
 
+
+async function findActorCell(expectedLabel: string): Promise<HTMLElement> {
+  const table = await screen.findByRole('table');
+  const rows = within(table).getAllByRole('row');
+  const firstDataRow = rows[1];
+  if (!firstDataRow) throw new Error('The activity table has no data row.');
+
+  const cells = within(firstDataRow).getAllByRole('cell');
+  const actorCell = cells[0];
+  if (!actorCell) throw new Error('The activity row has no actor cell.');
+
+  expect(within(actorCell).getByText(expectedLabel)).toBeTruthy();
+  return actorCell;
+}
+
 afterEach(() => cleanup());
 
 describe('AuditActivityPage', () => {
@@ -62,7 +77,7 @@ describe('AuditActivityPage', () => {
   it('renders actor, action, record details and Lagos-local date and time', async () => {
     render(<AuditActivityPage />);
 
-    expect(await screen.findByText('Jane Employee')).toBeTruthy();
+    expect(within(await findActorCell('Jane Employee')).getByText('Jane Employee')).toBeTruthy();
     expect(screen.getByText('Product Updated')).toBeTruthy();
     expect(screen.getByText('Product')).toBeTruthy();
     expect(screen.getByText(recordId)).toBeTruthy();
@@ -81,7 +96,7 @@ describe('AuditActivityPage', () => {
 
   it('applies employee, action, record, UUID and date filters to the agreed query keys', async () => {
     render(<AuditActivityPage />);
-    await screen.findByText('Jane Employee');
+    await screen.findByRole('table');
 
     fireEvent.change(screen.getByLabelText('Employee'), {
       target: { value: employeeId },
@@ -119,7 +134,7 @@ describe('AuditActivityPage', () => {
 
   it('resets all filters and reloads the first page', async () => {
     render(<AuditActivityPage />);
-    await screen.findByText('Jane Employee');
+    await screen.findByRole('table');
     fireEvent.change(screen.getByLabelText('Record UUID'), {
       target: { value: recordId },
     });
@@ -142,7 +157,7 @@ describe('AuditActivityPage', () => {
         : { ...sampleResponse, total: 26, totalPages: 2 },
     );
     render(<AuditActivityPage />);
-    await screen.findByText('Jane Employee');
+    await screen.findByRole('table');
     fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
     await screen.findByText('No activity found');
     expect(mocks.get).toHaveBeenLastCalledWith('/audit-logs?page=2&pageSize=25');
@@ -176,7 +191,7 @@ describe('AuditActivityPage', () => {
       actors: [],
     });
     render(<AuditActivityPage />);
-    expect(await screen.findByText('System')).toBeTruthy();
+    expect(within(await findActorCell('System')).getByText('System')).toBeTruthy();
     expect(screen.getByText('System event source')).toBeTruthy();
     expect(screen.getByText('System Maintenance Completed')).toBeTruthy();
   });
@@ -188,7 +203,7 @@ describe('AuditActivityPage', () => {
     expect(screen.getByText('Audit history is temporarily unavailable.')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByText('Jane Employee')).toBeTruthy();
+    expect(within(await findActorCell('Jane Employee')).getByText('Jane Employee')).toBeTruthy();
     expect(mocks.get).toHaveBeenCalledTimes(2);
   });
 
@@ -200,7 +215,7 @@ describe('AuditActivityPage', () => {
       totalPages: 2,
     }));
     render(<AuditActivityPage />);
-    await screen.findByText('Jane Employee');
+    await screen.findByRole('table');
 
     fireEvent.change(screen.getByLabelText('Action'), {
       target: { value: 'product.updated' },
@@ -222,7 +237,7 @@ describe('AuditActivityPage', () => {
 
   it('rejects a malformed record UUID before sending a request', async () => {
     render(<AuditActivityPage />);
-    await screen.findByText('Jane Employee');
+    await screen.findByRole('table');
     fireEvent.change(screen.getByLabelText('Record UUID'), {
       target: { value: 'not-a-uuid' },
     });
@@ -233,7 +248,7 @@ describe('AuditActivityPage', () => {
 
   it('rejects an inverted date range before sending a filtered request', async () => {
     render(<AuditActivityPage />);
-    await screen.findByText('Jane Employee');
+    await screen.findByRole('table');
     fireEvent.change(screen.getByLabelText('Start date'), {
       target: { value: '2026-11-03' },
     });
