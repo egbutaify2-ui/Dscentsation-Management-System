@@ -113,6 +113,8 @@ const olderPayment = {
   reference: 'OLDER-REF-101',
 };
 
+const paginationSummary = { ...paymentSummary, paymentCount: 101 };
+
 const managerPermissions = ['payments.record', 'payments.verify'];
 const staffPermissions = ['payments.record'];
 
@@ -238,7 +240,7 @@ describe('OrderPaymentManagement', () => {
 
   it('loads older records and navigates payment history pages', async () => {
     mocks.get.mockImplementation(async (path: string) => {
-      if (path.endsWith('/payments/summary')) return paymentSummary;
+      if (path.endsWith('/payments/summary')) return paginationSummary;
       if (path.endsWith('page=1&pageSize=100')) {
         return {
           items: recentPayments,
@@ -263,6 +265,7 @@ describe('OrderPaymentManagement', () => {
     render(<OrderPaymentManagement orderId={orderId} permissions={managerPermissions} />);
 
     expect(await screen.findByText('Recent payment 100')).toBeTruthy();
+    expect(screen.getByRole('navigation', { name: 'Payment history pages' })).toBeTruthy();
     expect(screen.getByText('Showing 1–100 of 101 payments · Page 1 of 2')).toBeTruthy();
     expect(
       (screen.getByRole('button', { name: 'Previous page' }) as HTMLButtonElement).disabled,
