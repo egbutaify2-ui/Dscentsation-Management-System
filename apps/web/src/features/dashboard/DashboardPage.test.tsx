@@ -89,10 +89,10 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Active customers')).toBeTruthy();
     expect(screen.getAllByText('No access').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(0);
-    await waitFor(() =>
+    await waitFor(() => {
       expect(mocks.getPage).toHaveBeenCalledTimes(1);
-      expect(mocks.getPage).toHaveBeenCalledWith('/orders?page=1&pageSize=1'),
-    );
+      expect(mocks.getPage).toHaveBeenCalledWith('/orders?page=1&pageSize=1');
+    });
     expect(mocks.get).not.toHaveBeenCalled();
   });
 
