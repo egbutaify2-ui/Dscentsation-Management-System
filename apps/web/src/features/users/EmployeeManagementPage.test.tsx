@@ -188,6 +188,85 @@ describe('EmployeeManagementPage', () => {
     );
   });
 
+  it('confirms reset generation and presents a one-time link for manual delivery', async () => {
+    const resetResult = {
+      employee,
+      resetUrl: 'https://dms.example.invalid/#/password-reset/accept?token=synthetic-reset-token',
+      expiresAt: '2026-11-02T10:00:00.000Z',
+    };
+    mocks.post.mockImplementation((path: string) =>
+      path.endsWith('/password-reset')
+        ? Promise.resolve(resetResult)
+        : Promise.resolve({ employee, setupUrl: 'unused', expiresAt: resetResult.expiresAt }),
+    );
+    render(<EmployeeManagementPage canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset password' }));
+
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Any previous unused reset link will stop working'),
+    );
+    await waitFor(() =>
+      expect(mocks.post).toHaveBeenCalledWith(
+        `/users/${employee.id}/password-reset`,
+        {},
+        'synthetic-csrf',
+      ),
+    );
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Reset link generated for Synthetic Staff',
+      }),
+    ).toBeTruthy();
+    expect((screen.getByLabelText('One-time password-reset URL') as HTMLInputElement).value).toBe(
+      resetResult.resetUrl,
+    );
+    expect(screen.getByText(/DMS does not send password-reset emails automatically/)).toBeTruthy();
+    expect(
+      screen.getByText(/official Dscentsation company email identity/),
+    ).toBeTruthy();
+    expect(screen.getByText(/Expires:/)).toBeTruthy();
+  });
+
+  it('copies the one-time password-reset link', async () => {
+    const resetUrl = 'https://dms.example.invalid/#/password-reset/accept?token=copy-reset-token';
+    mocks.post.mockResolvedValue({
+      employee,
+      resetUrl,
+      expiresAt: '2026-11-02T10:00:00.000Z',
+    });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    render(<EmployeeManagementPage canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset password' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy password-reset link' }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(resetUrl));
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy();
+  });
+
+  it('does not generate a reset link when Owner confirmation is declined', async () => {
+    vi.mocked(window.confirm).mockReturnValue(false);
+    render(<EmployeeManagementPage canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset password' }));
+    expect(window.confirm).toHaveBeenCalled();
+    expect(mocks.post).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('One-time password-reset URL')).toBeNull();
+  });
+
+  it('reports reset-generation API failures without displaying a link', async () => {
+    mocks.post.mockRejectedValueOnce(new Error('Password reset could not be generated.'));
+    render(<EmployeeManagementPage canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset password' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Password reset could not be generated.',
+    );
+    expect(screen.queryByLabelText('One-time password-reset URL')).toBeNull();
+  });
+
   it('revokes sessions and hides management actions without users.manage', async () => {
     const { rerender } = render(<EmployeeManagementPage canManage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Revoke sessions' }));
