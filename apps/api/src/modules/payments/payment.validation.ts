@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
+
 function isWithinPostgresBigintRange(value: string): boolean {
   try {
     return BigInt(value) <= MAX_POSTGRES_BIGINT;
