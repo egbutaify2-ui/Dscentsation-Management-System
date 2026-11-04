@@ -221,9 +221,7 @@ describe('EmployeeManagementPage', () => {
       resetResult.resetUrl,
     );
     expect(screen.getByText(/DMS does not send password-reset emails automatically/)).toBeTruthy();
-    expect(
-      screen.getByText(/official Dscentsation company email identity/),
-    ).toBeTruthy();
+    expect(screen.getByText(/official Dscentsation company email identity/)).toBeTruthy();
     expect(screen.getByText(/Expires:/)).toBeTruthy();
   });
 
