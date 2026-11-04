@@ -347,9 +347,7 @@ describe('CustomerManagementPage', () => {
       }
       return { data: [sampleCustomer], meta: pageMeta };
     });
-    render(
-      <CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />,
-    );
+    render(<CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />);
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
 
@@ -386,9 +384,7 @@ describe('CustomerManagementPage', () => {
       }
       return { data: [sampleCustomer], meta: pageMeta };
     });
-    render(
-      <CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />,
-    );
+    render(<CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />);
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
 
@@ -399,16 +395,17 @@ describe('CustomerManagementPage', () => {
   it('shows a purchase-history error and retries the same customer page', async () => {
     mocks.getPage.mockImplementation(async (path: string) => {
       if (path.startsWith('/orders?')) {
-        if (mocks.getPage.mock.calls.filter(([value]) => String(value).startsWith('/orders?')).length === 1) {
+        const orderRequestCount = mocks.getPage.mock.calls.filter(
+          ([value]) => String(value).startsWith('/orders?'),
+        ).length;
+        if (orderRequestCount === 1) {
           throw new Error('synthetic order database detail');
         }
         return { data: [sampleOrder], meta: orderHistoryMeta };
       }
       return { data: [sampleCustomer], meta: pageMeta };
     });
-    render(
-      <CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />,
-    );
+    render(<CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />);
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
 
@@ -425,15 +422,18 @@ describe('CustomerManagementPage', () => {
       if (path.startsWith('/orders?')) {
         const page = new URLSearchParams(path.split('?')[1]).get('page');
         return {
-          data: [{ ...sampleOrder, id: page === '2' ? '22222222-2222-4222-8222-222222222222' : sampleOrder.id }],
+          data: [
+            {
+              ...sampleOrder,
+              id: page === '2' ? '22222222-2222-4222-8222-222222222222' : sampleOrder.id,
+            },
+          ],
           meta: { page: Number(page), pageSize: 10, total: 21, totalPages: 3 },
         };
       }
       return { data: [sampleCustomer], meta: pageMeta };
     });
-    render(
-      <CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />,
-    );
+    render(<CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />);
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
 
@@ -474,9 +474,7 @@ describe('CustomerManagementPage', () => {
       Promise.resolve(path.endsWith(secondCustomer.id) ? secondCustomer : sampleCustomer),
     );
 
-    render(
-      <CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />,
-    );
+    render(<CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />);
     await screen.findByText('Second Synthetic Customer');
     fireEvent.click(screen.getAllByRole('button', { name: 'View' })[0]);
     await screen.findByRole('heading', { name: 'Synthetic Customer' });
@@ -494,5 +492,4 @@ describe('CustomerManagementPage', () => {
       expect(screen.queryByText('Synthetic Fragrance · 50ml')).toBeNull();
     });
   });
-
 });
