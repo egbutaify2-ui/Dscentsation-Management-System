@@ -51,6 +51,12 @@ const sampleCustomer = {
   updatedAt: '2026-10-02T10:30:00.000Z',
 };
 const archivedCustomer = { ...sampleCustomer, status: 'archived' as const };
+interface OrderHistoryPageMetaFixture {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
 interface OrderHistoryFixture {
   id: string;
   createdAt: string;
@@ -400,8 +406,8 @@ describe('CustomerManagementPage', () => {
   it('shows a purchase-history error and retries the same customer page', async () => {
     mocks.getPage.mockImplementation(async (path: string) => {
       if (path.startsWith('/orders?')) {
-        const orderRequestCount = mocks.getPage.mock.calls.filter(
-          ([value]) => String(value).startsWith('/orders?'),
+        const orderRequestCount = mocks.getPage.mock.calls.filter(([value]) =>
+          String(value).startsWith('/orders?'),
         ).length;
         if (orderRequestCount === 1) {
           throw new Error('synthetic order database detail');
@@ -455,11 +461,11 @@ describe('CustomerManagementPage', () => {
   it('clears previous customer history and ignores a stale response after switching profiles', async () => {
     let resolveFirstHistory!: (value: {
       data: OrderHistoryFixture[];
-      meta: CustomerPageMeta;
+      meta: OrderHistoryPageMetaFixture;
     }) => void;
     const firstHistoryPending = new Promise<{
       data: OrderHistoryFixture[];
-      meta: CustomerPageMeta;
+      meta: OrderHistoryPageMetaFixture;
     }>((resolve) => {
       resolveFirstHistory = resolve;
     });
@@ -481,12 +487,12 @@ describe('CustomerManagementPage', () => {
 
     render(<CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />);
     await screen.findByText('Second Synthetic Customer');
-    fireEvent.click(screen.getAllByRole('button', { name: 'View' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'View' })[0]!);
     await screen.findByRole('heading', { name: 'Synthetic Customer' });
     expect(screen.getByText('Loading purchase history…')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: '← Back to customers' }));
-    fireEvent.click(screen.getAllByRole('button', { name: 'View' })[1]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'View' })[1]!);
     await screen.findByRole('heading', { name: 'Second Synthetic Customer' });
     expect(await screen.findByText('Second Customer Product · 100ml')).toBeTruthy();
     expect(screen.queryByText('Synthetic Fragrance · 50ml')).toBeNull();
