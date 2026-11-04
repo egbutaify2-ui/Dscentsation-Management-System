@@ -415,7 +415,7 @@ describe('Payment Management API and PostgreSQL integrity', () => {
 
   it('rolls back the payment and payment event when audit insertion fails', async () => {
     const orderId = await createOrder('100000');
-    await pool.query(\`
+    await pool.query(`
       CREATE OR REPLACE FUNCTION task032_reject_payment_audit() RETURNS trigger
       LANGUAGE plpgsql AS $$
       BEGIN
@@ -425,7 +425,7 @@ describe('Payment Management API and PostgreSQL integrity', () => {
         RETURN NEW;
       END;
       $$;
-    \`);
+    `);
     await pool.query(
       "CREATE TRIGGER task032_reject_payment_audit BEFORE INSERT ON audit_logs " +
         "FOR EACH ROW WHEN (NEW.action = 'payment.recorded') " +

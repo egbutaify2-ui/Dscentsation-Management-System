@@ -1,5 +1,5 @@
 export async function up(pgm) {
-  pgm.sql(String.raw\`
+  pgm.sql(`
     CREATE TABLE payments (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       order_id UUID NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,
@@ -280,11 +280,11 @@ export async function up(pgm) {
     CREATE TRIGGER orders_payment_total_immutable
       BEFORE UPDATE ON orders
       FOR EACH ROW EXECUTE FUNCTION prevent_order_total_change_with_payments();
-  \`);
+  `);
 }
 
 export async function down(pgm) {
-  pgm.sql(String.raw\`
+  pgm.sql(`
     DO $$
     BEGIN
       IF EXISTS (SELECT 1 FROM payments) OR EXISTS (SELECT 1 FROM payment_events) THEN
@@ -313,5 +313,5 @@ export async function down(pgm) {
     DROP FUNCTION IF EXISTS enforce_payment_update();
     DROP FUNCTION IF EXISTS prevent_payment_history_mutation();
     DROP FUNCTION IF EXISTS prevent_payment_hard_delete();
-  \`);
+  `);
 }

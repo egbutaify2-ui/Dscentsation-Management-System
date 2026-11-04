@@ -64,6 +64,32 @@ jobs:
       - name: Install frozen workspace dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Task 032 Prettier formatting preview (temporary)
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec prettier --single-quote --trailing-comma all --print-width 100 --write \\
+            apps/api/migrations/008_payment_management.js \\
+            apps/api/src/modules/payments/payment.errors.ts \\
+            apps/api/src/modules/payments/payment.types.ts \\
+            apps/api/src/modules/payments/payment.validation.ts \\
+            apps/api/src/modules/payments/payment.postgres.repository.ts \\
+            apps/api/src/modules/payments/payment.routes.ts \\
+            apps/api/src/modules/payments/payment.database.test.ts \\
+            docs/development/payment-management-api.md
+          for file in \\
+            apps/api/migrations/008_payment_management.js \\
+            apps/api/src/modules/payments/payment.errors.ts \\
+            apps/api/src/modules/payments/payment.types.ts \\
+            apps/api/src/modules/payments/payment.validation.ts \\
+            apps/api/src/modules/payments/payment.postgres.repository.ts \\
+            apps/api/src/modules/payments/payment.routes.ts \\
+            apps/api/src/modules/payments/payment.database.test.ts \\
+            docs/development/payment-management-api.md; do
+            echo "TASK032_FORMATTED_FILE:$file"
+            base64 -w0 "$file"
+            echo
+          done
       - name: Check formatting
         run: pnpm format:check
 
