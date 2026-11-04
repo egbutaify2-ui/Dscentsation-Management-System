@@ -40,13 +40,7 @@ export function App() {
     }
     if (!canViewSuppliers && activeSection === 'suppliers') setActiveSection('overview');
     if (!canViewExpenses && activeSection === 'expenses') setActiveSection('overview');
-  }, [
-    activeSection,
-    canViewProducts,
-    canViewEmployees,
-    canViewSuppliers,
-    canViewExpenses,
-  ]);
+  }, [activeSection, canViewProducts, canViewEmployees, canViewSuppliers, canViewExpenses]);
 
   useEffect(() => {
     if (invitationToken && typeof window !== 'undefined') {
