@@ -359,6 +359,7 @@ describe('Audit activity history API', () => {
       expect(serialized).not.toMatch(/passwordHash|sessionId|accessToken|cookie|requestId/i);
     },
   );
+
   it('rejects malformed UUIDs, dates, invalid ranges and unknown query parameters', async () => {
     const invalidQueries = [
       { actorUserId: 'not-a-uuid' },
