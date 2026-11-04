@@ -102,12 +102,12 @@ describe('AppShell permission-aware navigation', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Customers' }));
     expect(onNavigate).toHaveBeenCalledWith('customers');
-    expect(
-      (screen.getByRole('button', { name: /Orders/ }) as HTMLButtonElement).disabled,
-    ).toBe(true);
-    expect(
-      (screen.getByRole('button', { name: /Inventory/ }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByRole('button', { name: /Orders/ }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect((screen.getByRole('button', { name: /Inventory/ }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
 
   it('shows Suppliers only when the backend session reports suppliers.view', () => {

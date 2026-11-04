@@ -53,11 +53,7 @@ function formatDate(value: string | null | undefined): string {
   }).format(date);
 }
 
-function customerListPath(
-  query: string,
-  status: CustomerStatusFilter,
-  page: number,
-): string {
+function customerListPath(query: string, status: CustomerStatusFilter, page: number): string {
   const params = new URLSearchParams();
   if (query.trim()) params.set('q', query.trim());
   params.set('status', status);
@@ -334,20 +330,12 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
                 </div>
                 <div className="customer-detail-actions">
                   {canUpdate && (
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={openEditDialog}
-                    >
+                    <button type="button" className="secondary-button" onClick={openEditDialog}>
                       Edit customer
                     </button>
                   )}
                   {canArchive && selectedCustomer.status === 'active' && (
-                    <button
-                      type="button"
-                      className="danger-button"
-                      onClick={requestArchive}
-                    >
+                    <button type="button" className="danger-button" onClick={requestArchive}>
                       Archive customer
                     </button>
                   )}
@@ -369,7 +357,9 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
                 </div>
                 <div>
                   <dt>Status</dt>
-                  <dd><CustomerStatusLabel status={selectedCustomer.status} /></dd>
+                  <dd>
+                    <CustomerStatusLabel status={selectedCustomer.status} />
+                  </dd>
                 </div>
                 <div>
                   <dt>Created</dt>
@@ -435,7 +425,9 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
 
           {listError ? (
             <div className="customer-error-row">
-              <p className="customer-alert error" role="alert">{listError}</p>
+              <p className="customer-alert error" role="alert">
+                {listError}
+              </p>
               <button
                 type="button"
                 className="customer-retry-button"
@@ -446,7 +438,9 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
               </button>
             </div>
           ) : loading ? (
-            <div className="customer-state" role="status">Loading customers…</div>
+            <div className="customer-state" role="status">
+              Loading customers…
+            </div>
           ) : customers.length === 0 ? (
             <div className="customer-state empty">
               <strong>No customers found</strong>
@@ -470,14 +464,20 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
                       <th>Customer</th>
                       <th>Status</th>
                       <th>Created</th>
-                      <th><span className="sr-only">Open</span></th>
+                      <th>
+                        <span className="sr-only">Open</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {customers.map((customer) => (
                       <tr key={customer.id}>
-                        <td><strong>{customer.fullName}</strong></td>
-                        <td><CustomerStatusLabel status={customer.status} /></td>
+                        <td>
+                          <strong>{customer.fullName}</strong>
+                        </td>
+                        <td>
+                          <CustomerStatusLabel status={customer.status} />
+                        </td>
                         <td>{formatDate(customer.createdAt)}</td>
                         <td>
                           <button
@@ -501,7 +501,9 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
                   {meta.total.toLocaleString('en-NG')} customers
                 </span>
                 <div className="customer-pagination-controls">
-                  <span>Page {meta.page} of {Math.max(meta.totalPages, 1)}</span>
+                  <span>
+                    Page {meta.page} of {Math.max(meta.totalPages, 1)}
+                  </span>
                   <button
                     type="button"
                     className="secondary-button"
@@ -595,7 +597,11 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
                 onChange={(event) => updateForm('notes', event.target.value)}
               />
 
-              {formError && <p className="customer-alert error" role="alert">{formError}</p>}
+              {formError && (
+                <p className="customer-alert error" role="alert">
+                  {formError}
+                </p>
+              )}
               <div className="customer-modal-actions">
                 <button
                   className="secondary-button"
@@ -632,7 +638,11 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
               Archive <strong>{pendingArchive.fullName}</strong>? The customer record will be
               retained and will no longer appear in the active register.
             </p>
-            {archiveError && <p className="customer-alert error" role="alert">{archiveError}</p>}
+            {archiveError && (
+              <p className="customer-alert error" role="alert">
+                {archiveError}
+              </p>
+            )}
             <div className="customer-modal-actions">
               <button
                 type="button"

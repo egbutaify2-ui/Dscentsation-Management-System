@@ -90,7 +90,8 @@ describe('CustomerManagementPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Search' }));
       await waitFor(() =>
         expect(mocks.getPage).toHaveBeenLastCalledWith(
-          '/customers?q=' + encodeURIComponent(term).replace(/%20/g, '+') +
+          '/customers?q=' +
+            encodeURIComponent(term).replace(/%20/g, '+') +
             '&status=active&page=1&pageSize=25',
         ),
       );
@@ -115,9 +116,7 @@ describe('CustomerManagementPage', () => {
 
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'active' } });
     await waitFor(() =>
-      expect(mocks.getPage).toHaveBeenLastCalledWith(
-        '/customers?status=active&page=1&pageSize=25',
-      ),
+      expect(mocks.getPage).toHaveBeenLastCalledWith('/customers?status=active&page=1&pageSize=25'),
     );
   });
 
@@ -164,9 +163,7 @@ describe('CustomerManagementPage', () => {
     expect(screen.getByText('Customer created.')).toBeTruthy();
   });
 
-  it(
-    'views customer details and formats created and updated timestamps in Africa/Lagos',
-    async () => {
+  it('views customer details and formats created and updated timestamps in Africa/Lagos', async () => {
     render(<CustomerManagementPage permissions={viewPermissions} />);
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
@@ -176,13 +173,15 @@ describe('CustomerManagementPage', () => {
     expect(screen.getByText('+234 800 123 4567')).toBeTruthy();
     expect(screen.getByText('customer@example.invalid')).toBeTruthy();
     expect(screen.getByText('Synthetic customer note')).toBeTruthy();
-    expect(screen.getByText(
-      new Intl.DateTimeFormat('en-GB', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZone: 'Africa/Lagos',
-      }).format(new Date(sampleCustomer.createdAt)),
-    )).toBeTruthy();
+    expect(
+      screen.getByText(
+        new Intl.DateTimeFormat('en-GB', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+          timeZone: 'Africa/Lagos',
+        }).format(new Date(sampleCustomer.createdAt)),
+      ),
+    ).toBeTruthy();
   });
 
   it('updates a customer profile without sending status or server-managed fields', async () => {
@@ -234,9 +233,7 @@ describe('CustomerManagementPage', () => {
     expect(screen.getByText('Customer archived. The record has been retained.')).toBeTruthy();
   });
 
-  it(
-    'displays the API validation message and keeps the form open after a rejected create',
-    async () => {
+  it('displays the API validation message and keeps the form open after a rejected create', async () => {
     mocks.post.mockRejectedValueOnce(
       new ApiError(400, {
         error: { code: 'INVALID_REQUEST', message: 'Review the supplied fields and try again.' },
@@ -254,9 +251,7 @@ describe('CustomerManagementPage', () => {
     expect(screen.getByRole('dialog', { name: 'Add a customer' })).toBeTruthy();
   });
 
-  it(
-    'hides create, edit and archive actions unless their exact permissions are present',
-    async () => {
+  it('hides create, edit and archive actions unless their exact permissions are present', async () => {
     render(<CustomerManagementPage permissions={viewPermissions} />);
     await screen.findByText('Synthetic Customer');
     expect(screen.queryByRole('button', { name: 'Add customer' })).toBeNull();
