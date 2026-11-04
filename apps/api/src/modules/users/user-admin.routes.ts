@@ -145,11 +145,7 @@ router.post(
         response.status(400).json(validationResponse(parsed.error));
         return;
       }
-      await acceptEmployeePasswordReset(
-        parsed.data.token,
-        parsed.data.password,
-        request.requestId,
-      );
+      await acceptEmployeePasswordReset(parsed.data.token, parsed.data.password, request.requestId);
       response.json({ data: { reset: true } });
     } catch (error) {
       next(error);
