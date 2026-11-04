@@ -45,7 +45,6 @@ const sampleResponse = {
   totalPages: 1,
 };
 
-
 async function findActorCell(expectedLabel: string): Promise<HTMLElement> {
   const table = await screen.findByRole('table');
   const rows = within(table).getAllByRole('row');
@@ -77,9 +76,7 @@ describe('AuditActivityPage', () => {
   it('renders actor, action, record details and Lagos-local date and time', async () => {
     render(<AuditActivityPage />);
 
-    expect(
-      within(await findActorCell('Jane Employee')).getByText('Jane Employee'),
-    ).toBeTruthy();
+    expect(within(await findActorCell('Jane Employee')).getByText('Jane Employee')).toBeTruthy();
     expect(screen.getByText('Product Updated')).toBeTruthy();
     expect(screen.getByText('Product')).toBeTruthy();
     expect(screen.getByText(recordId)).toBeTruthy();
