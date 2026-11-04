@@ -192,7 +192,6 @@ describe('AuditActivityPage', () => {
     expect(mocks.get).toHaveBeenCalledTimes(2);
   });
 
-
   it('keeps pagination scoped to the last applied filters', async () => {
     mocks.get.mockImplementation(async (path: string) => ({
       ...sampleResponse,
