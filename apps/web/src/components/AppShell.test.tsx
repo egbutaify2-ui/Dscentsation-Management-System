@@ -74,6 +74,38 @@ describe('AppShell permission-aware navigation', () => {
     expect(onNavigate).toHaveBeenCalledWith('employees');
   });
 
+  it('shows Customers only when the backend session reports customers.view', () => {
+    const onNavigate = vi.fn();
+    const { rerender } = render(
+      <AppShell
+        user={user}
+        permissions={[]}
+        activeSection="overview"
+        onNavigate={onNavigate}
+        onLogout={async () => undefined}
+      >
+        <p>Overview content</p>
+      </AppShell>,
+    );
+    expect(screen.queryByRole('button', { name: 'Customers' })).toBeNull();
+
+    rerender(
+      <AppShell
+        user={user}
+        permissions={['customers.view']}
+        activeSection="overview"
+        onNavigate={onNavigate}
+        onLogout={async () => undefined}
+      >
+        <p>Overview content</p>
+      </AppShell>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Customers' }));
+    expect(onNavigate).toHaveBeenCalledWith('customers');
+    expect((screen.getByRole('button', { name: /Orders/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: /Inventory/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('shows Suppliers only when the backend session reports suppliers.view', () => {
     const onNavigate = vi.fn();
     const { rerender } = render(
