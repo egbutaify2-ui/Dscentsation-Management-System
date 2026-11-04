@@ -51,12 +51,19 @@ const sampleCustomer = {
   updatedAt: '2026-10-02T10:30:00.000Z',
 };
 const archivedCustomer = { ...sampleCustomer, status: 'archived' as const };
+interface OrderHistoryFixture {
+  id: string;
+  createdAt: string;
+  sourceChannel: 'whatsapp' | 'instagram' | 'website' | 'phone';
+  status: string;
+  items: { productNameSnapshot: string; variantNameSnapshot: string; quantity: number }[];
+}
 const secondCustomer = {
   ...sampleCustomer,
   id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   fullName: 'Second Synthetic Customer',
 };
-const sampleOrder: OrderHistoryRecord = {
+const sampleOrder: OrderHistoryFixture = {
   id: 'abcdef01-1111-4111-8111-111111111111',
   createdAt: '2026-10-11T09:15:00.000Z',
   sourceChannel: 'instagram',
@@ -69,7 +76,7 @@ const sampleOrder: OrderHistoryRecord = {
     },
   ],
 };
-const secondCustomerOrder: OrderHistoryRecord = {
+const secondCustomerOrder: OrderHistoryFixture = {
   ...sampleOrder,
   id: 'bbbbbbbb-2222-4222-8222-222222222222',
   items: [
@@ -442,11 +449,11 @@ describe('CustomerManagementPage', () => {
 
   it('clears previous customer history and ignores a stale response after switching profiles', async () => {
     let resolveFirstHistory!: (value: {
-      data: OrderHistoryRecord[];
+      data: OrderHistoryFixture[];
       meta: CustomerPageMeta;
     }) => void;
     const firstHistoryPending = new Promise<{
-      data: OrderHistoryRecord[];
+      data: OrderHistoryFixture[];
       meta: CustomerPageMeta;
     }>((resolve) => {
       resolveFirstHistory = resolve;
