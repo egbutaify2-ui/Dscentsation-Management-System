@@ -3,6 +3,7 @@ import type { ZodError } from 'zod';
 import { requireAuthentication } from '../../middleware/authentication.js';
 import { requirePermission } from '../../middleware/authorization.js';
 import { listAuditActivity } from './audit.service.js';
+import type { AuditActivityFilters } from './audit.service.js';
 import { listAuditLogsQuerySchema } from './audit.validation.js';
 
 const router = Router();
@@ -29,13 +30,18 @@ router.get('/audit-logs', requirePermission('users.view'), async (request, respo
       return;
     }
 
-    response.json({
-      data: await listAuditActivity({
-        ...parsed.data,
-        page: parsed.data.page ?? 1,
-        pageSize: parsed.data.pageSize ?? 25,
-      }),
-    });
+    const filters: AuditActivityFilters = {
+      ...(parsed.data.actorUserId === undefined ? {} : { actorUserId: parsed.data.actorUserId }),
+      ...(parsed.data.action === undefined ? {} : { action: parsed.data.action }),
+      ...(parsed.data.entityType === undefined ? {} : { entityType: parsed.data.entityType }),
+      ...(parsed.data.entityId === undefined ? {} : { entityId: parsed.data.entityId }),
+      ...(parsed.data.from === undefined ? {} : { from: parsed.data.from }),
+      ...(parsed.data.to === undefined ? {} : { to: parsed.data.to }),
+      page: parsed.data.page ?? 1,
+      pageSize: parsed.data.pageSize ?? 25,
+    };
+
+    response.json({ data: await listAuditActivity(filters) });
   } catch (error) {
     next(error);
   }
