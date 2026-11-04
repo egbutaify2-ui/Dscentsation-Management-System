@@ -224,6 +224,11 @@ describe('OrderManagementPage', () => {
     await waitFor(() =>
       expect(screen.getByRole('option', { name: /Synthetic Customer/ })).toBeTruthy(),
     );
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText('Fulfilment location') as HTMLSelectElement).disabled,
+      ).toBe(false),
+    );
     fireEvent.change(screen.getByLabelText('Customer'), {
       target: { value: customerId },
     });
