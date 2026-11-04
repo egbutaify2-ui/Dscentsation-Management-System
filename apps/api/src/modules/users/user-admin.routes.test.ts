@@ -1128,4 +1128,52 @@ describe('Employee Account Administration API', () => {
     expect(last.body.error.code).toBe('PASSWORD_RESET_RATE_LIMITED');
     expect(JSON.stringify(last.body)).not.toContain('R'.repeat(43));
   });
+  it('does not create a session from a password checked before a concurrent reset', async () => {
+    const employee = await createActiveEmployee();
+    const blocker = await pool.connect();
+    let transactionOpen = false;
+    const replacementPassword = 'Employee-reset-replacement-password-2026';
+    try {
+      await blocker.query('BEGIN');
+      transactionOpen = true;
+      await blocker.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [employee.id]);
+
+      const loginAgent = request.agent(app);
+      const pendingLogin = signIn(loginAgent, employee.email);
+
+      // Give the login request time to reach the same user-row lock. A correct implementation
+      // waits here; the pre-fix flow could create a session using a previously read hash.
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      const sessionsWhileLocked = await pool.query<{ count: string }>(
+        'SELECT count(*)::text AS count FROM user_sessions WHERE user_id = $1',
+        [employee.id],
+      );
+      expect(sessionsWhileLocked.rows[0]?.count).toBe('0');
+
+      const replacementHash = await argon2.hash(replacementPassword, {
+        type: argon2.argon2id,
+      });
+      await blocker.query('UPDATE users SET password_hash = $2 WHERE id = $1', [
+        employee.id,
+        replacementHash,
+      ]);
+      await blocker.query('COMMIT');
+      transactionOpen = false;
+
+      const login = await pendingLogin;
+      expect(login.status).toBe(401);
+      const sessionsAfterCommit = await pool.query(
+        'SELECT 1 FROM user_sessions WHERE user_id = $1',
+        [employee.id],
+      );
+      expect(sessionsAfterCommit.rowCount).toBe(0);
+      expect((await signIn(request.agent(app), employee.email, replacementPassword)).status).toBe(
+        200,
+      );
+    } finally {
+      if (transactionOpen) await blocker.query('ROLLBACK');
+      blocker.release();
+    }
+  });
+
 });
