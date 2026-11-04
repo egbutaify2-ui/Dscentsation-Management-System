@@ -279,6 +279,7 @@ describe('DMS foundation API', () => {
       'expenses.update',
       'expenses.view',
     ];
+    const orderPermissions = ['orders.create', 'orders.update', 'orders.view'];
     const supplierPermissions = [
       'suppliers.create',
       'suppliers.manage_status',
