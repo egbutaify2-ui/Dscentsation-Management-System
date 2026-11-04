@@ -236,9 +236,7 @@ describe('OrderPaymentManagement', () => {
     );
   });
 
-  it(
-    'loads older payment records through accessible backend pagination and supports page navigation',
-    async () => {
+  it('loads older records and navigates payment history pages', async () => {
     mocks.get.mockImplementation(async (path: string) => {
       if (path.endsWith('/payments/summary')) return paymentSummary;
       if (path.endsWith('page=1&pageSize=100')) {
