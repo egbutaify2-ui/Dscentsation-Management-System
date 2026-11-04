@@ -409,6 +409,45 @@ export async function acceptEmployeePasswordReset(
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // Lock the employee first, matching the Owner issuance lock order. This prevents
+    // issuance and acceptance from taking the employee/token locks in opposite order.
+    const tokenOwner = await client.query<{ user_id: string }>(
+      'SELECT user_id FROM user_password_resets WHERE token_hash = $1',
+      [digest],
+    );
+    const userId = tokenOwner.rows[0]?.user_id;
+    if (!userId) {
+      throw new UserAdminError(
+        'This password-reset link is invalid, expired or no longer available.',
+        400,
+        'PASSWORD_RESET_INVALID',
+      );
+    }
+
+    const employeeResult = await client.query<{
+      status: EmployeeStatus;
+      role_code: string;
+    }>(
+      `SELECT u.status, r.code AS role_code
+         FROM users u
+         JOIN roles r ON r.id = u.role_id
+        WHERE u.id = $1
+        FOR UPDATE OF u`,
+      [userId],
+    );
+    const employee = employeeResult.rows[0];
+    if (
+      !employee ||
+      employee.status === 'invited' ||
+      (employee.role_code !== 'MANAGER' && employee.role_code !== 'STAFF')
+    ) {
+      throw new UserAdminError(
+        'This password-reset link is invalid, expired or no longer available.',
+        400,
+        'PASSWORD_RESET_INVALID',
+      );
+    }
+
     const selected = await client.query<{
       id: string;
       user_id: string;
@@ -418,28 +457,16 @@ export async function acceptEmployeePasswordReset(
       revoked_at: Date | string | null;
       consumed_at: Date | string | null;
       expired: boolean;
-      status: EmployeeStatus;
-      role_code: string;
     }>(
-      `SELECT pr.id, pr.user_id, pr.created_by, pr.created_at, pr.expires_at,
-              pr.revoked_at, pr.consumed_at, (pr.expires_at <= now()) AS expired,
-              u.status, r.code AS role_code
-         FROM user_password_resets pr
-         JOIN users u ON u.id = pr.user_id
-         JOIN roles r ON r.id = u.role_id
-        WHERE pr.token_hash = $1
-        FOR UPDATE OF pr, u`,
-      [digest],
+      `SELECT id, user_id, created_by, created_at, expires_at,
+              revoked_at, consumed_at, (expires_at <= now()) AS expired
+         FROM user_password_resets
+        WHERE token_hash = $1 AND user_id = $2
+        FOR UPDATE`,
+      [digest, userId],
     );
     const reset = selected.rows[0];
-    if (
-      !reset ||
-      reset.revoked_at ||
-      reset.consumed_at ||
-      reset.expired ||
-      reset.status === 'invited' ||
-      (reset.role_code !== 'MANAGER' && reset.role_code !== 'STAFF')
-    ) {
+    if (!reset || reset.revoked_at || reset.consumed_at || reset.expired) {
       throw new UserAdminError(
         'This password-reset link is invalid, expired or no longer available.',
         400,
@@ -495,7 +522,7 @@ export async function acceptEmployeePasswordReset(
           requestedByOwnerId: reset.created_by,
           issuedAt,
           consumedAt,
-          accountStatusPreserved: reset.status,
+          accountStatusPreserved: employee.status,
           revokedSessionCount: sessionsRevoked,
         },
       },
