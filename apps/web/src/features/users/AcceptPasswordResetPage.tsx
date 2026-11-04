@@ -27,11 +27,7 @@ export function AcceptPasswordResetPage({
 
     setSubmitting(true);
     try {
-      await api.post(
-        '/users/password-resets/accept',
-        { token, password },
-        await getCsrfToken(),
-      );
+      await api.post('/users/password-resets/accept', { token, password }, await getCsrfToken());
       setPassword('');
       setConfirmation('');
       await onResetComplete();
