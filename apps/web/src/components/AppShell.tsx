@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { AuthenticatedUser } from '../features/auth/AuthProvider.js';
 
 type WorkspaceSection = 'overview' | 'products' | 'employees' | 'customers';
-type Section = WorkspaceSection | 'expenses' | 'suppliers' | 'activity';
+type Section = WorkspaceSection | 'expenses' | 'suppliers' | 'activity' | 'orders';
 type NavigationItem = { label: string; section?: Section; symbol: string; enabled: boolean };
 
 export function AppShell({
@@ -24,6 +24,7 @@ export function AppShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const ordersVisible = permissions.includes('orders.view');
   const productVisible = permissions.includes('products.view');
   const employeesVisible = permissions.includes('users.view');
   const customersVisible = permissions.includes('customers.view');
@@ -38,13 +39,16 @@ export function AppShell({
     ...(employeesVisible
       ? [{ label: 'Employees', section: 'employees' as const, symbol: '♙', enabled: true }]
       : []),
+    ...(ordersVisible
+      ? [{ label: 'Orders', section: 'orders' as const, symbol: '▤', enabled: true }]
+      : []),
     ...(employeesVisible
       ? [{ label: 'Activity', section: 'activity' as const, symbol: '◷', enabled: true }]
       : []),
     ...(customersVisible
       ? [{ label: 'Customers', section: 'customers' as const, symbol: '♙', enabled: true }]
       : []),
-    { label: 'Orders', symbol: '▤', enabled: false },
+    ...(!ordersVisible ? [{ label: 'Orders', symbol: '▤', enabled: false }] : []),
     { label: 'Inventory', symbol: '▥', enabled: false },
     ...(suppliersVisible
       ? [{ label: 'Suppliers', section: 'suppliers' as const, symbol: '▧', enabled: true }]
@@ -80,6 +84,7 @@ export function AppShell({
     expenses: 'Expenses',
     suppliers: 'Suppliers',
     activity: 'Activity history',
+    orders: 'Orders',
   };
   const activeLabel = activeLabels[activeSection];
 
