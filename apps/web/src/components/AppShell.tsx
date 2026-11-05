@@ -48,7 +48,9 @@ export function AppShell({
     ...(customersVisible
       ? [{ label: 'Customers', section: 'customers' as const, symbol: '♙', enabled: true }]
       : []),
-    { label: 'Orders', symbol: '▤', enabled: false },
+    ...(!ordersVisible
+      ? [{ label: 'Orders', symbol: '▤', enabled: false }]
+      : []),
     { label: 'Inventory', symbol: '▥', enabled: false },
     ...(suppliersVisible
       ? [{ label: 'Suppliers', section: 'suppliers' as const, symbol: '▧', enabled: true }]

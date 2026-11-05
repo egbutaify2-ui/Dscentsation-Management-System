@@ -51,7 +51,48 @@ const sampleCustomer = {
   updatedAt: '2026-10-02T10:30:00.000Z',
 };
 const archivedCustomer = { ...sampleCustomer, status: 'archived' as const };
+interface OrderHistoryFixture {
+  id: string;
+  createdAt: string;
+  sourceChannel: 'whatsapp' | 'instagram' | 'website' | 'phone';
+  status: string;
+  items: {
+    productNameSnapshot: string;
+    variantNameSnapshot: string;
+    quantity: number;
+  }[];
+}
+const secondCustomer = {
+  ...sampleCustomer,
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  fullName: 'Second Synthetic Customer',
+};
+const sampleOrder: OrderHistoryFixture = {
+  id: 'abcdef01-1111-4111-8111-111111111111',
+  createdAt: '2026-10-11T09:15:00.000Z',
+  sourceChannel: 'instagram',
+  status: 'delivered',
+  items: [
+    {
+      productNameSnapshot: 'Synthetic Fragrance',
+      variantNameSnapshot: '50ml',
+      quantity: 2,
+    },
+  ],
+};
+const secondCustomerOrder: OrderHistoryFixture = {
+  ...sampleOrder,
+  id: 'bbbbbbbb-2222-4222-8222-222222222222',
+  items: [
+    {
+      productNameSnapshot: 'Second Customer Product',
+      variantNameSnapshot: '100ml',
+      quantity: 1,
+    },
+  ],
+};
 const pageMeta = { page: 1, pageSize: 25, total: 1, totalPages: 1 };
+const orderHistoryMeta = { page: 1, pageSize: 10, total: 1, totalPages: 1 };
 const viewPermissions = ['customers.view'];
 const fullPermissions = [
   'customers.view',
@@ -296,5 +337,164 @@ describe('CustomerManagementPage', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('heading', { name: 'Synthetic Customer' })).toBeTruthy();
+  });
+
+  it('shows purchase history using the existing customerId-filtered orders API', async () => {
+    mocks.getPage.mockImplementation(async (path: string) => {
+      if (path.startsWith('/orders?')) {
+        return { data: [sampleOrder], meta: orderHistoryMeta };
+      }
+      return { data: [sampleCustomer], meta: pageMeta };
+    });
+    render(<CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />);
+    await screen.findByText('Synthetic Customer');
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+
+    expect(await screen.findByText('Order #ABCDEF01')).toBeTruthy();
+    const orderDate = new Intl.DateTimeFormat('en-GB', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Africa/Lagos',
+    }).format(new Date(sampleOrder.createdAt));
+    expect(screen.getByText(orderDate)).toBeTruthy();
+    expect(screen.getByText('Synthetic Fragrance · 50ml')).toBeTruthy();
+    expect(screen.getByText('× 2')).toBeTruthy();
+    expect(screen.getByText('instagram')).toBeTruthy();
+    expect(screen.getByText('delivered')).toBeTruthy();
+    expect(mocks.getPage).toHaveBeenCalledWith(
+      '/orders?customerId=' + customerId + '&page=1&pageSize=10',
+    );
+    expect(screen.queryByText(/₦|payment|revenue|totalMinor/i)).toBeNull();
+  });
+
+  it('does not request order history when orders.view is absent', async () => {
+    render(<CustomerManagementPage permissions={viewPermissions} />);
+    await screen.findByText('Synthetic Customer');
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    await screen.findByRole('heading', { name: 'Synthetic Customer' });
+
+    expect(screen.getByText('Purchase history is not available to your account.')).toBeTruthy();
+    expect(mocks.getPage.mock.calls.some(([path]) => String(path).startsWith('/orders?'))).toBe(
+      false,
+    );
+  });
+
+  it('shows an empty purchase history when the authorised order page is empty', async () => {
+    mocks.getPage.mockImplementation(async (path: string) => {
+      if (path.startsWith('/orders?')) {
+        return {
+          data: [],
+          meta: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
+        };
+      }
+      return { data: [sampleCustomer], meta: pageMeta };
+    });
+    render(<CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />);
+    await screen.findByText('Synthetic Customer');
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+
+    expect(await screen.findByText('No purchase history')).toBeTruthy();
+    expect(screen.getByText('No orders are currently visible for this customer.')).toBeTruthy();
+  });
+
+  it('shows a purchase-history error and retries the same customer page', async () => {
+    mocks.getPage.mockImplementation(async (path: string) => {
+      if (path.startsWith('/orders?')) {
+        const orderRequestCount = mocks.getPage.mock.calls.filter(([value]) =>
+          String(value).startsWith('/orders?'),
+        ).length;
+        if (orderRequestCount === 1) {
+          throw new Error('synthetic order database detail');
+        }
+        return { data: [sampleOrder], meta: orderHistoryMeta };
+      }
+      return { data: [sampleCustomer], meta: pageMeta };
+    });
+    render(<CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />);
+    await screen.findByText('Synthetic Customer');
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'The customer request could not be completed. Please try again.',
+    );
+    expect(screen.queryByText('synthetic order database detail')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Order #ABCDEF01')).toBeTruthy();
+  });
+
+  it('uses server-returned purchase-history pagination metadata', async () => {
+    mocks.getPage.mockImplementation(async (path: string) => {
+      if (path.startsWith('/orders?')) {
+        const page = new URLSearchParams(path.split('?')[1]).get('page');
+        return {
+          data: [
+            {
+              ...sampleOrder,
+              id: page === '2' ? '22222222-2222-4222-8222-222222222222' : sampleOrder.id,
+            },
+          ],
+          meta: { page: Number(page), pageSize: 10, total: 21, totalPages: 3 },
+        };
+      }
+      return { data: [sampleCustomer], meta: pageMeta };
+    });
+    render(<CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />);
+    await screen.findByText('Synthetic Customer');
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+
+    expect(await screen.findByText('Order #ABCDEF01')).toBeTruthy();
+    expect(screen.getByText('Page 1 of 3')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByText('Order #22222222')).toBeTruthy();
+    expect(mocks.getPage).toHaveBeenLastCalledWith(
+      '/orders?customerId=' + customerId + '&page=2&pageSize=10',
+    );
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy();
+  });
+
+  it('clears previous customer history and ignores a stale response after switching profiles', async () => {
+    let resolveFirstHistory!: (value: {
+      data: OrderHistoryFixture[];
+      meta: typeof orderHistoryMeta;
+    }) => void;
+    const firstHistoryPending = new Promise<{
+      data: OrderHistoryFixture[];
+      meta: typeof orderHistoryMeta;
+    }>((resolve) => {
+      resolveFirstHistory = resolve;
+    });
+    mocks.getPage.mockImplementation((path: string) => {
+      if (path.startsWith('/orders?')) {
+        const requestedCustomerId = new URLSearchParams(path.split('?')[1]).get('customerId');
+        return requestedCustomerId === customerId
+          ? firstHistoryPending
+          : Promise.resolve({ data: [secondCustomerOrder], meta: orderHistoryMeta });
+      }
+      return Promise.resolve({
+        data: [sampleCustomer, secondCustomer],
+        meta: { page: 1, pageSize: 25, total: 2, totalPages: 1 },
+      });
+    });
+    mocks.get.mockImplementation((path: string) =>
+      Promise.resolve(path.endsWith(secondCustomer.id) ? secondCustomer : sampleCustomer),
+    );
+
+    render(<CustomerManagementPage permissions={[...viewPermissions, 'orders.view']} />);
+    await screen.findByText('Second Synthetic Customer');
+    fireEvent.click(screen.getAllByRole('button', { name: 'View' })[0]!);
+    await screen.findByRole('heading', { name: 'Synthetic Customer' });
+    expect(screen.getByText('Loading purchase history…')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '← Back to customers' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'View' })[1]!);
+    await screen.findByRole('heading', { name: 'Second Synthetic Customer' });
+    expect(await screen.findByText('Second Customer Product · 100ml')).toBeTruthy();
+    expect(screen.queryByText('Synthetic Fragrance · 50ml')).toBeNull();
+
+    resolveFirstHistory({ data: [sampleOrder], meta: orderHistoryMeta });
+    await waitFor(() => {
+      expect(screen.getByText('Second Customer Product · 100ml')).toBeTruthy();
+      expect(screen.queryByText('Synthetic Fragrance · 50ml')).toBeNull();
+    });
   });
 });
