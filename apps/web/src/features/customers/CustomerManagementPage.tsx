@@ -26,6 +26,20 @@ interface CustomerPageMeta {
   totalPages: number;
 }
 
+interface OrderHistoryItem {
+  productNameSnapshot: string;
+  variantNameSnapshot: string;
+  quantity: number;
+}
+
+interface OrderHistoryRecord {
+  id: string;
+  createdAt: string;
+  sourceChannel: 'whatsapp' | 'instagram' | 'website' | 'phone';
+  status: string;
+  items: OrderHistoryItem[];
+}
+
 interface CustomerForm {
   fullName: string;
   phone: string;
@@ -34,8 +48,15 @@ interface CustomerForm {
 }
 
 const PAGE_SIZE = 25;
+const ORDER_HISTORY_PAGE_SIZE = 10;
 const EMPTY_FORM: CustomerForm = { fullName: '', phone: '', email: '', notes: '' };
 const EMPTY_META: CustomerPageMeta = { page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 0 };
+const EMPTY_ORDER_HISTORY_META: CustomerPageMeta = {
+  page: 1,
+  pageSize: ORDER_HISTORY_PAGE_SIZE,
+  total: 0,
+  totalPages: 0,
+};
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -62,6 +83,14 @@ function customerListPath(query: string, status: CustomerStatusFilter, page: num
   return '/customers?' + params.toString();
 }
 
+function customerOrderHistoryPath(customerId: string, page: number): string {
+  const params = new URLSearchParams();
+  params.set('customerId', customerId);
+  params.set('page', String(page));
+  params.set('pageSize', String(ORDER_HISTORY_PAGE_SIZE));
+  return '/orders?' + params.toString();
+}
+
 function CustomerStatusLabel({ status }: { status: CustomerStatus }) {
   return <span className={'customer-status ' + status}>{status}</span>;
 }
@@ -70,6 +99,7 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
   const canCreate = permissions.includes('customers.create');
   const canUpdate = permissions.includes('customers.update');
   const canArchive = permissions.includes('customers.archive');
+  const canViewOrders = permissions.includes('orders.view');
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [meta, setMeta] = useState<CustomerPageMeta>(EMPTY_META);
@@ -83,6 +113,15 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [orderHistory, setOrderHistory] = useState<OrderHistoryRecord[]>([]);
+  const [orderHistoryMeta, setOrderHistoryMeta] =
+    useState<CustomerPageMeta>(EMPTY_ORDER_HISTORY_META);
+  const [orderHistoryLoading, setOrderHistoryLoading] = useState(false);
+  const [orderHistoryError, setOrderHistoryError] = useState<string | null>(null);
+
+  const orderHistoryRequestSequence = useRef(0);
+  const customerDetailRequestSequence = useRef(0);
+  const selectedCustomerIdRef = useRef<string | null>(null);
 
   const [dialog, setDialog] = useState<CustomerDialog>(null);
   const [form, setForm] = useState<CustomerForm>(EMPTY_FORM);
@@ -121,6 +160,44 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
     void loadCustomers('', 'active', 1);
   }, [loadCustomers]);
 
+  const loadOrderHistory = useCallback(
+    async (customerId: string, page: number) => {
+      if (!canViewOrders) return;
+      const requestId = orderHistoryRequestSequence.current + 1;
+      orderHistoryRequestSequence.current = requestId;
+      setOrderHistoryLoading(true);
+      setOrderHistoryError(null);
+      try {
+        const result = await api.getPage<OrderHistoryRecord[], CustomerPageMeta>(
+          customerOrderHistoryPath(customerId, page),
+        );
+        if (
+          orderHistoryRequestSequence.current !== requestId ||
+          selectedCustomerIdRef.current !== customerId
+        ) {
+          return;
+        }
+        setOrderHistory(result.data);
+        setOrderHistoryMeta(result.meta);
+      } catch (loadError) {
+        if (
+          orderHistoryRequestSequence.current === requestId &&
+          selectedCustomerIdRef.current === customerId
+        ) {
+          setOrderHistoryError(errorMessage(loadError));
+        }
+      } finally {
+        if (
+          orderHistoryRequestSequence.current === requestId &&
+          selectedCustomerIdRef.current === customerId
+        ) {
+          setOrderHistoryLoading(false);
+        }
+      }
+    },
+    [canViewOrders],
+  );
+
   async function applySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAppliedSearch(search);
@@ -141,17 +218,44 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
   }
 
   async function openCustomer(customer: Customer) {
+    selectedCustomerIdRef.current = customer.id;
+    orderHistoryRequestSequence.current += 1;
+    customerDetailRequestSequence.current += 1;
+    const detailRequestId = customerDetailRequestSequence.current;
+
+    setOrderHistory([]);
+    setOrderHistoryMeta(EMPTY_ORDER_HISTORY_META);
+    setOrderHistoryError(null);
+    setOrderHistoryLoading(false);
     setSelectedCustomer(customer);
     setDetailLoading(true);
     setDetailError(null);
     setNotice(null);
+
+    if (canViewOrders) void loadOrderHistory(customer.id, 1);
+
     try {
       const current = await api.get<Customer>('/customers/' + customer.id);
-      setSelectedCustomer(current);
+      if (
+        customerDetailRequestSequence.current === detailRequestId &&
+        selectedCustomerIdRef.current === customer.id
+      ) {
+        setSelectedCustomer(current);
+      }
     } catch (loadError) {
-      setDetailError(errorMessage(loadError));
+      if (
+        customerDetailRequestSequence.current === detailRequestId &&
+        selectedCustomerIdRef.current === customer.id
+      ) {
+        setDetailError(errorMessage(loadError));
+      }
     } finally {
-      setDetailLoading(false);
+      if (
+        customerDetailRequestSequence.current === detailRequestId &&
+        selectedCustomerIdRef.current === customer.id
+      ) {
+        setDetailLoading(false);
+      }
     }
   }
 
@@ -291,6 +395,13 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
               type="button"
               className="text-button"
               onClick={() => {
+                selectedCustomerIdRef.current = null;
+                orderHistoryRequestSequence.current += 1;
+                customerDetailRequestSequence.current += 1;
+                setOrderHistory([]);
+                setOrderHistoryMeta(EMPTY_ORDER_HISTORY_META);
+                setOrderHistoryError(null);
+                setOrderHistoryLoading(false);
                 setSelectedCustomer(null);
                 setDetailError(null);
                 setNotice(null);
@@ -374,6 +485,149 @@ export function CustomerManagementPage({ permissions }: { permissions: string[] 
                   <dd>{selectedCustomer.notes || '—'}</dd>
                 </div>
               </dl>
+
+              <section
+                className="customer-purchase-history"
+                aria-labelledby="customer-purchase-history-title"
+              >
+                <div className="customer-purchase-history-heading">
+                  <div>
+                    <p className="eyebrow">ORDER ACTIVITY</p>
+                    <h3 id="customer-purchase-history-title">Purchase history</h3>
+                    <p className="muted-copy">
+                      Orders recorded for this customer and visible to your account.
+                    </p>
+                  </div>
+                  {canViewOrders && orderHistoryMeta.total > 0 && (
+                    <span className="customer-record-count">
+                      {orderHistoryMeta.total.toLocaleString('en-NG')} orders
+                    </span>
+                  )}
+                </div>
+
+                {!canViewOrders ? (
+                  <div className="customer-state customer-history-restricted">
+                    Purchase history is not available to your account.
+                  </div>
+                ) : (
+                  <>
+                    {orderHistoryError && (
+                      <div className="customer-error-row">
+                        <p className="customer-alert error" role="alert">
+                          {orderHistoryError}
+                        </p>
+                        <button
+                          type="button"
+                          className="customer-retry-button"
+                          onClick={() =>
+                            void loadOrderHistory(selectedCustomer.id, orderHistoryMeta.page)
+                          }
+                          disabled={orderHistoryLoading}
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+
+                    {orderHistoryLoading && orderHistory.length === 0 ? (
+                      <div className="customer-state" role="status">
+                        Loading purchase history…
+                      </div>
+                    ) : !orderHistoryError && orderHistory.length === 0 ? (
+                      <div className="customer-state empty">
+                        <strong>No purchase history</strong>
+                        <span>No orders are currently visible for this customer.</span>
+                      </div>
+                    ) : orderHistoryError && orderHistory.length === 0 ? null : (
+                      <>
+                        {orderHistoryLoading && (
+                          <p className="customer-history-loading" role="status">
+                            Loading purchase history…
+                          </p>
+                        )}
+                        <div className="customer-order-list">
+                          {orderHistory.map((order) => (
+                            <article className="customer-order-card" key={order.id}>
+                              <div className="customer-order-heading">
+                                <strong title={order.id}>
+                                  Order #{order.id.slice(0, 8).toUpperCase()}
+                                </strong>
+                                <time dateTime={order.createdAt}>
+                                  {formatDate(order.createdAt)}
+                                </time>
+                              </div>
+                              <div className="customer-order-tags">
+                                <span className="customer-order-channel">
+                                  {order.sourceChannel}
+                                </span>
+                                <span className={'customer-order-status ' + order.status}>
+                                  {order.status.replace(/_/g, ' ')}
+                                </span>
+                              </div>
+                              <ul className="customer-order-items">
+                                {order.items.map((item, index) => (
+                                  <li key={order.id + '-' + index}>
+                                    <span>
+                                      {item.productNameSnapshot} · {item.variantNameSnapshot}
+                                    </span>
+                                    <strong>× {item.quantity}</strong>
+                                  </li>
+                                ))}
+                              </ul>
+                            </article>
+                          ))}
+                        </div>
+
+                        {orderHistoryMeta.totalPages > 0 && (
+                          <div
+                            className="customer-pagination customer-order-pagination"
+                            aria-label="Purchase history pagination"
+                          >
+                            <span>
+                              Showing {orderHistory.length.toLocaleString('en-NG')} of{' '}
+                              {orderHistoryMeta.total.toLocaleString('en-NG')} orders
+                            </span>
+                            <div className="customer-pagination-controls">
+                              <span>
+                                Page {orderHistoryMeta.page} of {orderHistoryMeta.totalPages}
+                              </span>
+                              <button
+                                type="button"
+                                className="secondary-button"
+                                disabled={orderHistoryLoading || orderHistoryMeta.page <= 1}
+                                onClick={() =>
+                                  void loadOrderHistory(
+                                    selectedCustomer.id,
+                                    orderHistoryMeta.page - 1,
+                                  )
+                                }
+                              >
+                                Previous
+                              </button>
+                              <button
+                                type="button"
+                                className="secondary-button"
+                                disabled={
+                                  orderHistoryLoading ||
+                                  orderHistoryMeta.page >= orderHistoryMeta.totalPages
+                                }
+                                onClick={() =>
+                                  void loadOrderHistory(
+                                    selectedCustomer.id,
+                                    orderHistoryMeta.page + 1,
+                                  )
+                                }
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </section>
             </>
           )}
         </section>
