@@ -1,120 +1,43 @@
-import { useEffect, useState } from 'react';
-import { AppShell } from './components/AppShell.js';
-import { useAuth } from './features/auth/AuthProvider.js';
-import { LoginPage } from './features/auth/LoginPage.js';
-import { DashboardPage } from './features/dashboard/DashboardPage.js';
-import { ExpenseManagementPage } from './features/expenses/ExpenseManagementPage.js';
-import { ProductManagementPage } from './features/products/ProductManagementPage.js';
-import { SupplierManagementPage } from './features/suppliers/SupplierManagementPage.js';
-import { EmployeeManagementPage } from './features/users/EmployeeManagementPage.js';
-import { CustomerManagementPage } from './features/customers/CustomerManagementPage.js';
-import { AuditActivityPage } from './features/audit/AuditActivityPage.js';
-import { AcceptInvitationPage } from './features/users/AcceptInvitationPage.js';
+import { useMemo, useState } from 'react';
 
-type WorkspaceSection = 'overview' | 'products' | 'employees' | 'customers';
-type Section = WorkspaceSection | 'expenses' | 'suppliers' | 'activity';
-
-function invitationTokenFromLocation(): string | null {
-  if (typeof window === 'undefined') return null;
-  const hash = window.location.hash;
-  if (!hash.startsWith('#/invite/accept?')) return null;
-  const token = new URLSearchParams(hash.slice(hash.indexOf('?') + 1)).get('token');
-  return token && /^[A-Za-z0-9_-]{43}$/.test(token) ? token : null;
-}
-
-export function App() {
-  const { status, user, permissions, error, login, logout, refresh } = useAuth();
-  const [activeSection, setActiveSection] = useState<Section>('overview');
-  const [invitationToken, setInvitationToken] = useState<string | null>(
-    invitationTokenFromLocation,
-  );
-  const canViewProducts = permissions.includes('products.view');
-  const canViewEmployees = permissions.includes('users.view');
-  const canViewActivity = permissions.includes('users.view');
-  const canViewCustomers = permissions.includes('customers.view');
-  const canViewSuppliers = permissions.includes('suppliers.view');
-  const canViewExpenses =
-    permissions.includes('expenses.view') || permissions.includes('expense_categories.view');
-
-  useEffect(() => {
-    if (!canViewProducts && activeSection === 'products') setActiveSection('overview');
-    if (!canViewEmployees && activeSection === 'employees') setActiveSection('overview');
-    if (!canViewActivity && activeSection === 'activity') setActiveSection('overview');
-    if (!canViewCustomers && activeSection === 'customers') setActiveSection('overview');
-    if (!canViewSuppliers && activeSection === 'suppliers') setActiveSection('overview');
-    if (!canViewExpenses && activeSection === 'expenses') setActiveSection('overview');
-  }, [
-    activeSection,
-    canViewProducts,
-    canViewEmployees,
-    canViewActivity,
-    canViewCustomers,
-    canViewSuppliers,
-    canViewExpenses,
-  ]);
-
-  useEffect(() => {
-    if (invitationToken && typeof window !== 'undefined') {
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
-    }
-  }, [invitationToken]);
-
-  if (invitationToken) {
-    return (
-      <AcceptInvitationPage
-        token={invitationToken}
-        onAccepted={async () => {
-          setInvitationToken(null);
-          await refresh();
-        }}
-      />
-    );
-  }
-
-  if (status === 'loading') {
-    return (
-      <main className="loading-screen">
-        <div className="loading-mark">D</div>
-        <p>Opening your workspace…</p>
-      </main>
-    );
-  }
-  if (status === 'error') {
-    return (
-      <main className="loading-screen">
-        <div className="loading-mark">D</div>
-        <h1>We could not connect</h1>
-        <p>{error}</p>
-        <button className="primary-button retry-button" onClick={() => void refresh()}>
-          Try again
-        </button>
-      </main>
-    );
-  }
-  if (status !== 'authenticated' || !user) return <LoginPage onLogin={login} />;
-  return (
-    <AppShell
-      user={user}
-      permissions={permissions}
-      activeSection={activeSection}
-      onNavigate={setActiveSection}
-      onLogout={logout}
-    >
-      {activeSection === 'products' && canViewProducts ? (
-        <ProductManagementPage />
-      ) : activeSection === 'employees' && canViewEmployees ? (
-        <EmployeeManagementPage canManage={permissions.includes('users.manage')} />
-      ) : activeSection === 'customers' && canViewCustomers ? (
-        <CustomerManagementPage permissions={permissions} />
-      ) : activeSection === 'activity' && canViewActivity ? (
-        <AuditActivityPage />
-      ) : activeSection === 'expenses' && canViewExpenses ? (
-        <ExpenseManagementPage permissions={permissions} />
-      ) : activeSection === 'suppliers' && canViewSuppliers ? (
-        <SupplierManagementPage permissions={permissions} />
-      ) : (
-        <DashboardPage user={user} />
-      )}
-    </AppShell>
-  );
+type Page = 'Overview'|'Orders'|'Products & Stock'|'Customers'|'Employees'|'Suppliers'|'Expenses'|'Activity';
+const pages: Page[] = ['Overview','Orders','Products & Stock','Customers','Employees','Suppliers','Expenses','Activity'];
+const orders = [
+ ['#DS-1048','Amaka Okafor','Instagram','₦185,000','Paid'],['#DS-1047','Chinedu Bello','WhatsApp','₦92,500','Pending'],
+ ['#DS-1046','Zainab Yusuf','Phone call','₦245,000','Paid'],['#DS-1045','Tomi Adeyemi','Website','₦68,000','Paid'],
+ ['#DS-1044','Ifeoma Nwosu','WhatsApp','₦132,000','Processing']];
+const data: Record<string,string[][]> = {
+ 'Products & Stock':[['Baccarat Rouge 540','MFK','₦485,000','12','Sheraton Store'],['Sauvage EDP','Dior','₦215,000','8','Warehouse'],['Libre EDP','YSL','₦198,000','3','Sheraton Store'],['Oud for Greatness','Initio','₦390,000','6','Warehouse']],
+ Customers:[['Amaka Okafor','0803 *** 2184','12','₦1,245,000'],['Chinedu Bello','0806 *** 9041','8','₦782,500'],['Zainab Yusuf','0812 *** 3320','6','₦965,000'],['Tomi Adeyemi','0701 *** 1189','4','₦428,000']],
+ Employees:[['Adaeze Eze','Manager','Sheraton Store','Active'],['Daniel Musa','Staff','Sheraton Store','Active'],['Kelechi Obi','Staff','Warehouse','Active']],
+ Suppliers:[['Essenza Trading','Fragrance distributor','₦2,450,000'],['Luxury Scents NG','Wholesale partner','₦1,820,000'],['Aroma House','Local supplier','₦640,000']],
+ Expenses:[['Store utilities','Operations','₦85,000','Nov 4'],['Delivery logistics','Fulfilment','₦42,500','Nov 4'],['Packaging materials','Supplies','₦68,000','Nov 3']],
+ Activity:[['Adaeze Eze','Recorded payment for #DS-1048','Today, 10:42 AM'],['Daniel Musa','Updated stock for Sauvage EDP','Today, 9:18 AM'],['Owner','Added a new customer record','Yesterday, 4:35 PM']]
+};
+const headers: Record<string,string[]> = {'Products & Stock':['PRODUCT','BRAND','PRICE','STOCK','LOCATION'],Customers:['CUSTOMER','PHONE','ORDERS','TOTAL SPENT'],Employees:['EMPLOYEE','ROLE','LOCATION','STATUS'],Suppliers:['SUPPLIER','TYPE','PURCHASES'],Expenses:['DESCRIPTION','CATEGORY','AMOUNT','DATE'],Activity:['TEAM MEMBER','ACTIVITY','TIME']};
+const stats = [['Total sales','₦8,450,000','+12.8%'],['Orders this month','128','+8.2%'],['Products in stock','246','Across 2 locations'],['Active customers','84','+6 this month']];
+export default function App() {
+ const [page,setPage]=useState<Page>('Overview'); const [search,setSearch]=useState(''); const [notice,setNotice]=useState('');
+ const rows = useMemo(()=> (page==='Orders'?orders:data[page]||[]).filter(r=>r.join(' ').toLowerCase().includes(search.toLowerCase())),[page,search]);
+ const cols = page==='Orders'?['ORDER','CUSTOMER','CHANNEL','TOTAL','PAYMENT']:headers[page]||[];
+ return <div style={{minHeight:'100vh',background:'#f5f7f4',color:'#203328',fontFamily:'Inter,Arial,sans-serif'}}>
+ <style>{`*{box-sizing:border-box}button,input{font:inherit}button{cursor:pointer}.dmsnav button{display:block;width:100%;text-align:left;border:0;background:transparent;color:#c6d2c8;padding:12px;border-radius:7px;font-size:12px}.dmsnav button:hover,.dmsnav button.on{background:#2c4936;color:white}.dmsgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}.dmsmetric{background:white;border:1px solid #e6ebe5;border-radius:10px;padding:19px}.dmstable{width:100%;border-collapse:collapse;min-width:580px}.dmstable th{text-align:left;color:#89958c;font-size:9px;letter-spacing:1px;padding:13px 17px;background:#fafbf9}.dmstable td{font-size:12px;padding:15px 17px;border-top:1px solid #edf0ec}.dmscard{background:white;border:1px solid #e6ebe5;border-radius:10px;overflow:hidden;margin-top:20px}@media(max-width:800px){.dmsgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.dmslayout{display:block!important}.dmsaside{position:static!important;width:auto!important}.dmsnav{display:flex;overflow:auto}.dmsnav button{white-space:nowrap;width:auto}.dmscontent{padding:22px 14px!important}.dmsbar{padding:12px 15px!important}}@media(max-width:480px){.dmsgrid{gap:8px}.dmsmetric{padding:12px}.dmsmetric strong{font-size:19px!important}}`}</style>
+ <div className="dmslayout" style={{display:'flex',minHeight:'100vh'}}>
+ <aside className="dmsaside" style={{width:235,background:'#17291d',color:'white',padding:22,flexShrink:0,display:'flex',flexDirection:'column'}}>
+ <div style={{fontFamily:'Georgia',fontSize:20,marginBottom:4}}>Dscentsation</div><div style={{fontSize:9,letterSpacing:2,color:'#9eb2a1',marginBottom:30}}>MANAGEMENT SYSTEM</div>
+ <div style={{fontSize:9,letterSpacing:2,color:'#819487',marginBottom:9}}>WORKSPACE</div><nav className="dmsnav">{pages.map((p,i)=><button className={page===p?'on':''} key={p} onClick={()=>{setPage(p);setSearch('')}}>{['⌂','▤','◇','♙','♧','▱','₦','◷'][i]}　{p}</button>)}</nav>
+ <div style={{marginTop:'auto',padding:'14px 10px',border:'1px solid #46614c',borderRadius:8,fontSize:10,lineHeight:1.6,color:'#d6e2d7'}}><b style={{color:'#b8d9ba'}}>● DEMO ENVIRONMENT</b><br/>Sample information only. No live business records connected.</div>
+ </aside>
+ <main style={{flex:1,minWidth:0}}>
+ <header className="dmsbar" style={{height:65,background:'white',borderBottom:'1px solid #e6ebe5',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 34px'}}><span style={{fontSize:12,color:'#829087'}}>Dscentsation　/　<b style={{color:'#263b2d'}}>{page}</b></span><span style={{fontSize:9,fontWeight:800,letterSpacing:1,color:'#8b6c29',background:'#fff5df',padding:'8px 11px',borderRadius:20}}>DEMO PREVIEW</span></header>
+ <div className="dmscontent" style={{maxWidth:1200,margin:'auto',padding:'38px 34px'}}>
+ <p style={{fontSize:9,letterSpacing:2,color:'#8b998e',fontWeight:800}}>BUSINESS OPERATIONS</p><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:15,flexWrap:'wrap'}}><div><h1 style={{font:'500 34px Georgia',margin:'7px 0',color:'#17291d'}}>{page==='Overview'?'Good morning, Owner':page}</h1><p style={{fontSize:12,color:'#89958c',margin:0}}>{page==='Overview'?'Here is what is happening across your business.':'Review your '+page.toLowerCase()+' records.'}</p></div>{page==='Orders'&&<button onClick={()=>setNotice('Creating orders is disabled in this sample preview.')} style={{background:'#17291d',color:'white',border:0,borderRadius:7,padding:'11px 15px'}}>＋ New order</button>}</div>
+ {page==='Overview'?<>
+ <div className="dmsgrid" style={{marginTop:26}}>{stats.map(([label,value,sub])=><div className="dmsmetric" key={label}><div style={{fontSize:11,color:'#849087'}}>{label}</div><strong style={{display:'block',font:'500 26px Georgia',margin:'14px 0 7px'}}>{value}</strong><small style={{fontSize:10,color:'#65866b'}}>{sub}</small></div>)}</div>
+ <div className="dmscard"><div style={{padding:'17px 19px',font:'500 20px Georgia'}}>Recent orders <span style={{font:'11px Arial',color:'#929d94',float:'right'}}>Latest activity</span></div><div style={{overflowX:'auto'}}><table className="dmstable"><thead><tr>{['ORDER','CUSTOMER','CHANNEL','TOTAL','PAYMENT'].map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{orders.slice(0,4).map(r=><tr key={r[0]}>{r.map((v,i)=><td key={i}>{v}</td>)}</tr>)}</tbody></table></div></div>
+ <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:14,marginTop:18}}><div className="dmsmetric"><b style={{fontFamily:'Georgia'}}>Stock by location</b><p style={{fontSize:12,color:'#718076'}}>Sheraton Store <b style={{float:'right'}}>98 units</b></p><p style={{fontSize:12,color:'#718076'}}>Warehouse <b style={{float:'right'}}>148 units</b></p></div><div className="dmsmetric"><b style={{fontFamily:'Georgia'}}>Business snapshot</b><p style={{fontSize:12,color:'#718076'}}>Outstanding payments <b style={{float:'right'}}>₦327,500</b></p><p style={{fontSize:12,color:'#718076'}}>Low-stock products <b style={{float:'right'}}>3 items</b></p></div></div>
+ </>:<div className="dmscard"><div style={{padding:17,display:'flex',justifyContent:'space-between',gap:12,alignItems:'center'}}><b style={{font:'500 20px Georgia'}}>{page} records</b><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search records…" style={{maxWidth:240,width:'45%',padding:9,border:'1px solid #e0e7df',borderRadius:7,fontSize:11}}/></div><div style={{overflowX:'auto'}}><table className="dmstable"><thead><tr>{cols.map(c=><th key={c}>{c}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{r.map((v,j)=><td key={j}>{v}</td>)}</tr>)}{!rows.length&&<tr><td colSpan={cols.length}>No matching sample records.</td></tr>}</tbody></table></div></div>}
+ {notice&&<p style={{fontSize:11,color:'#8b6c29'}}>{notice}<button onClick={()=>setNotice('')} style={{marginLeft:10}}>Dismiss</button></p>}
+ </div><footer style={{borderTop:'1px solid #e6ebe5',padding:'16px 30px',fontSize:9,color:'#9aa49c'}}>© 2026 Dscentsation · Demo preview · Sample data only · Not connected to live records</footer>
+ </main></div></div>;
 }
