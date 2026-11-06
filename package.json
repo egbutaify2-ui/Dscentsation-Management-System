@@ -9,7 +9,7 @@
     "pnpm": ">=12.16.1 <13"
   },
   "scripts": {
-    "dev": "node api.js && concurrently -k -n API,WEB -c blue,green \"pnpm --filter @dms/api dev\" \"pnpm --filter @dms/web dev\"",
+    "dev": "concurrently -k -n API,WEB -c blue,green \"pnpm --filter @dms/api dev\" \"pnpm --filter @dms/web dev\"",
     "lint": "eslint apps eslint.config.js",
     "format": "prettier --single-quote --trailing-comma all --print-width 100 --write \"apps/**/*.{ts,tsx,js,css,html,json}\" \"package.json\" \"tsconfig.base.json\" \"eslint.config.js\" \"docs/development/*.md\"",
     "format:check": "prettier --single-quote --trailing-comma all --print-width 100 --check \"apps/**/*.{ts,tsx,js,css,html,json}\" \"package.json\" \"tsconfig.base.json\" \"eslint.config.js\" \"docs/development/*.md\"",
@@ -17,7 +17,7 @@
     "test": "pnpm -r --if-present test",
     "test:api": "pnpm --filter @dms/api test",
     "test:web": "pnpm --filter @dms/web test",
-    "build": "node api.js && pnpm -r build",
+    "build": "pnpm -r build",
     "db:migrate": "pnpm --filter @dms/api db:migrate",
     "db:rollback": "pnpm --filter @dms/api db:rollback",
     "owner:create": "pnpm --filter @dms/api owner:create",
