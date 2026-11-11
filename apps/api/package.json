@@ -14,10 +14,10 @@
     "owner:create": "tsx src/cli/create-owner.ts"
   },
   "dependencies": {
-    "argon2": "0.45.1",
+    "argon2": "0.45.2",
     "connect-pg-simple": "10.0.0",
     "express": "5.3.0",
-    "express-rate-limit": "8.7.0",
+    "express-rate-limit": "8.7.3",
     "express-session": "1.19.0",
     "helmet": "8.3.0",
     "pg": "8.23.1",
@@ -33,6 +33,6 @@
     "node-pg-migrate": "9.0.0",
     "supertest": "7.3.1",
     "tsx": "4.23.15",
-    "vitest": "5.0.5"
+    "vitest": "5.1.0"
   }
 }
