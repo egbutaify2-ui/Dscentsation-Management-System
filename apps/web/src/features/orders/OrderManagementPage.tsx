@@ -486,10 +486,11 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
 
   async function submitOrder(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (
-      view === 'create' &&
-      (!canCreateOrders || !canViewCustomers || !canViewProducts)
-    ) return;
+    if (view === 'create') {
+      if (!canCreateOrders || !canViewCustomers || !canViewProducts) {
+        return;
+      }
+    }
     if (!canUpdateOrders && view === 'edit') return;
     if (view === 'edit' && (!selectedOrder || selectedOrder.status !== 'received')) return;
     const validation = validateOrderForm(form);
