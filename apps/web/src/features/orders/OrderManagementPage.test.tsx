@@ -385,7 +385,7 @@ describe('OrderManagementPage', () => {
     expect(api.get).toHaveBeenLastCalledWith('/orders/' + orderId);
   });
 
-  it('allows metadata-only received-order amendments without customer or product view permissions', async () => {
+  it('allows metadata-only amendments without customer or product view permissions', async () => {
     const amended = {
       ...sampleOrder,
       deliveryAddressSnapshot: 'Updated delivery address',
@@ -438,7 +438,7 @@ describe('OrderManagementPage', () => {
     expect(api.get).not.toHaveBeenCalledWith('/products?status=all');
   });
 
-  it('loads and permits product amendments without customer.view while retaining the customer snapshot', async () => {
+  it('allows product amendments with products.view but no customers.view', async () => {
     const amended = {
       ...sampleOrder,
       items: [{ ...sampleOrder.items[0], quantity: 3, lineTotalMinor: '3750000' }],
@@ -489,7 +489,7 @@ describe('OrderManagementPage', () => {
     expect(screen.getByText('Synthetic Customer')).toBeTruthy();
   });
 
-  it('loads permitted customers without products.view and keeps line-item amendment controls disabled', async () => {
+  it('loads customers without products.view and disables line-item edits', async () => {
     const amended = { ...sampleOrder, notes: 'Customer access metadata amendment' };
     let detailFetches = 0;
     vi.mocked(api.get).mockImplementation((path) => {
@@ -519,7 +519,9 @@ describe('OrderManagementPage', () => {
     ).toBeTruthy();
     expect(screen.queryByLabelText('Product / variant')).toBeNull();
     expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
 
     fireEvent.change(screen.getByLabelText('Order notes'), {
       target: { value: 'Customer access metadata amendment' },

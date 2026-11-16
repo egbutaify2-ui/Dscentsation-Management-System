@@ -1031,14 +1031,20 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                       >
                         <div className="order-line-name">
                           <strong>
-                            {product?.name ?? savedItem?.productNameSnapshot ?? 'Product unavailable'}
+                            {product?.name ??
+                              savedItem?.productNameSnapshot ??
+                              'Product unavailable'}
                           </strong>
                           <small>
-                            {variant?.name ?? savedItem?.variantNameSnapshot ?? 'Variant unavailable'}
+                            {variant?.name ??
+                              savedItem?.variantNameSnapshot ??
+                              'Variant unavailable'}
                             {' · '}
                             {variant?.sku ?? savedItem?.skuSnapshot ?? 'No SKU'}
                             {' · '}
-                            {variant?.unitOfMeasure ?? savedItem?.unitOfMeasureSnapshot ?? 'Unit unavailable'}
+                            {variant?.unitOfMeasure ??
+                              savedItem?.unitOfMeasureSnapshot ??
+                              'Unit unavailable'}
                           </small>
                         </div>
                         <label>
@@ -1057,7 +1063,9 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                         </label>
                         <div className="order-line-total">
                           <small>
-                            {unitMinor ? formatMoney(unitMinor) + ' each' : 'Saved price unavailable'}
+                            {unitMinor
+                              ? formatMoney(unitMinor) + ' each'
+                              : 'Saved price unavailable'}
                           </small>
                           <strong>
                             {lineTotalMinor ? formatMoney(lineTotalMinor) : '—'}
@@ -1098,7 +1106,9 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                 <div className="order-preview-total">
                   <span>Price estimate unavailable</span>
                   <strong>—</strong>
-                  <small>Product reference data must be available before an estimate can be shown.</small>
+                  <small>
+                    Product reference data must be available before an estimate can be shown.
+                  </small>
                 </div>
               )}
             </div>
