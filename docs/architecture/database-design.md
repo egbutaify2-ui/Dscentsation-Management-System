@@ -460,7 +460,7 @@ Remaining design/configuration details:
 7. Whether supplier purchase orders, invoices and payments are required in the first operational release or a later phase.
 8. Whether cost price changes require effective-dated cost history for valuation.
 9. File retention limits, permitted file types and who may view supporting documents.
-10. Render Postgres backup/recovery verification, restore-test evidence, expected recovery objectives and total cost approval.
+10. Supabase production-plan backup/recovery verification, off-site export and restore-test evidence, expected recovery objectives, reliability and total cost approval.
 11. Confirm the physical paperwork/reference process used by Sheraton Staff at Warehouse; the permission boundary and stock movement rules for pickup remain as specified.
 
 **Schema status:** The Task 005 eight-table foundation, three Task 007 Product Management tables and Task 008 `user_invitations` table are merged into `main`. The remaining conceptual schema and outstanding business/architecture decisions remain unapproved.
