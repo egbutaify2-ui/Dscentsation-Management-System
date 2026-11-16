@@ -154,6 +154,35 @@ describe('OrderManagementPage', () => {
     expect(within(orderRow).getByText('₦25,000.00')).toBeTruthy();
     expect(within(orderRow).getByText('Received')).toBeTruthy();
   });
+  it('shows loading while the order register request is pending', async () => {
+    let completeRequest: (() => void) | undefined;
+    vi.mocked(api.getPage).mockImplementation((path) => {
+      if (path.startsWith('/orders?')) {
+        return new Promise((resolve) => {
+          completeRequest = () => resolve({ data: [sampleOrder], meta: pageMeta } as never);
+        }) as never;
+      }
+      return Promise.resolve({ data: [], meta: pageMeta } as never);
+    });
+    render(<OrderManagementPage permissions={['orders.view']} />);
+
+    expect(screen.getByRole('status').textContent).toContain('Loading orders…');
+    await waitFor(() => expect(completeRequest).toBeTypeOf('function'));
+    completeRequest?.();
+    expect(await screen.findByRole('table')).toBeTruthy();
+  });
+
+  it('shows the empty state when the order register has no matching records', async () => {
+    vi.mocked(api.getPage).mockResolvedValue({
+      data: [],
+      meta: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
+    } as never);
+    render(<OrderManagementPage permissions={['orders.view']} />);
+
+    expect(await screen.findByText('No orders found')).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
   it('hides create and amendment actions without their specific permissions', async () => {
     render(<OrderManagementPage permissions={['orders.view']} />);
     await screen.findByText('Synthetic Customer');
@@ -218,7 +247,11 @@ describe('OrderManagementPage', () => {
       }
       return Promise.reject(new Error('Unexpected API GET ' + path));
     });
-    render(<OrderManagementPage permissions={permissions} />);
+    render(
+      <OrderManagementPage
+        permissions={['orders.view', 'orders.create', 'customers.view', 'products.view']}
+      />,
+    );
     openCreateForm();
 
     await waitFor(() =>
