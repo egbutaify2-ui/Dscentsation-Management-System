@@ -305,7 +305,8 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
   const loadReferenceData = useCallback(async () => {
     if (!canViewCustomers || !canViewProducts) {
       setReferenceError(
-        'Order capture requires customers.view and products.view so the existing records can be selected.',
+        'Customer and product selection requires customers.view and products.view. ' +
+          'Existing received orders can still be amended with orders.update.',
       );
       return;
     }
@@ -1057,16 +1058,15 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                   type="submit"
                   disabled={
                     saving ||
-                    loadingReferences ||
-                    !canViewCustomers ||
-                    !canViewProducts ||
                     (view === 'create' &&
-                      (!canCreateWithDependencies ||
+                      (loadingReferences ||
+                        !canCreateWithDependencies ||
                         loadingLocations ||
                         Boolean(locationError) ||
                         !activeLocations.some(
                           (location) => location.id === form.fulfilmentLocationId,
-                        )))
+                        ))) ||
+                    (view === 'edit' && (!canUpdateOrders || loadingReferences))
                   }
                 >
                   {saving ? 'Saving…' : view === 'create' ? 'Create order' : 'Save amendment'}

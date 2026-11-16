@@ -1,4 +1,6 @@
 node_modules/
+.env
+.env.*
 .pnpm-store/
 dist/
 coverage/
@@ -6,4 +8,3 @@ coverage/
 !.env.example
 .DS_Store
 *.log
-config.bat

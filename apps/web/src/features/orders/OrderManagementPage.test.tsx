@@ -347,6 +347,38 @@ describe('OrderManagementPage', () => {
     expect(api.get).toHaveBeenLastCalledWith('/orders/' + orderId);
   });
 
+  it('allows received-order amendments with orders.update without create or reference-view permissions', async () => {
+    const amended = { ...sampleOrder, notes: 'Updated without reference access' };
+    let detailFetches = 0;
+    vi.mocked(api.get).mockImplementation((path) => {
+      if (path === '/locations') return Promise.resolve(locations as never);
+      if (path.startsWith('/orders/')) {
+        detailFetches += 1;
+        return Promise.resolve((detailFetches === 1 ? sampleOrder : amended) as never);
+      }
+      return Promise.reject(new Error('Unexpected API GET ' + path));
+    });
+    render(<OrderManagementPage permissions={['orders.view', 'orders.update']} />);
+
+    await screen.findByText('Synthetic Customer');
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
+    fireEvent.change(screen.getByLabelText('Order notes'), {
+      target: { value: 'Updated without reference access' },
+    });
+
+    const saveButton = screen.getByRole('button', { name: 'Save amendment' }) as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(false);
+    fireEvent.click(saveButton);
+
+    expect((await screen.findByRole('status')).textContent).toContain('Order amendment saved.');
+    expect(api.patch).toHaveBeenCalledWith(
+      '/orders/' + orderId,
+      { notes: 'Updated without reference access' },
+      'synthetic-csrf',
+    );
+  });
+
   it('recovers from an order detail API failure using the detail retry action', async () => {
     let detailAttempts = 0;
     vi.mocked(api.get).mockImplementation((path) => {
