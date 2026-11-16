@@ -1068,9 +1068,7 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                               ? formatMoney(unitMinor) + ' each'
                               : 'Saved price unavailable'}
                           </small>
-                          <strong>
-                            {lineTotalMinor ? formatMoney(lineTotalMinor) : '—'}
-                          </strong>
+                          <strong>{lineTotalMinor ? formatMoney(lineTotalMinor) : '—'}</strong>
                         </div>
                         <button
                           className="text-button remove-line"
