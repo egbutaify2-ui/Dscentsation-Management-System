@@ -223,9 +223,12 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
   const [locationError, setLocationError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingReferences, setLoadingReferences] = useState(false);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
+  const [productReferenceError, setProductReferenceError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
@@ -303,27 +306,53 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
   );
 
   const loadReferenceData = useCallback(async () => {
-    if (!canViewCustomers || !canViewProducts) {
-      setReferenceError(
-        'Customer and product selection requires customers.view and products.view. ' +
-          'Existing received orders can still be amended with orders.update.',
-      );
-      return;
-    }
     setLoadingReferences(true);
     setReferenceError(null);
-    try {
-      const [customerPage, productRows] = await Promise.all([
-        api.getPage<Customer[], PageMeta>('/customers?status=active&page=1&pageSize=100'),
-        api.get<Product[]>('/products?status=all'),
-      ]);
-      setCustomers(customerPage.data.filter((customer) => customer.status === 'active'));
-      setProducts(productRows);
-    } catch (loadError) {
-      setReferenceError(errorMessage(loadError));
-    } finally {
-      setLoadingReferences(false);
+    setProductReferenceError(null);
+    const failures: string[] = [];
+    const requests: Promise<void>[] = [];
+
+    if (canViewCustomers) {
+      setLoadingCustomers(true);
+      requests.push(
+        api
+          .getPage<Customer[], PageMeta>('/customers?status=active&page=1&pageSize=100')
+          .then((customerPage) => {
+            setCustomers(customerPage.data.filter((customer) => customer.status === 'active'));
+          })
+          .catch((loadError) => {
+            setCustomers([]);
+            failures.push('Customer lookup failed: ' + errorMessage(loadError));
+          })
+          .finally(() => setLoadingCustomers(false)),
+      );
+    } else {
+      setCustomers([]);
+      setLoadingCustomers(false);
     }
+
+    if (canViewProducts) {
+      setLoadingProducts(true);
+      requests.push(
+        api
+          .get<Product[]>('/products?status=all')
+          .then((productRows) => setProducts(productRows))
+          .catch((loadError) => {
+            setProducts([]);
+            const message = 'Product lookup failed: ' + errorMessage(loadError);
+            setProductReferenceError(message);
+            failures.push(message);
+          })
+          .finally(() => setLoadingProducts(false)),
+      );
+    } else {
+      setProducts([]);
+      setLoadingProducts(false);
+    }
+
+    await Promise.all(requests);
+    setReferenceError(failures.length > 0 ? failures.join(' ') : null);
+    setLoadingReferences(false);
   }, [canViewCustomers, canViewProducts]);
 
   useEffect(() => {
@@ -397,6 +426,7 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
   }
 
   function addItem(): void {
+    if (!canViewProducts || loadingProducts || productReferenceError) return;
     const parsed = parseVariantKey(productChoice);
     const quantity = Number(quantityChoice);
     if (!parsed || !Number.isSafeInteger(quantity) || quantity < 1) {
@@ -423,6 +453,7 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
   }
 
   function updateItem(index: number, updates: Partial<OrderDraftItem>): void {
+    if (!canViewProducts || loadingProducts || productReferenceError) return;
     setForm((current) => ({
       ...current,
       items: current.items.map((item, itemIndex) =>
@@ -432,6 +463,7 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
   }
 
   function removeItem(index: number): void {
+    if (!canViewProducts || loadingProducts || productReferenceError) return;
     setForm((current) => ({
       ...current,
       items: current.items.filter((_item, itemIndex) => itemIndex !== index),
@@ -454,7 +486,10 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
 
   async function submitOrder(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (!canCreateOrders && view === 'create') return;
+    if (
+      view === 'create' &&
+      (!canCreateOrders || !canViewCustomers || !canViewProducts)
+    ) return;
     if (!canUpdateOrders && view === 'edit') return;
     if (view === 'edit' && (!selectedOrder || selectedOrder.status !== 'received')) return;
     const validation = validateOrderForm(form);
@@ -511,9 +546,12 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
         variantId: item.productVariantId,
         quantity: item.quantity,
       }));
-      if (JSON.stringify(fullPayload.items) !== JSON.stringify(savedItems)) {
-        changes.items = fullPayload.items;
+      const itemsChanged = JSON.stringify(fullPayload.items) !== JSON.stringify(savedItems);
+      if (itemsChanged && !canViewProducts) {
+        setError('Product and line-item amendments require the products.view permission.');
+        return;
       }
+      if (itemsChanged) changes.items = fullPayload.items;
       if (fullPayload.deliveryAddress !== (selectedOrder.deliveryAddressSnapshot ?? null)) {
         changes.deliveryAddress = fullPayload.deliveryAddress;
       }
@@ -556,6 +594,10 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
 
   const preview = previewTotals();
   const canCreateWithDependencies = canCreateOrders && canViewCustomers && canViewProducts;
+  const canEditLineItems = canViewProducts && !loadingProducts && !productReferenceError;
+  const canShowPricePreview =
+    canEditLineItems &&
+    form.items.every((item) => Boolean(selectedVariant(item.productId, item.variantId)));
   const activeLocations = locations.filter((location) => location.isActive);
 
   if (!canViewOrders) {
@@ -581,7 +623,7 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
         </div>
         <div className="order-heading-actions">
           <span className="module-status-pill">Internal records</span>
-          {view === 'register' && canCreateOrders && (
+          {view === 'register' && canCreateWithDependencies && (
             <button
               className="primary-button order-action-button"
               type="button"
@@ -804,14 +846,19 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
           )}
           {loadingReferences && (
             <p className="order-helper" role="status">
-              Loading customers and products…
+              Loading permitted customer and product reference data…
             </p>
           )}
 
-          {(!canViewCustomers || !canViewProducts) && (
+          {view === 'create' && !canCreateWithDependencies && (
             <p className="order-alert error" role="alert">
-              Order capture requires customers.view and products.view. No additional permissions are
-              granted by this frontend.
+              Order creation requires orders.create, customers.view and products.view.
+            </p>
+          )}
+          {view === 'edit' && !canViewProducts && (
+            <p className="order-helper">
+              Product and line-item changes are unavailable without products.view. Saved product
+              snapshots remain visible; order metadata can still be amended.
             </p>
           )}
 
@@ -822,7 +869,7 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                 <select
                   required
                   value={form.customerId}
-                  disabled={loadingReferences || !canViewCustomers}
+                  disabled={loadingCustomers || !canViewCustomers}
                   onChange={(event) => setForm({ ...form, customerId: event.target.value })}
                 >
                   <option value="">Choose an active customer</option>
@@ -913,13 +960,14 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                   <h3>Products and variants</h3>
                 </div>
               </div>
-              <div className="order-add-item">
+              {(view === 'create' || canEditLineItems) && (
+                <div className="order-add-item">
                 <label>
                   Product / variant
                   <select
                     aria-label="Product / variant"
                     value={productChoice}
-                    disabled={loadingReferences || !canViewProducts}
+                    disabled={!canEditLineItems}
                     onChange={(event) => setProductChoice(event.target.value)}
                   >
                     <option value="">Select a product variant</option>
@@ -940,6 +988,7 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                     min="1"
                     step="1"
                     value={quantityChoice}
+                    disabled={!canEditLineItems}
                     onChange={(event) => setQuantityChoice(event.target.value)}
                   />
                 </label>
@@ -947,11 +996,12 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                   className="secondary-button"
                   type="button"
                   onClick={addItem}
-                  disabled={!productChoice}
+                  disabled={!canEditLineItems || !productChoice}
                 >
                   Add item
                 </button>
-              </div>
+                </div>
+              )}
 
               {form.items.length === 0 ? (
                 <div className="order-empty-items">No products added yet.</div>
@@ -960,17 +1010,32 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                   {form.items.map((item, index) => {
                     const product = products.find((candidate) => candidate.id === item.productId);
                     const variant = selectedVariant(item.productId, item.variantId);
-                    const unitMinor = nairaToMinor(variant?.sellingPrice ?? '0').toString();
+                    const savedItem = selectedOrder?.items.find(
+                      (candidate) =>
+                        candidate.productId === item.productId &&
+                        candidate.productVariantId === item.variantId,
+                    );
+                    const unitMinor = variant
+                      ? nairaToMinor(variant.sellingPrice).toString()
+                      : savedItem?.unitPriceMinor;
+                    const lineTotalMinor = unitMinor
+                      ? (safeQuantity(item.quantity) * BigInt(unitMinor)).toString()
+                      : savedItem?.lineTotalMinor;
                     return (
                       <div
                         className="order-line"
                         key={productVariantKey(item.productId, item.variantId)}
                       >
                         <div className="order-line-name">
-                          <strong>{product?.name ?? 'Product snapshot'}</strong>
+                          <strong>
+                            {product?.name ?? savedItem?.productNameSnapshot ?? 'Product unavailable'}
+                          </strong>
                           <small>
-                            {variant?.name ?? 'Variant snapshot'}
-                            {variant?.sku ? ' · ' + variant.sku : ''}
+                            {variant?.name ?? savedItem?.variantNameSnapshot ?? 'Variant unavailable'}
+                            {' · '}
+                            {variant?.sku ?? savedItem?.skuSnapshot ?? 'No SKU'}
+                            {' · '}
+                            {variant?.unitOfMeasure ?? savedItem?.unitOfMeasureSnapshot ?? 'Unit unavailable'}
                           </small>
                         </div>
                         <label>
@@ -981,23 +1046,25 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                             min="1"
                             step="1"
                             value={item.quantity}
+                            disabled={!canEditLineItems}
                             onChange={(event) =>
                               updateItem(index, { quantity: Number(event.target.value) })
                             }
                           />
                         </label>
                         <div className="order-line-total">
-                          <small>{formatMoney(unitMinor)} each</small>
+                          <small>
+                            {unitMinor ? formatMoney(unitMinor) + ' each' : 'Saved price unavailable'}
+                          </small>
                           <strong>
-                            {formatMoney(
-                              (safeQuantity(item.quantity) * BigInt(unitMinor)).toString(),
-                            )}
+                            {lineTotalMinor ? formatMoney(lineTotalMinor) : '—'}
                           </strong>
                         </div>
                         <button
                           className="text-button remove-line"
                           type="button"
                           onClick={() => removeItem(index)}
+                          disabled={!canEditLineItems}
                         >
                           Remove
                         </button>
@@ -1006,14 +1073,31 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                   })}
                 </div>
               )}
-              <div className="order-preview-total">
-                <span>Estimated subtotal</span>
-                <strong>{formatMoney(preview.subtotal.toString())}</strong>
-                <small>
-                  Preview only. The server resolves current prices and returns the authoritative
-                  totals.
-                </small>
-              </div>
+              {canShowPricePreview ? (
+                <div className="order-preview-total">
+                  <span>Estimated subtotal</span>
+                  <strong>{formatMoney(preview.subtotal.toString())}</strong>
+                  <small>
+                    Preview only. The server resolves current prices and returns the authoritative
+                    totals.
+                  </small>
+                </div>
+              ) : view === 'edit' && selectedOrder ? (
+                <div className="order-preview-total">
+                  <span>Saved server total</span>
+                  <strong>{formatMoney(selectedOrder.totalMinor)}</strong>
+                  <small>
+                    Saved subtotal: {formatMoney(selectedOrder.subtotalMinor)}. Product price
+                    estimates are unavailable; these are the authoritative saved order totals.
+                  </small>
+                </div>
+              ) : (
+                <div className="order-preview-total">
+                  <span>Price estimate unavailable</span>
+                  <strong>—</strong>
+                  <small>Product reference data must be available before an estimate can be shown.</small>
+                </div>
+              )}
             </div>
 
             <div className="order-form-grid order-form-notes">
@@ -1059,14 +1143,15 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
                   disabled={
                     saving ||
                     (view === 'create' &&
-                      (loadingReferences ||
+                      (loadingCustomers ||
+                        loadingProducts ||
                         !canCreateWithDependencies ||
                         loadingLocations ||
                         Boolean(locationError) ||
                         !activeLocations.some(
                           (location) => location.id === form.fulfilmentLocationId,
                         ))) ||
-                    (view === 'edit' && (!canUpdateOrders || loadingReferences))
+                    (view === 'edit' && !canUpdateOrders)
                   }
                 >
                   {saving ? 'Saving…' : view === 'create' ? 'Create order' : 'Save amendment'}

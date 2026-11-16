@@ -380,8 +380,12 @@ describe('OrderManagementPage', () => {
     expect(api.get).toHaveBeenLastCalledWith('/orders/' + orderId);
   });
 
-  it('allows received-order amendments with orders.update without create or reference-view permissions', async () => {
-    const amended = { ...sampleOrder, notes: 'Updated without reference access' };
+  it('allows metadata-only received-order amendments without customer or product view permissions', async () => {
+    const amended = {
+      ...sampleOrder,
+      deliveryAddressSnapshot: 'Updated delivery address',
+      updatedAt: '2026-11-02T10:00:00.000Z',
+    };
     let detailFetches = 0;
     vi.mocked(api.get).mockImplementation((path) => {
       if (path === '/locations') return Promise.resolve(locations as never);
@@ -396,18 +400,154 @@ describe('OrderManagementPage', () => {
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
-    fireEvent.change(screen.getByLabelText('Order notes'), {
-      target: { value: 'Updated without reference access' },
-    });
 
-    const saveButton = screen.getByRole('button', { name: 'Save amendment' }) as HTMLButtonElement;
-    expect(saveButton.disabled).toBe(false);
-    fireEvent.click(saveButton);
+    expect(screen.getByText('Synthetic Eau de Parfum')).toBeTruthy();
+    expect(screen.getByText(/100 ml · SYN-100 · bottle/)).toBeTruthy();
+    expect(screen.queryByLabelText('Product / variant')).toBeNull();
+    expect(screen.queryByLabelText('New item quantity')).toBeNull();
+    expect((screen.getByLabelText('Customer') as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Saved server total')).toBeTruthy();
+    expect(screen.queryByText('Estimated subtotal')).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Delivery address'), {
+      target: { value: 'Updated delivery address' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save amendment' }));
 
     expect((await screen.findByRole('status')).textContent).toContain('Order amendment saved.');
+    expect(screen.getByText('Updated delivery address')).toBeTruthy();
     expect(api.patch).toHaveBeenCalledWith(
       '/orders/' + orderId,
-      { notes: 'Updated without reference access' },
+      { deliveryAddress: 'Updated delivery address' },
+      'synthetic-csrf',
+    );
+    expect(api.getPage).not.toHaveBeenCalledWith(
+      '/customers?status=active&page=1&pageSize=100',
+    );
+    expect(api.get).not.toHaveBeenCalledWith('/products?status=all');
+  });
+
+  it('loads and permits product amendments without customer.view while retaining the customer snapshot', async () => {
+    const amended = {
+      ...sampleOrder,
+      items: [{ ...sampleOrder.items[0], quantity: 3, lineTotalMinor: '3750000' }],
+    };
+    vi.mocked(api.patch).mockResolvedValue(amended as never);
+    let detailFetches = 0;
+    vi.mocked(api.get).mockImplementation((path) => {
+      if (path === '/locations') return Promise.resolve(locations as never);
+      if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
+      if (path.startsWith('/orders/')) {
+        detailFetches += 1;
+        return Promise.resolve((detailFetches === 1 ? sampleOrder : amended) as never);
+      }
+      return Promise.reject(new Error('Unexpected API GET ' + path));
+    });
+    render(
+      <OrderManagementPage permissions={['orders.view', 'orders.update', 'products.view']} />,
+    );
+
+    await screen.findByText('Synthetic Customer');
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/products?status=all'));
+    expect(api.getPage).not.toHaveBeenCalledWith(
+      '/customers?status=active&page=1&pageSize=100',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
+
+    expect((screen.getByLabelText('Customer') as HTMLSelectElement).disabled).toBe(true);
+    expect(screen.getByRole('option', { name: /Synthetic Customer · existing order customer/ }))
+      .toBeTruthy();
+    expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText('Quantity for item 1'), {
+      target: { value: '3' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save amendment' }));
+
+    await screen.findByText('Order amendment saved.');
+    expect(api.patch).toHaveBeenCalledWith(
+      '/orders/' + orderId,
+      { items: [{ productId, variantId, quantity: 3 }] },
+      'synthetic-csrf',
+    );
+    expect(screen.getByText('Synthetic Customer')).toBeTruthy();
+  });
+
+  it('loads permitted customers without products.view and keeps line-item amendment controls disabled', async () => {
+    const amended = { ...sampleOrder, notes: 'Customer access metadata amendment' };
+    let detailFetches = 0;
+    vi.mocked(api.get).mockImplementation((path) => {
+      if (path === '/locations') return Promise.resolve(locations as never);
+      if (path.startsWith('/orders/')) {
+        detailFetches += 1;
+        return Promise.resolve((detailFetches === 1 ? sampleOrder : amended) as never);
+      }
+      return Promise.reject(new Error('Unexpected API GET ' + path));
+    });
+    render(
+      <OrderManagementPage permissions={['orders.view', 'orders.update', 'customers.view']} />,
+    );
+
+    await screen.findByText('Synthetic Customer');
+    await waitFor(() =>
+      expect(api.getPage).toHaveBeenCalledWith('/customers?status=active&page=1&pageSize=100'),
+    );
+    expect(api.get).not.toHaveBeenCalledWith('/products?status=all');
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
+
+    const customerSelect = screen.getByLabelText('Customer') as HTMLSelectElement;
+    expect(customerSelect.disabled).toBe(false);
+    expect(within(customerSelect).getByRole('option', { name: /Synthetic Customer/ })).toBeTruthy();
+    expect((screen.getByLabelText('Product / variant') as HTMLSelectElement | null)).toBeNull();
+    expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText('Order notes'), {
+      target: { value: 'Customer access metadata amendment' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save amendment' }));
+
+    await screen.findByText('Order amendment saved.');
+    expect(api.patch).toHaveBeenCalledWith(
+      '/orders/' + orderId,
+      { notes: 'Customer access metadata amendment' },
+      'synthetic-csrf',
+    );
+  });
+
+  it('retains full-permission received-order line-item amendments', async () => {
+    const amended = {
+      ...sampleOrder,
+      items: [{ ...sampleOrder.items[0], quantity: 3, lineTotalMinor: '3750000' }],
+    };
+    vi.mocked(api.patch).mockResolvedValue(amended as never);
+    let detailFetches = 0;
+    vi.mocked(api.get).mockImplementation((path) => {
+      if (path === '/locations') return Promise.resolve(locations as never);
+      if (path === '/products?status=all') return Promise.resolve([sampleProduct] as never);
+      if (path.startsWith('/orders/')) {
+        detailFetches += 1;
+        return Promise.resolve((detailFetches === 1 ? sampleOrder : amended) as never);
+      }
+      return Promise.reject(new Error('Unexpected API GET ' + path));
+    });
+    render(<OrderManagementPage permissions={permissions} />);
+
+    await screen.findByText('Synthetic Customer');
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
+    fireEvent.change(screen.getByLabelText('Quantity for item 1'), {
+      target: { value: '3' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save amendment' }));
+
+    await screen.findByText('Order amendment saved.');
+    expect(api.patch).toHaveBeenCalledWith(
+      '/orders/' + orderId,
+      { items: [{ productId, variantId, quantity: 3 }] },
       'synthetic-csrf',
     );
   });
