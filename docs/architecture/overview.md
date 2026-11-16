@@ -35,7 +35,7 @@ The following is implementation evidence from the current `main` branch, not a b
 - Migration 001 seeds Owner, Manager and Staff plus the four foundation permission codes. Migration 002 adds six Owner-only `products.*` permissions. Task 008 migration 003 adds Owner-only `users.view` and `users.manage`; Manager and Staff receive neither. Audit rows remain protected against UPDATE, DELETE and TRUNCATE by PostgreSQL triggers.
 - CI uses GitHub Actions for pull requests targeting `main` and pushes to `main`. The current baseline includes Prettier, ESLint, TypeScript checks, Vitest, Supertest, React Testing Library, PostgreSQL-backed integration tests, migration/seed/rollback/reapplication checks and production builds.
 
-The repository structure is consistent with the proposed modular-monolith direction, but ADR-001 remains Proposed. TypeScript/Vite/API details, database tooling and test-strategy ratification retain their existing decision-register statuses. No production host/database, background worker, email provider, file-storage service or deployment has been provisioned. Task 008 does not send email: it returns a one-time invitation URL for manual delivery through the official company email identity while DMS-DEC-017 remains pending. Location assignments remain out of scope under DMS-DEC-001, and the complete role/permission matrix remains unresolved under DMS-DEC-002.
+The repository structure is consistent with the proposed modular-monolith direction, but ADR-001 remains Proposed. TypeScript/Vite/API details, database tooling and test-strategy ratification retain their existing decision-register statuses. No Render application service, DMS Supabase project, background worker, email provider, file-storage service or deployment has been provisioned. The project owner selected Supabase PostgreSQL for DMS staging on 16 November 2026 only; production database plan, reliability, backup, restore and cost approval remain unresolved under DMS-DEC-019. Task 008 does not send email: it returns a one-time invitation URL for manual delivery through the official company email identity while DMS-DEC-017 remains pending. Location assignments remain out of scope under DMS-DEC-001, and the complete role/permission matrix remains unresolved under DMS-DEC-002.
 
 ## 2. Confirmed product boundaries
 
@@ -73,7 +73,7 @@ flowchart LR
   DEPLOY --> API
 ```
 
-The diagram is a logical target, not a record of deployed services. Task 005 implemented the web/API code, PostgreSQL access and CI workflow only. The transactional outbox, background worker, company email provider, private object storage, Render deployment pipeline and hosted application/database services shown or described as target components have not been provisioned.
+The diagram is a logical target, not a record of deployed services. Task 005 implemented the web/API code, PostgreSQL access and CI workflow only. The transactional outbox, background worker, company email provider, private object storage, Render application deployment path, DMS staging Supabase project and production database services have not been provisioned.
 
 ### 3.1 Frontend — React
 
@@ -346,19 +346,24 @@ Use synthetic customer, payment and stock data in all development and automated 
 
 ## 9. Deployment and operations architecture
 
-The project manager has confirmed Render Postgres as the preferred database option, subject to verification of backups, recovery and total cost before provisioning.
+The project owner selected Supabase PostgreSQL for DMS staging on 16 November 2026. This is a staging-only provider selection; it does not approve production use or authorise project creation. No DMS Supabase project, database credentials, Render service or deployment currently exists.
 
 | Component | Proposed deployment |
 |---|---|
-| React application | Render static site (or equivalent Render-hosted frontend) |
+| React application | Render static site |
 | Express API | Render web service |
-| PostgreSQL | Render Postgres preferred, subject to backup/restore, recovery and cost verification |
+| PostgreSQL | Supabase PostgreSQL for staging only; production provider/plan and operational readiness remain unapproved |
+| Staging connection | Supabase Shared Pooler, Session mode, port 5432 when IPv4 is required; copy exact host and username from Dashboard Connect |
 | Session store | Persistent PostgreSQL-backed session store shared by all API instances; no production in-memory store |
 | Background worker | Render worker service if/when asynchronous email and reservation-expiry processing are introduced |
 | File objects | Private Supabase Storage bucket or approved equivalent |
 | CI | GitHub Actions for checks on pull requests and protected branches |
 
-Before approving Render Postgres, verify backup frequency and retention, point-in-time recovery support/limits, the actual restore procedure, and perform or document a restore test. Agree recovery objectives (RPO/RTO), verify region/private-network suitability, connection/storage/compute limits and calculate total recurring cost at expected capacity, including database, backup/recovery-related charges, frontend/API/worker services and required plan tiers. Record the findings and obtain project-manager approval. Render Postgres remains preferred, not yet approved for production provisioning until these checks pass.
+The current API keeps its `pg` pool, SQL migrations and PostgreSQL-backed sessions. For staging, use the Dashboard-provided Supabase Session Pooler URL and `DATABASE_SSL=true`; do not construct pooler hostnames. Use a direct database connection only after the Render network's IPv6 support has been verified. Transaction Pooler mode on port 6543 is not the default for this long-running API because transaction pooling changes session-state behaviour; it requires a demonstrated compatibility need.
+
+Before operational or production reliance, verify plan capacity, database size, connection limits, region/network suitability, reliability and total recurring cost. Supabase Free projects may pause after one week of inactivity, do not include automatic daily database backups and currently include 500 MB of database size. Check current plan limits and pricing rather than assuming Free is appropriate. If the business requires a non-pausing database and automatic daily backups, select a suitable paid plan before relying on it.
+
+Establish regular encrypted off-site logical exports and test restoration into an isolated database. Confirm export coverage, retention, recovery ownership and actual restore procedure; Supabase database backups do not include Storage API objects. Agree and document RPO/RTO, backup frequency/retention, availability expectations and total cost. No production budget, RPO/RTO, backup configuration or successful restore test is approved or evidenced. These remain open under DMS-DEC-019.
 
 Use separate development/test, staging and production configuration. Keep production secrets out of repository files and frontend build variables. Run database migrations as a controlled deployment step before the new backend version handles traffic. Do not run schema migrations automatically from every application instance at startup.
 
@@ -366,7 +371,7 @@ CI should run formatting/lint checks, TypeScript checks, unit/integration tests 
 
 Production API instances must use the shared PostgreSQL-backed session store. Reservation expiry should run through a retry-safe scheduled/background worker using the same PostgreSQL transaction rules as order dispatch and cancellation.
 
-Task 005 did not provision a Render service, production PostgreSQL instance, worker, email provider or file-storage service. No production deployment was performed. Render Postgres remains preferred subject to the backup, recovery and cost verification recorded in ADR-010.
+Task 005 did not provision a Render service, production database, worker, email provider or file-storage service. No production deployment was performed. The later Supabase selection applies only to staging; a DMS Supabase project has not been provisioned, and production readiness remains subject to the backup, recovery, reliability and cost verification recorded in ADR-010 / DMS-DEC-019.
 
 ## 10. Phased implementation boundaries
 
@@ -390,7 +395,7 @@ The following pre-existing project-manager decisions remain confirmed and are no
 - Staff may record payment entries; only Managers and the Owner may verify payments.
 
 **Task 010 planning direction, pending formal confirmation under DMS-DEC-001 and DMS-DEC-002:** all authorised operational users share read-only visibility of both locations; non-Owner direct stock-changing operations are assignment-scoped; other cross-location stock-changing requests require destination-location approval; the Owner has direct authority across both locations and may review another user's pending request; and the consolidated financial overview is Owner-only. This planning direction is not formal approval evidence. The existing Manager role is eligible for Sheraton pickup/receipt only where the destination assignment and explicit action permissions are satisfied.
-- Render Postgres is preferred, subject to backup, recovery and cost verification.
+- Supabase PostgreSQL is selected for DMS staging only; production adoption remains pending backup, restore, reliability and cost approval under DMS-DEC-019.
 - Each order has exactly one fulfilment location in the first release.
 - Stock is reserved immediately when an order is confirmed, even if unpaid.
 - Reservation expiry must be configurable.
@@ -404,7 +409,7 @@ Remaining questions before implementation:
 5. Which company-hosted email provider and supported SMTP/API sending method will be used?
 6. What are the receipt format, numbering rules and record-retention requirements?
 7. What are the file-storage provider/region, allowed file types, maximum file sizes and retention rules?
-8. Do Render Postgres backup, recovery and cost checks meet the business's expectations?
+8. Does the proposed Supabase production plan meet the business's backup, restore, reliability, capacity and total-cost requirements?
 9. Confirm the canonical Warehouse and Sheraton location records/codes and the destination accounts assigned to each location.
 10. Confirm any operational paperwork/reference required at Warehouse when the destination-assigned pickup actor (including the assigned Store Manager where ADR-016 assignment and action-permission checks pass) records physical pickup; the access boundary and stock accounting rules in this architecture are fixed.
 
