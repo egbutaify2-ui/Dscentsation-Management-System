@@ -24,11 +24,11 @@
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
-    "concurrently": "10.0.6",
-    "eslint": "10.14.0",
-    "globals": "17.13.0",
-    "prettier": "3.9.10",
+    "concurrently": "10.0.7",
+    "eslint": "10.15.0",
+    "globals": "17.14.0",
+    "prettier": "3.10.1",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.72.1"
+    "typescript-eslint": "8.72.2"
   }
 }
