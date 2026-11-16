@@ -412,9 +412,9 @@ describe('OrderManagementPage', () => {
     expect(screen.queryByLabelText('New item quantity')).toBeNull();
     expect((screen.getByLabelText('Customer') as HTMLSelectElement).disabled).toBe(true);
     expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(true);
-    expect(
-      (screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     expect(screen.getByText('Saved server total')).toBeTruthy();
     expect(screen.queryByText('Estimated subtotal')).toBeNull();
 
@@ -430,9 +430,7 @@ describe('OrderManagementPage', () => {
       { deliveryAddress: 'Updated delivery address' },
       'synthetic-csrf',
     );
-    expect(api.getPage).not.toHaveBeenCalledWith(
-      '/customers?status=active&page=1&pageSize=100',
-    );
+    expect(api.getPage).not.toHaveBeenCalledWith('/customers?status=active&page=1&pageSize=100');
     expect(api.get).not.toHaveBeenCalledWith('/products?status=all');
   });
 
@@ -456,9 +454,7 @@ describe('OrderManagementPage', () => {
 
     await screen.findByText('Synthetic Customer');
     await waitFor(() => expect(api.get).toHaveBeenCalledWith('/products?status=all'));
-    expect(api.getPage).not.toHaveBeenCalledWith(
-      '/customers?status=active&page=1&pageSize=100',
-    );
+    expect(api.getPage).not.toHaveBeenCalledWith('/customers?status=active&page=1&pageSize=100');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
 
@@ -510,14 +506,12 @@ describe('OrderManagementPage', () => {
 
     const customerSelect = screen.getByLabelText('Customer') as HTMLSelectElement;
     await waitFor(() => expect(customerSelect.disabled).toBe(false));
-    expect(
-      within(customerSelect).getByRole('option', { name: /Synthetic Customer/ }),
-    ).toBeTruthy();
+    expect(within(customerSelect).getByRole('option', { name: /Synthetic Customer/ })).toBeTruthy();
     expect(screen.queryByLabelText('Product / variant')).toBeNull();
     expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(true);
-    expect(
-      (screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
 
     fireEvent.change(screen.getByLabelText('Order notes'), {
       target: { value: 'Customer access metadata amendment' },
