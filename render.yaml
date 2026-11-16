@@ -1,4 +1,4 @@
-# DMS staging only. This Blueprint is intentionally pinned to main.
+# DMS staging only. This Blueprint defines Render application services; PostgreSQL is hosted separately.
 # Review the PR and approve the Blueprint in Render before provisioning anything.
 services:
   - type: web
@@ -24,11 +24,9 @@ services:
       - key: NODE_VERSION
         value: "26.13.0"
       - key: DATABASE_URL
-        fromDatabase:
-          name: dms-staging-db
-          property: connectionString
+        sync: false
       - key: DATABASE_SSL
-        value: "false"
+        value: "true"
       - key: SESSION_SECRET
         generateValue: true
       - key: SESSION_IDLE_TIMEOUT_MINUTES
@@ -74,15 +72,3 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
-
-databases:
-  - name: dms-staging-db
-    plan: 0.1c-256mb
-    region: frankfurt
-    databaseName: dms_staging
-    user: dms_staging_user
-    diskSizeGB: 1
-    postgresMajorVersion: "17"
-    # DMS connects through Render's private DATABASE_URL reference only.
-    # No external database client access is required for staging.
-    ipAllowList: []
