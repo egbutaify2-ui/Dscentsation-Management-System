@@ -411,12 +411,8 @@ describe('OrderManagementPage', () => {
     expect(screen.queryByLabelText('Product / variant')).toBeNull();
     expect(screen.queryByLabelText('New item quantity')).toBeNull();
     expect((screen.getByLabelText('Customer') as HTMLSelectElement).disabled).toBe(true);
-    expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(
-      true,
-    );
-    expect((screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
+    expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText('Saved server total')).toBeTruthy();
     expect(screen.queryByText('Estimated subtotal')).toBeNull();
 
@@ -454,9 +450,7 @@ describe('OrderManagementPage', () => {
       }
       return Promise.reject(new Error('Unexpected API GET ' + path));
     });
-    render(
-      <OrderManagementPage permissions={['orders.view', 'orders.update', 'products.view']} />,
-    );
+    render(<OrderManagementPage permissions={['orders.view', 'orders.update', 'products.view']} />);
 
     await screen.findByText('Synthetic Customer');
     await waitFor(() => expect(api.get).toHaveBeenCalledWith('/products?status=all'));
@@ -471,9 +465,7 @@ describe('OrderManagementPage', () => {
       screen.getByRole('option', { name: /Synthetic Customer · existing order customer/ }),
     ).toBeTruthy();
     await waitFor(() =>
-      expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(
-        false,
-      ),
+      expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(false),
     );
     fireEvent.change(screen.getByLabelText('Quantity for item 1'), {
       target: { value: '3' },
@@ -500,9 +492,7 @@ describe('OrderManagementPage', () => {
       }
       return Promise.reject(new Error('Unexpected API GET ' + path));
     });
-    render(
-      <OrderManagementPage permissions={['orders.view', 'orders.update', 'customers.view']} />,
-    );
+    render(<OrderManagementPage permissions={['orders.view', 'orders.update', 'customers.view']} />);
 
     await screen.findByText('Synthetic Customer');
     await waitFor(() =>
@@ -558,9 +548,7 @@ describe('OrderManagementPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
     await waitFor(() =>
-      expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(
-        false,
-      ),
+      expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(false),
     );
     fireEvent.change(screen.getByLabelText('Quantity for item 1'), {
       target: { value: '3' },
