@@ -262,6 +262,11 @@ describe('OrderManagementPage', () => {
         false,
       ),
     );
+    await waitFor(() =>
+      expect((screen.getByLabelText('Product / variant') as HTMLSelectElement).disabled).toBe(
+        false,
+      ),
+    );
     fireEvent.change(screen.getByLabelText('Customer'), {
       target: { value: customerId },
     });
@@ -406,8 +411,12 @@ describe('OrderManagementPage', () => {
     expect(screen.queryByLabelText('Product / variant')).toBeNull();
     expect(screen.queryByLabelText('New item quantity')).toBeNull();
     expect((screen.getByLabelText('Customer') as HTMLSelectElement).disabled).toBe(true);
-    expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(
+      true,
+    );
+    expect((screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     expect(screen.getByText('Saved server total')).toBeTruthy();
     expect(screen.queryByText('Estimated subtotal')).toBeNull();
 
@@ -458,15 +467,20 @@ describe('OrderManagementPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
 
     expect((screen.getByLabelText('Customer') as HTMLSelectElement).disabled).toBe(true);
-    expect(screen.getByRole('option', { name: /Synthetic Customer · existing order customer/ }))
-      .toBeTruthy();
-    expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(false);
+    expect(
+      screen.getByRole('option', { name: /Synthetic Customer · existing order customer/ }),
+    ).toBeTruthy();
+    await waitFor(() =>
+      expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(
+        false,
+      ),
+    );
     fireEvent.change(screen.getByLabelText('Quantity for item 1'), {
       target: { value: '3' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save amendment' }));
 
-    await screen.findByText('Order amendment saved.');
+    expect((await screen.findByRole('status')).textContent).toContain('Order amendment saved.');
     expect(api.patch).toHaveBeenCalledWith(
       '/orders/' + orderId,
       { items: [{ productId, variantId, quantity: 3 }] },
@@ -499,9 +513,11 @@ describe('OrderManagementPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
 
     const customerSelect = screen.getByLabelText('Customer') as HTMLSelectElement;
-    expect(customerSelect.disabled).toBe(false);
-    expect(within(customerSelect).getByRole('option', { name: /Synthetic Customer/ })).toBeTruthy();
-    expect((screen.getByLabelText('Product / variant') as HTMLSelectElement | null)).toBeNull();
+    await waitFor(() => expect(customerSelect.disabled).toBe(false));
+    expect(
+      within(customerSelect).getByRole('option', { name: /Synthetic Customer/ }),
+    ).toBeTruthy();
+    expect(screen.queryByLabelText('Product / variant')).toBeNull();
     expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement).disabled).toBe(true);
 
@@ -510,7 +526,7 @@ describe('OrderManagementPage', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save amendment' }));
 
-    await screen.findByText('Order amendment saved.');
+    expect((await screen.findByRole('status')).textContent).toContain('Order amendment saved.');
     expect(api.patch).toHaveBeenCalledWith(
       '/orders/' + orderId,
       { notes: 'Customer access metadata amendment' },
@@ -539,12 +555,17 @@ describe('OrderManagementPage', () => {
     await screen.findByText('Synthetic Customer');
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Amend order' }));
+    await waitFor(() =>
+      expect((screen.getByLabelText('Quantity for item 1') as HTMLInputElement).disabled).toBe(
+        false,
+      ),
+    );
     fireEvent.change(screen.getByLabelText('Quantity for item 1'), {
       target: { value: '3' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save amendment' }));
 
-    await screen.findByText('Order amendment saved.');
+    expect((await screen.findByRole('status')).textContent).toContain('Order amendment saved.');
     expect(api.patch).toHaveBeenCalledWith(
       '/orders/' + orderId,
       { items: [{ productId, variantId, quantity: 3 }] },

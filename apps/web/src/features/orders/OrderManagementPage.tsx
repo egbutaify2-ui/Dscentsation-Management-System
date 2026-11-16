@@ -962,44 +962,47 @@ export function OrderManagementPage({ permissions }: { permissions: string[] }) 
               </div>
               {(view === 'create' || canEditLineItems) && (
                 <div className="order-add-item">
-                <label>
-                  Product / variant
-                  <select
-                    aria-label="Product / variant"
-                    value={productChoice}
-                    disabled={!canEditLineItems}
-                    onChange={(event) => setProductChoice(event.target.value)}
+                  <label>
+                    Product / variant
+                    <select
+                      aria-label="Product / variant"
+                      value={productChoice}
+                      disabled={!canEditLineItems}
+                      onChange={(event) => setProductChoice(event.target.value)}
+                    >
+                      <option value="">Select a product variant</option>
+                      {activeProducts.map((product) =>
+                        product.variants.map((variant) => (
+                          <option
+                            key={variant.id}
+                            value={productVariantKey(product.id, variant.id)}
+                          >
+                            {product.name} · {variant.name} · {variant.sellingPrice} NGN
+                          </option>
+                        )),
+                      )}
+                    </select>
+                  </label>
+                  <label>
+                    Quantity
+                    <input
+                      aria-label="New item quantity"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={quantityChoice}
+                      disabled={!canEditLineItems}
+                      onChange={(event) => setQuantityChoice(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={addItem}
+                    disabled={!canEditLineItems || !productChoice}
                   >
-                    <option value="">Select a product variant</option>
-                    {activeProducts.map((product) =>
-                      product.variants.map((variant) => (
-                        <option key={variant.id} value={productVariantKey(product.id, variant.id)}>
-                          {product.name} · {variant.name} · {variant.sellingPrice} NGN
-                        </option>
-                      )),
-                    )}
-                  </select>
-                </label>
-                <label>
-                  Quantity
-                  <input
-                    aria-label="New item quantity"
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={quantityChoice}
-                    disabled={!canEditLineItems}
-                    onChange={(event) => setQuantityChoice(event.target.value)}
-                  />
-                </label>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={addItem}
-                  disabled={!canEditLineItems || !productChoice}
-                >
-                  Add item
-                </button>
+                    Add item
+                  </button>
                 </div>
               )}
 
