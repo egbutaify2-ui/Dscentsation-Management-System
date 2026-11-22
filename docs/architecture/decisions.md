@@ -299,41 +299,49 @@ Store file bytes in a private object-storage bucket. Keep metadata, ownership an
 
 **Task 005 implementation status:** No object-storage adapter, storage bucket, file metadata table, upload/download workflow or storage provider was implemented or provisioned. This ADR remains **Proposed; provider pending selection**.
 
-## ADR-010 — Prefer Render Postgres, subject to backup, recovery and cost verification
+## ADR-010 — Use Supabase PostgreSQL for staging; production readiness remains pending
 
-**Status:** Preferred by the project manager; provisioning is conditional on verification.
+**Status:** Supabase PostgreSQL selected for DMS staging by the project owner on 16 November 2026. Production provider/plan approval remains pending.
 
 **Context**
 
-The README identifies Render as the proposed application host. The system requires a React frontend, Express API, PostgreSQL and potentially background workers. The project manager prefers Render Postgres, provided its operational safeguards and cost are acceptable.
+DMS retains its React frontend, Node.js/Express API, `pg` connection pool, checked-in SQL migrations and PostgreSQL-backed Express sessions. The owner selected Supabase PostgreSQL instead of Render Postgres for the hosted DMS staging database because Render Postgres is not a viable free database option. The separate Stack-it Supabase project belongs to another product and is not part of DMS. No DMS Supabase project has been created, and this ADR does not authorise project creation or deployment.
 
 **Decision**
 
-Prefer Render for the frontend/API and Render Postgres for the managed database, reachable through private networking. Do not provision the production database until backup, recovery and cost checks have been completed and documented. Use a shared PostgreSQL-backed session store; production in-memory sessions are prohibited.
+Keep Render as the proposed frontend/API host and use Supabase PostgreSQL for DMS staging only. When separately authorised, provision an independent DMS Supabase project. For the existing long-running Node API, use the Supabase Shared Pooler in Session mode on port 5432 as the default when IPv4 connectivity is required. Copy the exact host, username and connection string from that project's Dashboard **Connect** dialog; never construct a pooler hostname. Use `DATABASE_SSL=true` so the existing API pool verifies TLS certificates. Consider a direct database connection only after Render's outbound IPv6 connectivity is verified. Do not use Shared Pooler Transaction mode on port 6543 without a demonstrated technical requirement and compatibility review.
+
+Preserve PostgreSQL-backed sessions, the existing `pg` access layer and the `node-pg-migrate` workflow. Production adoption, plan and cost are not approved by the staging selection. Production in-memory sessions remain prohibited.
 
 **Why**
 
-- Aligns with the existing Render hosting direction and keeps the initial topology compact.
-- A managed database reduces day-to-day database administration compared with self-hosting.
-- Private connectivity and central persistence support the API and session store.
+- Preserves the PostgreSQL database, `pg` pool, SQL migration and session architecture already implemented.
+- Shared Pooler Session mode provides an IPv4-capable route without requiring an unverified direct IPv6 connection.
+- Session mode avoids the session-state changes and prepared-statement restrictions associated with transaction pooling.
+- Keeps database credentials on the API service; no database URL or secret is exposed to the static frontend.
 
-**Required verification before provisioning**
+**Required verification before production provisioning or operational reliance**
 
-- Backup frequency, retention and backup availability for the selected plan.
-- Point-in-time recovery support, limits and the actual restore procedure.
-- A restore test (or documented pre-production restoration exercise) and evidence that data can be recovered.
-- Recovery objectives appropriate to the business (RPO/RTO to be agreed).
-- Region, private networking, connection limits, storage/compute capacity and operational constraints.
-- Total recurring cost at expected workload, including database compute/storage, backup or recovery-related charges where applicable, frontend/API/worker services and required plan tiers.
+- Select a plan that meets required availability and non-pausing expectations. Supabase Free projects may pause after one week of inactivity.
+- Verify database-size, compute, egress, connection and pooler limits against actual workload. The currently published Free plan includes 500 MB database size; recheck live limits and pricing.
+- Verify backup frequency, retention and availability. Supabase Free does not include automatic daily database backups; the currently published Pro plan includes daily backups with seven-day retention.
+- Establish regular encrypted off-site logical exports, including schema and data, and verify export completeness.
+- Document the restore procedure and perform an evidenced restore test in an isolated project/database. Database backups do not include objects stored through the Supabase Storage API.
+- Agree business-appropriate Recovery Point Objective (RPO) and Recovery Time Objective (RTO).
+- Verify region/network suitability, capacity, connection limits, reliability expectations, monitoring and operational ownership.
+- Calculate total recurring cost at expected workload, including database plan/compute, storage, egress, backup/recovery, frontend/API/worker service tiers and required add-ons.
 
 **Consequences**
 
-- Render Postgres is the preferred candidate, not a provisioned production service until the checks are accepted.
-- Record verification findings and project-manager approval before production data is introduced.
-- Use separate staging and production configuration; migrations are controlled deployment steps.
-- No deployment or service provisioning is part of this architecture-correction task.
+- Supabase PostgreSQL is selected for DMS staging only; no production database provider/plan is approved.
+- The DMS project must be separately created only after owner authorisation and must not reuse Stack-it Project.
+- Configure the API's manually supplied `DATABASE_URL` secret and `DATABASE_SSL=true`; keep both off the static frontend and out of Git.
+- A paid Supabase plan should be selected before operational reliance if the business requires a non-pausing service and automatic daily backups. This is a recommendation, not a budget or purchase approval.
+- Record backup/restore, reliability, recovery-objective and cost evidence and obtain explicit business/project-manager approval before production data is introduced.
+- Use separate development/test, staging and production configuration; migrations remain controlled deployment steps.
+- No project provisioning, credential handling, deployment or migration is part of this documentation/configuration task.
 
-**Task 005 implementation status:** No Render frontend, API, worker or production PostgreSQL service was provisioned, and no deployment occurred. Render Postgres remains a preferred candidate subject to the verification and approval already stated in this ADR; its status is unchanged.
+**Task 040 implementation status:** The Render Blueprint now describes only the API and static frontend, with `DATABASE_URL` supplied manually and `DATABASE_SSL=true`. The Supabase project, credentials, migration run, backup/export schedule, restore test, Render staging services and deployment remain uncreated/unperformed. Production readiness remains open under DMS-DEC-019.
 
 
 ## ADR-011 — Use an automated test pyramid with special focus on transaction invariants
@@ -518,7 +526,7 @@ The following pre-existing project-manager decisions remain confirmed and are no
 |---|---|
 | Transfer receipt | For standard transfers, Staff assigned to the destination location confirm physical receipt. |
 | Payment permissions | Staff can record payments; only Managers and Owner can verify payments. |
-| Database hosting preference | Render Postgres is preferred, subject to backup, recovery and cost verification before provisioning. |
+| Staging database selection | Supabase PostgreSQL is selected for DMS staging only. A separate DMS project requires later authorisation; production provider/plan, backup, restore, reliability and cost approval remain open under DMS-DEC-019. |
 | Order fulfilment | One fulfilment location per order in the first release; no cross-location split fulfilment. |
 | Reservation timing | Reserve stock immediately on order confirmation, whether paid or unpaid. |
 | Reservation expiry | Expiry must be configurable and persisted; each reservation snapshots its applied policy/expiry. |
@@ -537,7 +545,7 @@ Remaining details requiring confirmation:
 7. Receipt numbering/format and which business events issue an order receipt versus a payment receipt.
 8. Company email provider, sender authentication and supported SMTP/API method.
 9. File-storage provider/region, allowed types, size limits and retention.
-10. Render Postgres backup/recovery findings, restore-test evidence, recovery objectives and total cost approval.
+10. Supabase production-plan backup/recovery findings, off-site export and restore-test evidence, recovery objectives, reliability and total cost approval.
 11. Record-retention, correction/deletion and privacy policy.
 
 
